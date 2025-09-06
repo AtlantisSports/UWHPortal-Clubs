@@ -141,6 +141,12 @@ class Practice extends BaseModel {
     return '${weekdays[dateTime.weekday - 1]}, ${months[dateTime.month - 1]} ${dateTime.day}';
   }
   
+  /// Get Google Maps URL for the location
+  String get mapsUrl {
+    final encodedAddress = Uri.encodeComponent(address.isNotEmpty ? address : location);
+    return 'https://www.google.com/maps/search/?api=1&query=$encodedAddress';
+  }
+  
   @override
   Map<String, dynamic> toJson() {
     return {

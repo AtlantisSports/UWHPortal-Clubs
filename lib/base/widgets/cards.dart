@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/practice.dart';
 import 'rsvp_components.dart';
@@ -193,7 +194,7 @@ class _ClubCardState extends State<ClubCard> {
                     const SizedBox(width: AppSpacing.small),
                     const Expanded(
                       child: Text(
-                        'Typical Weekly Schedule',
+                        'Typical weekly practices',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           color: AppColors.primary,
@@ -231,79 +232,107 @@ class _ClubCardState extends State<ClubCard> {
 
   Widget _buildPracticeScheduleItem(Practice practice) {
     final dayName = _getDayName(practice.dateTime.weekday);
-    final timeStr = '${practice.dateTime.hour.toString().padLeft(2, '0')}:${practice.dateTime.minute.toString().padLeft(2, '0')}';
+    final startTime = practice.dateTime;
+    final endTime = practice.dateTime.add(practice.duration);
+    final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}-${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
     
     return Container(
-      margin: const EdgeInsets.only(bottom: AppSpacing.small),
-      padding: const EdgeInsets.all(AppSpacing.medium),
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(AppRadius.small),
-        border: Border.all(
-          color: AppColors.textSecondary.withValues(alpha: 0.1),
-        ),
+        color: AppColors.surface.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.small,
-                  vertical: 2,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(AppRadius.small),
-                ),
-                child: Text(
-                  dayName,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.small),
-              Text(
-                timeStr,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              Icon(
-                Icons.location_on,
-                size: 14,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                practice.location,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-          if (practice.description.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              practice.description,
+          // Day badge
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              dayName,
               style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
               ),
             ),
-          ],
+          ),
+          const SizedBox(width: 8),
+          // Time range
+          Text(
+            timeStr,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Separator
+          Text(
+            '•',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary.withValues(alpha: 0.6),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // Location (clickable)
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _launchLocationUrl(practice.mapsUrl),
+              child: Text(
+                practice.location,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF0284C7), // Blue color to indicate it's clickable
+                  decoration: TextDecoration.underline,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  /// Launch location URL in maps app or browser
+  Future<void> _launchLocationUrl(String url) async {
+    try {
+      // For web, this will open in a new tab
+      // For mobile, this will try to open in maps app
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        // Fallback: show a snackbar with the address
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open location: $url'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Error handling
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Error opening location'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 
   String _getDayName(int weekday) {

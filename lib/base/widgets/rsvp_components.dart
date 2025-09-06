@@ -308,14 +308,33 @@ class NextPracticeCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header
-          Text(
-            'Next Practice',
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF374151),
-            ),
+          // Header with title and RSVP text positioned over buttons
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Next Practice',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF374151),
+                ),
+              ),
+              // Spacer to position RSVP text over buttons
+              SizedBox(
+                width: 160, // Width of 3 buttons (48) + 2 gaps (8) + padding = ~160
+                child: Center(
+                  child: Text(
+                    _getRSVPHeaderText(),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                      color: _getRSVPHeaderColor(),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 6),
           
@@ -399,25 +418,13 @@ class NextPracticeCard extends StatelessWidget {
               ),
               
               // RSVP buttons
-              Column(
+              Row(
                 children: [
-                  const Text(
-                    'Will you attend?',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF6B7280),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      _buildRSVPButton(RSVPStatus.yes),
-                      const SizedBox(width: 8),
-                      _buildRSVPButton(RSVPStatus.maybe),
-                      const SizedBox(width: 8),
-                      _buildRSVPButton(RSVPStatus.no),
-                    ],
-                  ),
+                  _buildRSVPButton(RSVPStatus.yes),
+                  const SizedBox(width: 8),
+                  _buildRSVPButton(RSVPStatus.maybe),
+                  const SizedBox(width: 8),
+                  _buildRSVPButton(RSVPStatus.no),
                 ],
               ),
             ],
@@ -451,31 +458,26 @@ class NextPracticeCard extends StatelessWidget {
           ),
           color: isSelected ? fadedBg : Colors.white,
         ),
-        child: Stack(
-          children: [
-            // Circle background
-            Center(
-              child: Container(
-                width: 32,
-                height: 32,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: color,
-                    width: isSelected ? 4 : 2, // Thicker border when selected
-                  ),
-                  color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent, // Light background when selected
-                ),
-                child: status == RSVPStatus.maybe 
-                  ? null  // No icon for maybe option
-                  : Icon(
-                      _getOverlayIcon(status),
-                      size: 23.4, // Increased by 30% (18 * 1.3 = 23.4)
-                      color: color,
-                    ),
+        child: Center(
+          child: Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: color,
+                width: isSelected ? 4 : 2, // Thicker border when selected
               ),
+              color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent, // Light background when selected
             ),
-          ],
+            child: status == RSVPStatus.maybe 
+              ? null  // No icon for maybe option
+              : Icon(
+                  _getOverlayIcon(status),
+                  size: 23.4, // Increased by 30% (18 * 1.3 = 23.4)
+                  color: color,
+                ),
+          ),
         ),
       ),
     );
@@ -491,6 +493,36 @@ class NextPracticeCard extends StatelessWidget {
         return const Color(0xFFFEF2F2);
       case RSVPStatus.pending:
         return const Color(0xFFF3F4F6);
+    }
+  }
+
+  String _getRSVPHeaderText() {
+    switch (currentRSVP) {
+      case RSVPStatus.yes:
+        return 'You are going';
+      case RSVPStatus.no:
+        return 'Not going';
+      case RSVPStatus.maybe:
+        return 'Will you attend?';
+      case RSVPStatus.pending:
+        return 'Will you attend?';
+      case null:
+        return 'Will you attend?';
+    }
+  }
+
+  Color _getRSVPHeaderColor() {
+    switch (currentRSVP) {
+      case RSVPStatus.yes:
+        return const Color(0xFF10B981); // Green
+      case RSVPStatus.no:
+        return const Color(0xFFEF4444); // Red
+      case RSVPStatus.maybe:
+        return const Color(0xFF6B7280); // Gray (same as default)
+      case RSVPStatus.pending:
+        return const Color(0xFF6B7280); // Gray
+      case null:
+        return const Color(0xFF6B7280); // Gray
     }
   }
   
