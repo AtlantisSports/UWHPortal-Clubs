@@ -35,7 +35,7 @@ class _RightDrawerState extends State<RightDrawer> {
               padding: const EdgeInsets.fromLTRB(16, 40, 16, 12),
               color: Colors.white,
               child: Center(
-                child: Container(
+                child: SizedBox(
                   height: 60,
                   child: Image.asset(
                     'assets/images/uwh_portal_logo.png',

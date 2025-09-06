@@ -1,8 +1,10 @@
-/// Clubs feature - List screen showing all clubs
+/// Clubs feature - List screen showing all clubs with RSVP functionality
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/models/club.dart';
+import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
@@ -16,21 +18,23 @@ class ClubsListScreen extends StatefulWidget {
 }
 
 class _ClubsListScreenState extends State<ClubsListScreen> {
-  final TextEditingController _searchController = TextEditingController();
   List<Club> _clubs = [];
+  List<Practice> _upcomingPractices = [];
   bool _isLoading = true;
-  String _searchQuery = '';
+  final String _currentUserId = 'user123'; // TODO: Get from auth service
+  
+  // Toast state
+  bool _showToast = false;
+  String _toastMessage = '';
+  Color _toastColor = Colors.green;
+  IconData? _toastIcon;
+  String? _toastText;
   
   @override
   void initState() {
     super.initState();
     _loadClubs();
-  }
-  
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
+    _loadUpcomingPractices();
   }
   
   Future<void> _loadClubs() async {
@@ -38,170 +42,367 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     
     try {
       // TODO: Replace with actual API call using ClubsService
-      // For now, using mock data
+      // For now, using mock data with practices
       await Future.delayed(const Duration(seconds: 1)); // Simulate API call
       
-      _clubs = _generateMockClubs();
+      _clubs = _generateMockClubsWithPractices();
     } catch (e) {
       // Handle error
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading clubs: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading clubs: $e')),
+        );
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
   
-  List<Club> _generateMockClubs() {
-    final now = DateTime.now();
-    return [
-      Club(
-        id: '1',
-        name: 'Pacific Northwest UWH',
-        description: 'Competitive underwater hockey club focusing on tournament play and skill development.',
-        location: 'Seattle, WA',
-        contactEmail: 'contact@pnwuwh.com',
-        website: 'https://pnwuwh.com',
-        createdAt: now.subtract(const Duration(days: 365)),
-        updatedAt: now,
-        tags: ['competitive', 'tournaments', 'training'],
-      ),
-      Club(
-        id: '2',
-        name: 'Golden Gate Underwater Hockey',
-        description: 'Friendly club welcoming players of all skill levels. Weekly training and social events.',
-        location: 'San Francisco, CA',
-        contactEmail: 'info@gguwh.org',
-        createdAt: now.subtract(const Duration(days: 200)),
-        updatedAt: now,
-        tags: ['beginner-friendly', 'social', 'weekly-training'],
-      ),
-      Club(
-        id: '3',
-        name: 'Austin Aquatic Warriors',
-        description: 'Texas-based club with a focus on youth development and community outreach.',
-        location: 'Austin, TX',
-        contactEmail: 'warriors@austinuwh.com',
-        createdAt: now.subtract(const Duration(days: 150)),
-        updatedAt: now,
-        tags: ['youth', 'community', 'development'],
-      ),
-    ];
+  Future<void> _loadUpcomingPractices() async {
+    try {
+      // TODO: Replace with actual API call
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      _upcomingPractices = _generateMockPractices();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading practices: $e')),
+        );
+      }
+    }
   }
   
-  List<Club> get _filteredClubs {
-    if (_searchQuery.isEmpty) return _clubs;
+  void _handleRSVPChange(String practiceId, RSVPStatus newStatus) {
+    setState(() {
+      // Update practice in clubs list
+      for (var club in _clubs) {
+        for (var i = 0; i < club.upcomingPractices.length; i++) {
+          if (club.upcomingPractices[i].id == practiceId) {
+            final practice = club.upcomingPractices[i];
+            final updatedRSVPs = Map<String, RSVPStatus>.from(practice.rsvpResponses);
+            updatedRSVPs[_currentUserId] = newStatus;
+            final updatedPractice = practice.copyWith(rsvpResponses: updatedRSVPs);
+            club.upcomingPractices[i] = updatedPractice; // Actually assign the updated practice
+            break;
+          }
+        }
+      }
+      
+      // Update practice in upcoming practices list
+      for (var i = 0; i < _upcomingPractices.length; i++) {
+        if (_upcomingPractices[i].id == practiceId) {
+          final updatedRSVPs = Map<String, RSVPStatus>.from(_upcomingPractices[i].rsvpResponses);
+          updatedRSVPs[_currentUserId] = newStatus;
+          _upcomingPractices[i] = _upcomingPractices[i].copyWith(rsvpResponses: updatedRSVPs);
+          break;
+        }
+      }
+    });
     
-    return _clubs.where((club) =>
-      club.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      club.location.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-      club.description.toLowerCase().contains(_searchQuery.toLowerCase())
-    ).toList();
+    // TODO: Send RSVP update to backend
+    if (mounted) {
+      // Prepare toast content based on RSVP status
+      String message = 'RSVP updated to: ${newStatus.displayText}';
+      Color toastColor = newStatus.color;
+      
+      if (newStatus == RSVPStatus.maybe) {
+        _showCustomToast(message, toastColor, Icons.help);
+      } else {
+        _showCustomToast(message, toastColor, newStatus.overlayIcon);
+      }
+    }
   }
-  
-  void _onSearchChanged(String query) {
-    setState(() => _searchQuery = query);
+
+  void _showCustomToast(String message, Color color, IconData icon) {
+    setState(() {
+      _toastMessage = message;
+      _toastColor = color;
+      _toastIcon = icon;
+      _toastText = null;
+      _showToast = true;
+    });
+    
+    // Hide toast after 4 seconds
+    Timer(Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _showToast = false;
+        });
+      }
+    });
   }
-  
+
   void _onClubTap(Club club) {
-    Navigator.push(
-      context,
+    Navigator.of(context).push(
       MaterialPageRoute(
-        builder: (context) => ClubDetailScreen(club: club),
+        builder: (context) => ClubDetailScreen(
+          club: club,
+          currentUserId: _currentUserId,
+          onRSVPChanged: _handleRSVPChange,
+        ),
       ),
     );
   }
   
+  /// Get the next upcoming practice for a club
+  Practice? _getNextPractice(Club club) {
+    if (club.upcomingPractices.isEmpty) return null;
+    
+    final now = DateTime.now();
+    final upcomingPractices = club.upcomingPractices
+        .where((practice) => practice.dateTime.isAfter(now))
+        .toList();
+    
+    if (upcomingPractices.isEmpty) return null;
+    
+    // Sort by date and return the earliest
+    upcomingPractices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    return upcomingPractices.first;
+  }
+  
+  /// Open map for practice location
+  void _openMapForPractice(Practice practice) {
+    // TODO: Implement map opening functionality
+    // For now, show a placeholder message
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Opening map for: ${practice.address}'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Clubs'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(
-              Icons.notifications_outlined,
-              size: 28.8, // 20% larger than default 24
+    return DefaultTabController(
+      length: 2,
+      child: Stack(
+        children: [
+          Scaffold(
+            appBar: AppBar(
+              title: const Text('Clubs'),
+              backgroundColor: Colors.grey[100],
+              foregroundColor: Colors.black87,
+              elevation: 0,
+              actions: [
+                IconButton(
+                  icon: const Icon(
+                    Icons.notifications_outlined,
+                    size: 28.8, // 20% larger than default 24
+                  ),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.menu,
+                    size: 28.8, // 20% larger than default 24
+                  ),
+                  onPressed: () {
+                    Scaffold.of(context).openEndDrawer();
+                  },
+                ),
+              ],
+              bottom: const TabBar(
+                labelColor: Colors.black87,
+                unselectedLabelColor: Colors.black54,
+                indicatorColor: AppColors.primary,
+                tabs: [
+                  Tab(text: 'My Clubs', icon: Icon(Icons.group)),
+                  Tab(text: 'Find a club', icon: Icon(Icons.search)),
+                ],
+              ),
             ),
-            onPressed: () {},
+            body: TabBarView(
+              children: [
+                _buildClubsTab(),
+                _buildFindClubTab(),
+              ],
+            ),
           ),
-          IconButton(
-            icon: const Icon(
-              Icons.menu,
-              size: 28.8, // 20% larger than default 24
+          // Custom toast positioned over the tab area
+          if (_showToast)
+            Positioned(
+              top: kToolbarHeight + 48, // Position to cover the tab bar area
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _toastColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      // Display either icon or text (skip if empty)
+                      if (_toastIcon != null)
+                        Icon(
+                          _toastIcon!,
+                          color: Colors.white,
+                          size: 20,
+                        )
+                      else if (_toastText != null && _toastText!.isNotEmpty)
+                        Text(
+                          _toastText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Arial',
+                          ),
+                        ),
+                      // Only add spacing if we have an icon or non-empty text
+                      if ((_toastIcon != null) || (_toastText != null && _toastText!.isNotEmpty))
+                        const SizedBox(width: 8),
+                      Text(
+                        _toastMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildClubsTab() {
+    return Column(
+      children: [
+        // Clubs list
+        Expanded(
+          child: _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : _clubs.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      padding: const EdgeInsets.all(AppSpacing.small),
+                      itemCount: _clubs.length,
+                      itemBuilder: (context, index) {
+                        final club = _clubs[index];
+                        final nextPractice = _getNextPractice(club);
+                        final currentRSVP = nextPractice != null 
+                            ? nextPractice.getRSVPStatus(_currentUserId)
+                            : RSVPStatus.pending;
+                        
+                        return ClubCard(
+                          name: club.name,
+                          location: club.location,
+                          logoUrl: club.logoUrl,
+                          nextPractice: nextPractice,
+                          currentRSVP: currentRSVP,
+                          allPractices: club.upcomingPractices, // Add all practices for dropdown
+                          onRSVPChanged: (status) {
+                            if (nextPractice != null) {
+                              _handleRSVPChange(nextPractice.id, status);
+                            }
+                          },
+                          onTap: () => _onClubTap(club),
+                          onLocationTap: nextPractice != null ? () {
+                            _openMapForPractice(nextPractice);
+                          } : null,
+                        );
+                      },
+                    ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildFindClubTab() {
+    return Column(
+      children: [
+        // Find club header
+        Container(
+          padding: const EdgeInsets.all(16),
+          color: AppColors.primary.withValues(alpha: 0.1),
+          child: Row(
+            children: [
+              Icon(
+                Icons.search,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Find a Club',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.primary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                'Coming Soon',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
+          ),
+        ),
+        
+        // Find club placeholder
+        Expanded(
+          child: _buildFindClubPlaceholder(),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildFindClubPlaceholder() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.search,
+            size: 64,
+            color: AppColors.textDisabled,
+          ),
+          const SizedBox(height: AppSpacing.medium),
+          Text(
+            'Find Clubs Near You',
+            style: AppTextStyles.headline3.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.small),
+          Text(
+            'This feature is coming soon!\nYou\'ll be able to search and discover clubs in your area.',
+            textAlign: TextAlign.center,
+            style: AppTextStyles.bodyMedium.copyWith(
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.large),
+          PrimaryButton(
+            text: 'Get Notified',
             onPressed: () {
-              Scaffold.of(context).openEndDrawer();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('We\'ll notify you when this feature is available!'),
+                  duration: Duration(seconds: 4),
+                ),
+              );
             },
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Search bar
-          Container(
-            color: AppColors.primary,
-            padding: const EdgeInsets.all(AppSpacing.medium),
-            child: TextField(
-              controller: _searchController,
-              onChanged: _onSearchChanged,
-              decoration: InputDecoration(
-                hintText: 'Search clubs...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppRadius.medium),
-                  borderSide: BorderSide.none,
-                ),
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.medium,
-                  vertical: AppSpacing.small,
-                ),
-              ),
-            ),
-          ),
-          
-          // Clubs list
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredClubs.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(AppSpacing.small),
-                        itemCount: _filteredClubs.length,
-                        itemBuilder: (context, index) {
-                          final club = _filteredClubs[index];
-                          return ClubCard(
-                            name: club.name,
-                            description: club.description,
-                            location: club.location,
-                            logoUrl: club.logoUrl,
-                            tags: club.tags,
-                            onTap: () => _onClubTap(club),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to create club screen
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Create club feature coming soon!')),
-          );
-        },
-        backgroundColor: AppColors.secondary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
-  
+
   Widget _buildEmptyState() {
     return Center(
       child: Column(
@@ -214,30 +415,254 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           ),
           const SizedBox(height: AppSpacing.medium),
           Text(
-            _searchQuery.isEmpty ? 'No clubs found' : 'No clubs match your search',
+            'No clubs found',
             style: AppTextStyles.headline3.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: AppSpacing.small),
           Text(
-            _searchQuery.isEmpty 
-                ? 'Be the first to create a club!'
-                : 'Try adjusting your search terms',
+            'Be the first to create a club!',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
           const SizedBox(height: AppSpacing.large),
-          if (_searchQuery.isEmpty)
-            PrimaryButton(
-              text: 'Create Club',
-              onPressed: () {
-                // TODO: Navigate to create club screen
-              },
-            ),
+          PrimaryButton(
+            text: 'Create Club',
+            onPressed: () {
+              // TODO: Navigate to create club screen
+            },
+          ),
         ],
       ),
     );
+  }
+  
+  List<Club> _generateMockClubsWithPractices() {
+    final now = DateTime.now();
+    return [
+      // Denver UWH - from portal-rsvp-demo repository
+      Club(
+        id: 'denver-uwh',
+        name: 'Denver UWH',
+        description: 'Denver Underwater Hockey - Multiple practice sessions throughout the week at VMAC and Carmody facilities.',
+        location: 'Denver, CO',
+        contactEmail: 'contact@denveruwh.com',
+        website: 'https://www.meetup.com/denver-underwater-hockey/',
+        createdAt: now.subtract(const Duration(days: 500)),
+        updatedAt: now,
+        isActive: true,
+        tags: const ['competitive', 'beginner-friendly', 'multi-location'],
+        memberCount: 42,
+        upcomingPractices: [
+          Practice(
+            id: 'denver-monday',
+            clubId: 'denver-uwh',
+            title: 'Monday Practice',
+            description: 'Beginner-friendly; arrive 10 min early.',
+            dateTime: _getNextPracticeDate(now, DateTime.monday, 20, 15), // 8:15 PM
+            location: 'VMAC',
+            address: '5310 E 136th Ave, Thornton, CO',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending, // Current user starts with no selection
+              'user456': RSVPStatus.maybe,
+              'user789': RSVPStatus.pending,
+              'user101': RSVPStatus.yes,
+              'user202': RSVPStatus.no,
+            },
+          ),
+          Practice(
+            id: 'denver-wednesday',
+            clubId: 'denver-uwh',
+            title: 'Wednesday Practice',
+            description: 'Shallow end reserved. High-level participants only.',
+            dateTime: _getNextPracticeDate(now, DateTime.wednesday, 19, 0), // 7:00 PM
+            location: 'Carmody',
+            address: '2200 S Kipling St, Lakewood, CO',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending,
+              'user456': RSVPStatus.yes,
+              'user789': RSVPStatus.maybe,
+              'user101': RSVPStatus.no,
+            },
+          ),
+          Practice(
+            id: 'denver-thursday',
+            clubId: 'denver-uwh',
+            title: 'Thursday Scrimmage',
+            description: 'Scrimmage heavy. High-level participants only.',
+            dateTime: _getNextPracticeDate(now, DateTime.thursday, 20, 15), // 8:15 PM
+            location: 'VMAC',
+            address: '5310 E 136th Ave, Thornton, CO',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending, // Current user starts with no selection
+              'user456': RSVPStatus.yes,
+              'user789': RSVPStatus.yes,
+              'user101': RSVPStatus.pending,
+              'user202': RSVPStatus.yes,
+            },
+          ),
+          Practice(
+            id: 'denver-sunday-morning',
+            clubId: 'denver-uwh',
+            title: 'Sunday Morning Training',
+            description: 'Drills + conditioning.',
+            dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
+            location: 'VMAC',
+            address: '5310 E 136th Ave, Thornton, CO',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending, // Current user starts with no selection
+              'user456': RSVPStatus.pending,
+              'user789': RSVPStatus.yes,
+              'user101': RSVPStatus.maybe,
+            },
+          ),
+          Practice(
+            id: 'denver-sunday-afternoon',
+            clubId: 'denver-uwh',
+            title: 'Sunday Afternoon Session',
+            description: 'Afternoon session.',
+            dateTime: _getNextPracticeDate(now, DateTime.sunday, 15, 0), // 3:00 PM
+            location: 'Carmody',
+            address: '2200 S Kipling St, Lakewood, CO',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending, // Current user starts with no selection
+              'user456': RSVPStatus.yes,
+              'user789': RSVPStatus.maybe,
+            },
+          ),
+        ],
+      ),
+      // Sydney Kings UWH - from portal-rsvp-demo repository
+      Club(
+        id: 'sydney-uwh',
+        name: 'Sydney Kings',
+        description: 'Sydney Kings Underwater Hockey Club - All levels welcome; bring fins & mouthguard.',
+        location: 'Sydney, NSW',
+        contactEmail: 'info@sydneykingsuwh.com.au',
+        website: 'https://nswunderwaterhockey.com/clubs/sydney',
+        createdAt: now.subtract(const Duration(days: 300)),
+        updatedAt: now,
+        isActive: true,
+        tags: const ['all-levels', 'community', 'friday-night'],
+        memberCount: 28,
+        upcomingPractices: [
+          Practice(
+            id: 'sydney-friday',
+            clubId: 'sydney-uwh',
+            title: 'Friday Night Practice',
+            description: 'All levels; bring fins & mouthguard.',
+            dateTime: _getNextPracticeDate(now, DateTime.friday, 19, 0), // 7:00 PM
+            location: 'Ryde Pool',
+            address: '504 Victoria Rd, Ryde, NSW',
+            rsvpResponses: {
+              'user123': RSVPStatus.pending,
+              'user456': RSVPStatus.yes,
+              'user789': RSVPStatus.maybe,
+              'user101': RSVPStatus.yes,
+              'user202': RSVPStatus.no,
+              'user303': RSVPStatus.yes,
+            },
+          ),
+        ],
+      ),
+    ];
+  }
+  
+  // Helper method to calculate next practice date for a given day of week
+  DateTime _getNextPracticeDate(DateTime now, int targetDayOfWeek, int hour, int minute) {
+    int daysToAdd = targetDayOfWeek - now.weekday;
+    if (daysToAdd <= 0) {
+      daysToAdd += 7; // Next week
+    }
+    
+    DateTime targetDate = now.add(Duration(days: daysToAdd));
+    return DateTime(targetDate.year, targetDate.month, targetDate.day, hour, minute);
+  }
+  
+  List<Practice> _generateMockPractices() {
+    final now = DateTime.now();
+    return [
+      // Denver UWH practices
+      Practice(
+        id: 'denver-monday',
+        clubId: 'denver-uwh',
+        title: 'Monday Practice',
+        description: 'Beginner-friendly; arrive 10 min early.',
+        dateTime: _getNextPracticeDate(now, DateTime.monday, 20, 15), // 8:15 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        rsvpResponses: {
+          _currentUserId: RSVPStatus.pending, // Current user starts with no selection
+          'user456': RSVPStatus.maybe,
+          'user789': RSVPStatus.pending,
+          'user101': RSVPStatus.yes,
+          'user202': RSVPStatus.no,
+        },
+      ),
+      Practice(
+        id: 'denver-wednesday',
+        clubId: 'denver-uwh',
+        title: 'Wednesday Practice',
+        description: 'Shallow end reserved. High-level participants only.',
+        dateTime: _getNextPracticeDate(now, DateTime.wednesday, 19, 0), // 7:00 PM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        rsvpResponses: {
+          _currentUserId: RSVPStatus.pending,
+          'user456': RSVPStatus.yes,
+          'user789': RSVPStatus.maybe,
+          'user101': RSVPStatus.no,
+        },
+      ),
+      Practice(
+        id: 'denver-thursday',
+        clubId: 'denver-uwh',
+        title: 'Thursday Scrimmage',
+        description: 'Scrimmage heavy. High-level participants only.',
+        dateTime: _getNextPracticeDate(now, DateTime.thursday, 20, 15), // 8:15 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        rsvpResponses: {
+          _currentUserId: RSVPStatus.maybe,
+          'user456': RSVPStatus.yes,
+          'user789': RSVPStatus.yes,
+          'user101': RSVPStatus.pending,
+          'user202': RSVPStatus.yes,
+        },
+      ),
+      Practice(
+        id: 'denver-sunday-morning',
+        clubId: 'denver-uwh',
+        title: 'Sunday Morning Training',
+        description: 'Drills + conditioning.',
+        dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        rsvpResponses: {
+          _currentUserId: RSVPStatus.pending, // Current user starts with no selection
+          'user456': RSVPStatus.pending,
+          'user789': RSVPStatus.yes,
+          'user101': RSVPStatus.maybe,
+        },
+      ),
+      Practice(
+        id: 'sydney-friday',
+        clubId: 'sydney-uwh',
+        title: 'Friday Night Practice',
+        description: 'All levels; bring fins & mouthguard.',
+        dateTime: _getNextPracticeDate(now, DateTime.friday, 19, 0), // 7:00 PM
+        location: 'Ryde Pool',
+        address: '504 Victoria Rd, Ryde, NSW',
+        rsvpResponses: {
+          _currentUserId: RSVPStatus.pending,
+          'user456': RSVPStatus.yes,
+          'user789': RSVPStatus.maybe,
+          'user101': RSVPStatus.yes,
+          'user202': RSVPStatus.no,
+        },
+      ),
+    ];
   }
 }

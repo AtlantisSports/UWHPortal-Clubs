@@ -15,7 +15,7 @@ class UWHPortalLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return SizedBox(
       height: height ?? 80,
       width: width,
       child: CustomPaint(
@@ -28,17 +28,6 @@ class UWHPortalLogo extends StatelessWidget {
 class UWHLogoPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..style = PaintingStyle.fill;
-    
-    // Blue gradient for UWH text
-    final bluePaint = Paint()
-      ..shader = LinearGradient(
-        colors: [Color(0xFF1976D2), Color(0xFF0D47A1)],
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height * 0.6));
-    
     // Draw "UWH" text (simplified representation)
     final textPainter = TextPainter(
       text: TextSpan(

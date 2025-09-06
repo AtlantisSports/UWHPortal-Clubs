@@ -3,15 +3,20 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../core/models/club.dart';
+import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/buttons.dart';
 
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
+  final String currentUserId;
+  final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
   
   const ClubDetailScreen({
     super.key,
     required this.club,
+    required this.currentUserId,
+    this.onRSVPChanged,
   });
   
   @override

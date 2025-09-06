@@ -39,12 +39,12 @@ class ProgramsScreen extends StatelessWidget {
           children: [
             _ThreePersonIcon(),
             SizedBox(height: AppSpacing.medium),
-            const Text(
+            Text(
               'Programs Feature',
               style: AppTextStyles.headline2,
             ),
-            const SizedBox(height: AppSpacing.small),
-            const Text(
+            SizedBox(height: AppSpacing.small),
+            Text(
               'Coming Soon',
               style: AppTextStyles.bodyMedium,
             ),

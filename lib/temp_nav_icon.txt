@@ -1,0 +1,45 @@
+class _ThreePersonNavIcon extends StatelessWidget {
+  const _ThreePersonNavIcon();
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 30,
+      height: 24,
+      child: Stack(
+        children: [
+          // Left person
+          Positioned(
+            left: 0,
+            top: 4,
+            child: Icon(
+              Icons.person,
+              size: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+          // Center person (slightly higher)
+          Positioned(
+            left: 7,
+            top: 0,
+            child: Icon(
+              Icons.person,
+              size: 20,
+              color: Colors.grey[600],
+            ),
+          ),
+          // Right person
+          Positioned(
+            left: 16,
+            top: 4,
+            child: Icon(
+              Icons.person,
+              size: 16,
+              color: Colors.grey[600],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

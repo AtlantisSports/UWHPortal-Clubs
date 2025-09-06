@@ -83,7 +83,7 @@ class UiUtils {
   /// Show snackbar with message
   static void showSnackbar(BuildContext context, String message, {
     bool isError = false,
-    Duration duration = const Duration(seconds: 3),
+    Duration duration = const Duration(seconds: 4),
   }) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

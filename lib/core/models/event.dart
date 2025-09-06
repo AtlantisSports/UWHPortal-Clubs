@@ -4,6 +4,7 @@ library;
 import 'base_model.dart';
 
 class Event extends BaseModel {
+  @override
   final String id;
   final String title;
   final String description;
@@ -17,7 +18,9 @@ class Event extends BaseModel {
   final double? price;
   final EventStatus status;
   final List<String> tags;
+  @override
   final DateTime createdAt;
+  @override
   final DateTime updatedAt;
   
   Event({
@@ -36,7 +39,11 @@ class Event extends BaseModel {
     this.tags = const [],
     required this.createdAt,
     required this.updatedAt,
-  });
+  }) : super(
+         id: id,
+         createdAt: createdAt,
+         updatedAt: updatedAt,
+       );
   
   /// Create Event from JSON (compatible with uwhportal API response)
   factory Event.fromJson(Map<String, dynamic> json) {

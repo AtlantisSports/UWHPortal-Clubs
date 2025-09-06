@@ -22,7 +22,7 @@ class PhoneFrame extends StatelessWidget {
         borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.3),
+            color: Colors.black.withValues(alpha: 0.3),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -36,7 +36,7 @@ class PhoneFrame extends StatelessWidget {
             _buildStatusBar(),
             // App Content
             Expanded(
-              child: Container(
+              child: SizedBox(
                 width: double.infinity,
                 child: child,
               ),
@@ -196,12 +196,12 @@ class PhoneFrame extends StatelessWidget {
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(20),
-        child: Container(
+        child: SizedBox(
           width: 40,
           height: 40,
           child: Icon(
             icon,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.white.withValues(alpha: 0.8),
             size: 24,
           ),
         ),
@@ -227,8 +227,8 @@ class PhoneFrameWrapper extends StatelessWidget {
       backgroundColor: const Color(0xFFF5F5F5), // Light gray background
       body: Center(
         child: PhoneFrame(
-          child: child,
           onBackPressed: onBackPressed,
+          child: child,
         ),
       ),
     );
