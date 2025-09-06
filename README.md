@@ -1,17 +1,22 @@
-# UWH Portal - Clubs Flutter Mockup
+# UWHPortal-Clubs
 
-A modular Flutter mobile application designed for seamless integration with the [uwhportal monorepo](https://github.com/zerotomvp/uwhportal).
+A modular Flutter mobile application designed for seamless integration with the underwater hockey portal ecosystem.
 
 ## Overview
 
-This Flutter app provides a clubs management interface for underwater hockey communities, following the architecture patterns and design principles established by the main uwhportal project.
+This Flutter app provides a comprehensive clubs management interface for underwater hockey communities, featuring a complete navigation system, user role management, and phone frame mockup for development testing.
 
 ## Features
 
+- **Complete Navigation System**: Bottom navigation with drawer integration
+- **Phone Frame Mockup**: Realistic mobile device simulation for development
+- **User Role Management**: Multiple user roles with permission-based features
 - **Clubs Directory**: Browse and search underwater hockey clubs
-- **Club Details**: View detailed club information, join/leave functionality
+- **Club Details**: View detailed club information with join/leave functionality
+- **Hamburger Menu Navigation**: Consistent navigation across all screens
+- **Back Button Handling**: Smart back navigation that closes drawers first
 - **Responsive Design**: Mobile-first approach with clean, accessible UI
-- **Backend Compatible**: API client designed for ASP.NET Core integration
+- **Backend Ready**: API client designed for integration
 
 ## Architecture
 
@@ -141,4 +146,4 @@ This project follows the same license as the main uwhportal repository.
 
 ## Contact
 
-For questions about integration or contribution, please refer to the main uwhportal repository or contact the development team.
+For questions about integration or contribution, please refer to the main underwater hockey portal development team.
