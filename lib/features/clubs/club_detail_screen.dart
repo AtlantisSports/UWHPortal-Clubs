@@ -13,12 +13,14 @@ class ClubDetailScreen extends StatefulWidget {
   final Club club;
   final String currentUserId;
   final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
+  final VoidCallback? onBackPressed;
   
   const ClubDetailScreen({
     super.key,
     required this.club,
     required this.currentUserId,
     this.onRSVPChanged,
+    this.onBackPressed,
   });
   
   @override
@@ -103,10 +105,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   
   @override
   Widget build(BuildContext context) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
-    final EdgeInsets responsivePadding = ResponsiveHelper.getResponsivePadding(context);
+    // Force mobile layout since we're always within a phone frame
+    final bool isMobile = true;
+    final EdgeInsets responsivePadding = const EdgeInsets.all(16.0);
     
-    return Scaffold(
+    // Ensure content fits within phone frame constraints
+    return ConstrainedBox(
+      constraints: const BoxConstraints(
+        maxWidth: 393, // Galaxy S23 width - match phone frame
+      ),
+      child: Scaffold(
       appBar: AppBar(
         title: Text('Clubs - ${widget.club.name}'),
         backgroundColor: Colors.grey[100],
@@ -139,12 +147,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             // Club header section with image/icon
             Container(
               width: double.infinity,
-              height: ResponsiveHelper.responsive(
-                context: context,
-                mobile: 200.0,
-                tablet: 250.0,
-                desktop: 300.0,
-              ),
+              height: 200.0, // Mobile height
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
@@ -287,12 +290,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         ],
                       ),
                       SizedBox(
-                        height: ResponsiveHelper.responsive(
-                          context: context,
-                          mobile: 300.0,
-                          tablet: 400.0,
-                          desktop: 500.0,
-                        ),
+                        height: 300.0, // Mobile height
                         child: TabBarView(
                           controller: _tabController,
                           children: [
@@ -308,14 +306,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 ],
               ),
             ),
-          ],
-        ),
-      ),
-    );
+          ], // Close Column children
+        ), // Close Column
+      ), // Close SingleChildScrollView
+    ), // Close Scaffold
+    ); // Close ConstrainedBox
   }
 
   Widget _buildRSVPTab(BuildContext context) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
+    // Force mobile layout since we're always within a phone frame
+    final bool isMobile = true;
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -344,7 +344,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildTypicalPracticesTab(BuildContext context) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
+    // Force mobile layout since we're always within a phone frame
+    final bool isMobile = true;
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -469,7 +470,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildGalleryTab(BuildContext context) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
+    // Force mobile layout since we're always within a phone frame
+    final bool isMobile = true;
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
@@ -506,7 +508,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildForumTab(BuildContext context) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
+    // Force mobile layout since we're always within a phone frame
+    final bool isMobile = true;
     
     return Padding(
       padding: const EdgeInsets.all(16.0),

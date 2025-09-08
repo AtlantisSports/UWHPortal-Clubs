@@ -83,11 +83,14 @@ class MyApp extends StatelessWidget {
             bodySmall: AppTextStyles.bodySmall,
             labelLarge: AppTextStyles.button,
           ),
-          // Override page transitions to maintain mobile constraint
-          pageTransitionsTheme: PageTransitionsTheme(
-            builders: {
-              for (final platform in TargetPlatform.values)
-                platform: const _ConstrainedPageTransition(),
+          // Use default page transitions for snappy navigation
+          pageTransitionsTheme: const PageTransitionsTheme(
+            builders: <TargetPlatform, PageTransitionsBuilder>{
+              TargetPlatform.android: ZoomPageTransitionsBuilder(),
+              TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.linux: ZoomPageTransitionsBuilder(),
+              TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+              TargetPlatform.windows: ZoomPageTransitionsBuilder(),
             },
           ),
         ),
@@ -126,17 +129,10 @@ class MyApp extends StatelessWidget {
             );
           },
         ),
-        // Use custom route generation to constrain all routes
-        onGenerateRoute: _generateConstrainedRoute,
+        // Use default route generation for snappy navigation
+        onGenerateRoute: null,
       ),
     );
-  }
-
-  // Custom route generator that constrains all routes to mobile width
-  Route<dynamic>? _generateConstrainedRoute(RouteSettings settings) {
-    // For now, return null to use default route generation
-    // The PageTransitionsTheme will handle the constraint
-    return null;
   }
 }
 
@@ -305,27 +301,6 @@ class ProfilePlaceholderScreen extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Custom page transition that maintains mobile width constraint for all routes
-class _ConstrainedPageTransition extends PageTransitionsBuilder {
-  const _ConstrainedPageTransition();
-
-  @override
-  Widget buildTransitions<T extends Object?>(
-    PageRoute<T> route,
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) {
-    // All routes are already constrained by the parent Container in MaterialApp
-    // Just use the default transition
-    return FadeTransition(
-      opacity: animation,
-      child: child,
     );
   }
 }

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
@@ -22,6 +23,10 @@ class ClubsListScreen extends StatefulWidget {
 class _ClubsListScreenState extends State<ClubsListScreen> {
   final String _currentUserId = 'user123'; // TODO: Get from auth service
   
+  // Internal navigation state
+  Club? _selectedClub;
+  bool _showingClubDetail = false;
+  
   // Toast state
   bool _showToast = false;
   String _toastMessage = '';
@@ -34,7 +39,28 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ClubsProvider>().loadClubs();
+      
+      // Register clubs tab handler for reset functionality
+      final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
+      navigationProvider.registerTabBackHandler(3, _resetToClubsList);
     });
+  }
+  
+  @override
+  void dispose() {
+    // Unregister tab handler when widget is disposed
+    final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
+    navigationProvider.unregisterTabBackHandler(3);
+    super.dispose();
+  }
+  
+  void _resetToClubsList() {
+    if (_showingClubDetail) {
+      setState(() {
+        _selectedClub = null;
+        _showingClubDetail = false;
+      });
+    }
   }
   
   void _handleRSVPChange(String practiceId, RSVPStatus newStatus) {
@@ -74,15 +100,17 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
 
   void _onClubTap(Club club) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => ClubDetailScreen(
-          club: club,
-          currentUserId: _currentUserId,
-          onRSVPChanged: _handleRSVPChange,
-        ),
-      ),
-    );
+    setState(() {
+      _selectedClub = club;
+      _showingClubDetail = true;
+    });
+  }
+  
+  void _navigateBackToList() {
+    setState(() {
+      _selectedClub = null;
+      _showingClubDetail = false;
+    });
   }
   
   /// Get the next upcoming practice for a club
@@ -115,6 +143,17 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Show club detail if selected
+    if (_showingClubDetail && _selectedClub != null) {
+      return ClubDetailScreen(
+        club: _selectedClub!,
+        currentUserId: _currentUserId,
+        onRSVPChanged: _handleRSVPChange,
+        onBackPressed: _navigateBackToList,
+      );
+    }
+    
+    // Show clubs list
     return DefaultTabController(
       length: 2,
       child: Stack(
