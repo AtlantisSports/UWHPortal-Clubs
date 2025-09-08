@@ -13,7 +13,7 @@ import 'package:clubs_mockup/main.dart';
 void main() {
   testWidgets('Clubs mockup app loads', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ClubsMockupApp());
+    await tester.pumpWidget(const MyApp());
 
     // Wait for the app to fully load
     await tester.pumpAndSettle();

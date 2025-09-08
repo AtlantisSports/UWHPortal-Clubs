@@ -3,12 +3,14 @@ library;
 
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
+import 'clubs_provider.dart';
 
 class ClubsListScreen extends StatefulWidget {
   const ClubsListScreen({super.key});
@@ -18,9 +20,6 @@ class ClubsListScreen extends StatefulWidget {
 }
 
 class _ClubsListScreenState extends State<ClubsListScreen> {
-  List<Club> _clubs = [];
-  List<Practice> _upcomingPractices = [];
-  bool _isLoading = true;
   final String _currentUserId = 'user123'; // TODO: Get from auth service
   
   // Toast state
@@ -33,76 +32,15 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadClubs();
-    _loadUpcomingPractices();
-  }
-  
-  Future<void> _loadClubs() async {
-    setState(() => _isLoading = true);
-    
-    try {
-      // TODO: Replace with actual API call using ClubsService
-      // For now, using mock data with practices
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
-      
-      _clubs = _generateMockClubsWithPractices();
-    } catch (e) {
-      // Handle error
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading clubs: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
-  }
-  
-  Future<void> _loadUpcomingPractices() async {
-    try {
-      // TODO: Replace with actual API call
-      await Future.delayed(const Duration(milliseconds: 500));
-      
-      _upcomingPractices = _generateMockPractices();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error loading practices: $e')),
-        );
-      }
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ClubsProvider>().loadClubs();
+    });
   }
   
   void _handleRSVPChange(String practiceId, RSVPStatus newStatus) {
-    setState(() {
-      // Update practice in clubs list
-      for (var club in _clubs) {
-        for (var i = 0; i < club.upcomingPractices.length; i++) {
-          if (club.upcomingPractices[i].id == practiceId) {
-            final practice = club.upcomingPractices[i];
-            final updatedRSVPs = Map<String, RSVPStatus>.from(practice.rsvpResponses);
-            updatedRSVPs[_currentUserId] = newStatus;
-            final updatedPractice = practice.copyWith(rsvpResponses: updatedRSVPs);
-            club.upcomingPractices[i] = updatedPractice; // Actually assign the updated practice
-            break;
-          }
-        }
-      }
-      
-      // Update practice in upcoming practices list
-      for (var i = 0; i < _upcomingPractices.length; i++) {
-        if (_upcomingPractices[i].id == practiceId) {
-          final updatedRSVPs = Map<String, RSVPStatus>.from(_upcomingPractices[i].rsvpResponses);
-          updatedRSVPs[_currentUserId] = newStatus;
-          _upcomingPractices[i] = _upcomingPractices[i].copyWith(rsvpResponses: updatedRSVPs);
-          break;
-        }
-      }
-    });
+    context.read<ClubsProvider>().handleRSVPChange(practiceId, newStatus);
     
-    // TODO: Send RSVP update to backend
+    // Show confirmation message
     if (mounted) {
       // Prepare toast content based on RSVP status
       String message = 'RSVP updated to: ${newStatus.displayText}';
@@ -277,45 +215,49 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
   
   Widget _buildClubsTab() {
-    return Column(
-      children: [
-        // Clubs list
-        Expanded(
-          child: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _clubs.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(AppSpacing.small),
-                      itemCount: _clubs.length,
-                      itemBuilder: (context, index) {
-                        final club = _clubs[index];
-                        final nextPractice = _getNextPractice(club);
-                        final currentRSVP = nextPractice != null 
-                            ? nextPractice.getRSVPStatus(_currentUserId)
-                            : RSVPStatus.pending;
-                        
-                        return ClubCard(
-                          name: club.name,
-                          location: club.location,
-                          logoUrl: club.logoUrl,
-                          nextPractice: nextPractice,
-                          currentRSVP: currentRSVP,
-                          allPractices: club.upcomingPractices, // Add all practices for dropdown
-                          onRSVPChanged: (status) {
-                            if (nextPractice != null) {
-                              _handleRSVPChange(nextPractice.id, status);
-                            }
+    return Consumer<ClubsProvider>(
+      builder: (context, clubsProvider, child) {
+        return Column(
+          children: [
+            // Clubs list
+            Expanded(
+              child: clubsProvider.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : clubsProvider.clubs.isEmpty
+                      ? _buildEmptyState()
+                      : ListView.builder(
+                          padding: const EdgeInsets.all(AppSpacing.small),
+                          itemCount: clubsProvider.clubs.length,
+                          itemBuilder: (context, index) {
+                            final club = clubsProvider.clubs[index];
+                            final nextPractice = _getNextPractice(club);
+                            final currentRSVP = nextPractice != null 
+                                ? nextPractice.getRSVPStatus(_currentUserId)
+                                : RSVPStatus.pending;
+                            
+                            return ClubCard(
+                              name: club.name,
+                              location: club.location,
+                              logoUrl: club.logoUrl,
+                              nextPractice: nextPractice,
+                              currentRSVP: currentRSVP,
+                              allPractices: club.upcomingPractices, // Add all practices for dropdown
+                              onRSVPChanged: (status) {
+                                if (nextPractice != null) {
+                                  _handleRSVPChange(nextPractice.id, status);
+                                }
+                              },
+                              onTap: () => _onClubTap(club),
+                              onLocationTap: nextPractice != null ? () {
+                                _openMapForPractice(nextPractice);
+                              } : null,
+                            );
                           },
-                          onTap: () => _onClubTap(club),
-                          onLocationTap: nextPractice != null ? () {
-                            _openMapForPractice(nextPractice);
-                          } : null,
-                        );
-                      },
-                    ),
-        ),
-      ],
+                        ),
+            ),
+          ],
+        );
+      },
     );
   }
   

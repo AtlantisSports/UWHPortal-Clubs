@@ -5,7 +5,9 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../utils/error_handler.dart';
 
 class ApiClient {
   static const String _baseUrl = 'https://api.uwhportal.com'; // Replace with actual endpoint
@@ -33,10 +35,15 @@ class ApiClient {
       final response = await _client.get(
         Uri.parse('$_baseUrl$endpoint'),
         headers: _defaultHeaders,
-      );
+      ).timeout(const Duration(seconds: 30));
+      
       return _handleResponse(response);
+    } on SocketException {
+      throw const NetworkException('No internet connection');
+    } on HttpException {
+      throw const NetworkException('Network request failed');
     } catch (e) {
-      throw ApiException('GET request failed: $e');
+      throw ApiException('GET request failed', originalError: e);
     }
   }
   
@@ -93,19 +100,18 @@ class ApiClient {
       );
     }
   }
+
+  /// Extract error message from response body
+  String _extractErrorMessage(http.Response response) {
+    try {
+      final body = json.decode(response.body) as Map<String, dynamic>;
+      return body['message'] ?? body['error'] ?? 'Unknown error';
+    } catch (e) {
+      return response.body.isNotEmpty ? response.body : 'Unknown error';
+    }
+  }
   
   void dispose() {
     _client.close();
   }
-}
-
-/// Custom exception for API errors
-class ApiException implements Exception {
-  final String message;
-  final int? statusCode;
-  
-  const ApiException(this.message, {this.statusCode});
-  
-  @override
-  String toString() => 'ApiException: $message';
 }

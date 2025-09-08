@@ -6,6 +6,8 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/buttons.dart';
+import '../../base/widgets/next_practice_card.dart';
+import '../../core/utils/responsive_helper.dart';
 
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
@@ -26,13 +28,48 @@ class ClubDetailScreen extends StatefulWidget {
 class _ClubDetailScreenState extends State<ClubDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  bool _isMember = false; // TODO: Get from actual membership status
+  bool _isMember = false;
   bool _isLoading = false;
+  RSVPStatus? _currentRSVPStatus;
   
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    _initializeRSVPStatus();
+  }
+
+  void _initializeRSVPStatus() {
+    final nextPractice = _getNextPractice();
+    if (nextPractice != null) {
+      _currentRSVPStatus = nextPractice.getRSVPStatus(widget.currentUserId);
+    }
+  }
+
+  /// Get the next upcoming practice (same logic as My Clubs view)
+  Practice? _getNextPractice() {
+    if (widget.club.upcomingPractices.isEmpty) return null;
+    
+    final now = DateTime.now();
+    final upcomingPractices = widget.club.upcomingPractices
+        .where((practice) => practice.dateTime.isAfter(now))
+        .toList();
+    
+    if (upcomingPractices.isEmpty) return null;
+    
+    // Sort by date and return the earliest one
+    upcomingPractices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    return upcomingPractices.first;
+  }
+
+  void _handleRSVPChange(RSVPStatus newStatus) {
+    final nextPractice = _getNextPractice();
+    if (nextPractice != null && widget.onRSVPChanged != null) {
+      setState(() {
+        _currentRSVPStatus = newStatus;
+      });
+      widget.onRSVPChanged!(nextPractice.id, newStatus);
+    }
   }
   
   @override
@@ -66,161 +103,208 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   
   @override
   Widget build(BuildContext context) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    final EdgeInsets responsivePadding = ResponsiveHelper.getResponsivePadding(context);
+    
     return Scaffold(
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) => [
-          SliverAppBar(
-            expandedHeight: 250,
-            floating: false,
-            pinned: true,
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            actions: [
-              IconButton(
-                icon: const Icon(
-                  Icons.notifications_outlined,
-                  size: 28.8, // 20% larger than default 24
-                ),
-                onPressed: () {},
-              ),
-              IconButton(
-                icon: const Icon(
-                  Icons.menu,
-                  size: 28.8, // 20% larger than default 24
-                ),
-                onPressed: () {
-                  Scaffold.of(context).openEndDrawer();
-                },
-              ),
-            ],
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.club.name,
-                style: AppTextStyles.headline3.copyWith(color: Colors.white),
-              ),
-              background: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      AppColors.primary,
-                      AppColors.primaryDark,
-                    ],
-                  ),
-                ),
-                child: widget.club.logoUrl != null
-                    ? Image.network(
-                        widget.club.logoUrl!,
-                        fit: BoxFit.cover,
-                      )
-                    : const Icon(
-                        Icons.group,
-                        size: 100,
-                        color: Colors.white54,
-                      ),
-              ),
+      appBar: AppBar(
+        title: Text('Clubs - ${widget.club.name}'),
+        backgroundColor: Colors.grey[100],
+        foregroundColor: Colors.black87,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: Icon(
+              Icons.notifications_outlined,
+              size: isMobile ? 24.0 : 28.8,
             ),
+            onPressed: () {},
+          ),
+          IconButton(
+            icon: Icon(
+              Icons.menu,
+              size: isMobile ? 24.0 : 28.8,
+            ),
+            onPressed: () {
+              Scaffold.of(context).openEndDrawer();
+            },
           ),
         ],
-        body: Column(
+      ),
+      body: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Club info header
+            // Club header section with image/icon
             Container(
-              color: Colors.white,
-              padding: const EdgeInsets.all(AppSpacing.medium),
+              width: double.infinity,
+              height: ResponsiveHelper.responsive(
+                context: context,
+                mobile: 200.0,
+                tablet: 250.0,
+                desktop: 300.0,
+              ),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primaryDark,
+                  ],
+                ),
+              ),
+              child: widget.club.logoUrl != null
+                  ? Image.network(
+                      widget.club.logoUrl!,
+                      fit: BoxFit.cover,
+                    )
+                  : Icon(
+                      Icons.group,
+                      size: isMobile ? 80 : 100,
+                      color: Colors.white54,
+                    ),
+            ),
+            
+            // Club info content
+            Padding(
+              padding: responsivePadding,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: ResponsiveHelper.getSpacing(context)),
+                  
+                  // Location
                   Row(
                     children: [
                       const Icon(
                         Icons.location_on,
                         color: AppColors.textSecondary,
-                        size: 16,
+                        size: 20,
                       ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Text(
-                        widget.club.location,
-                        style: AppTextStyles.bodyMedium.copyWith(
-                          color: AppColors.textSecondary,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          widget.club.location,
+                          style: AppTextStyles.bodyMedium.copyWith(
+                            fontSize: isMobile ? 14 : 16,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpacing.small),
+                  
+                  SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 8.0)),
+                  
+                  // Description
                   Text(
                     widget.club.description,
-                    style: AppTextStyles.bodyMedium,
-                  ),
-                  if (widget.club.tags.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.medium),
-                    Wrap(
-                      spacing: AppSpacing.small,
-                      runSpacing: AppSpacing.xs,
-                      children: widget.club.tags.map((tag) => Chip(
-                        label: Text(
-                          tag,
-                          style: AppTextStyles.caption,
-                        ),
-                        backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        visualDensity: VisualDensity.compact,
-                      )).toList(),
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontSize: isMobile ? 14 : 16,
                     ),
-                  ],
-                  const SizedBox(height: AppSpacing.medium),
+                  ),
+                  
+                  SizedBox(height: ResponsiveHelper.getSpacing(context)),
+                  
+                  // Action buttons
                   Row(
                     children: [
                       Expanded(
-                        child: PrimaryButton(
-                          text: _isMember ? 'Leave Club' : 'Join Club',
-                          onPressed: _toggleMembership,
-                          isLoading: _isLoading,
-                          icon: _isMember ? Icons.exit_to_app : Icons.group_add,
+                        child: SizedBox(
+                          height: 36,
+                          child: PrimaryButton(
+                            text: _isMember ? 'Leave' : 'Join',
+                            onPressed: _toggleMembership,
+                            isLoading: _isLoading,
+                            icon: _isMember ? Icons.exit_to_app : Icons.group_add,
+                          ),
                         ),
                       ),
-                      const SizedBox(width: AppSpacing.small),
-                      SecondaryButton(
-                        text: 'Contact',
-                        onPressed: () {
-                          // TODO: Open email or contact form
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Contact feature coming soon!')),
-                          );
-                        },
-                        icon: Icons.email,
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: SecondaryButton(
+                            text: 'Contact',
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('Contact feature coming soon!')),
+                              );
+                            },
+                            icon: Icons.email,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
-            ),
-            
-            // Tabs
-            Container(
-              color: Colors.white,
-              child: TabBar(
-                controller: _tabController,
-                labelColor: AppColors.primary,
-                unselectedLabelColor: AppColors.textSecondary,
-                indicatorColor: AppColors.primary,
-                tabs: const [
-                  Tab(text: 'Events'),
-                  Tab(text: 'Members'),
-                  Tab(text: 'About'),
-                ],
-              ),
-            ),
-            
-            // Tab content
-            Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildEventsTab(),
-                  _buildMembersTab(),
-                  _buildAboutTab(),
+                  
+                  SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
+                  
+                  // Next Practice Card (reusing from ClubCard)
+                  Builder(builder: (context) {
+                    final nextPractice = _getNextPractice();
+                    if (nextPractice == null) return const SizedBox.shrink();
+                    
+                    return NextPracticeCard(
+                      practice: nextPractice,
+                      isRSVPed: _currentRSVPStatus != null && _currentRSVPStatus != RSVPStatus.pending,
+                      onRSVPPressed: () {
+                        // TODO: Handle RSVP button press - could open RSVP dialog
+                      },
+                    );
+                  }),
+                  
+                  Builder(builder: (context) {
+                    final nextPractice = _getNextPractice();
+                    return nextPractice != null
+                        ? SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 8.0))
+                        : const SizedBox.shrink();
+                  }),
+                  
+                  // Tabs section
+                  Column(
+                    children: [
+                      TabBar(
+                        controller: _tabController,
+                        labelColor: AppColors.primary,
+                        unselectedLabelColor: AppColors.textSecondary,
+                        indicatorColor: AppColors.primary,
+                        labelStyle: TextStyle(
+                          fontSize: isMobile ? 14 : 16,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        unselectedLabelStyle: TextStyle(
+                          fontSize: isMobile ? 14 : 16,
+                          fontWeight: FontWeight.normal,
+                        ),
+                        tabs: const [
+                          Tab(text: 'RSVP'),
+                          Tab(text: 'Typical Practices'),
+                          Tab(text: 'Gallery'),
+                          Tab(text: 'Forum'),
+                        ],
+                      ),
+                      SizedBox(
+                        height: ResponsiveHelper.responsive(
+                          context: context,
+                          mobile: 300.0,
+                          tablet: 400.0,
+                          desktop: 500.0,
+                        ),
+                        child: TabBarView(
+                          controller: _tabController,
+                          children: [
+                            _buildRSVPTab(context),
+                            _buildTypicalPracticesTab(context),
+                            _buildGalleryTab(context),
+                            _buildForumTab(context),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -229,109 +313,231 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
     );
   }
-  
-  Widget _buildEventsTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.event,
-            size: 64,
-            color: AppColors.textDisabled,
-          ),
-          SizedBox(height: AppSpacing.medium),
-          Text(
-            'No upcoming events',
-            style: AppTextStyles.headline3,
-          ),
-          SizedBox(height: AppSpacing.small),
-          Text(
-            'Events will appear here when available',
-            style: AppTextStyles.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildMembersTab() {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.people,
-            size: 64,
-            color: AppColors.textDisabled,
-          ),
-          SizedBox(height: AppSpacing.medium),
-          Text(
-            'Members list',
-            style: AppTextStyles.headline3,
-          ),
-          SizedBox(height: AppSpacing.small),
-          Text(
-            'Member information coming soon',
-            style: AppTextStyles.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildAboutTab() {
+
+  Widget _buildRSVPTab(BuildContext context) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    
     return Padding(
-      padding: const EdgeInsets.all(AppSpacing.medium),
+      padding: const EdgeInsets.all(16.0),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'RSVP Management',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: isMobile ? 20 : 24,
+              ),
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context)),
+            Text(
+              'Manage your RSVP status for upcoming practices and events.',
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: isMobile ? 14 : 16,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTypicalPracticesTab(BuildContext context) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Typical Practice Schedule',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: isMobile ? 20 : 24,
+              ),
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context)),
+            
+            // Sample practice items
+            _buildPracticeItem(context,
+              day: 'Monday',
+              time: '7:00 PM - 9:00 PM', 
+              location: 'UBC Pool',
+              description: 'Regular team practice with scrimmage',
+            ),
+            _buildPracticeItem(context,
+              day: 'Wednesday', 
+              time: '7:00 PM - 9:00 PM',
+              location: 'UBC Pool',
+              description: 'Skills training and conditioning',
+            ),
+            _buildPracticeItem(context,
+              day: 'Saturday',
+              time: '10:00 AM - 12:00 PM',
+              location: 'UBC Pool', 
+              description: 'Game strategy and team building',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPracticeItem(BuildContext context, {
+    required String day,
+    required String time,
+    required String location,
+    required String description,
+  }) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 16.0),
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'About ${widget.club.name}',
-            style: AppTextStyles.headline3,
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  day,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontSize: isMobile ? 12 : 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                time,
+                style: AppTextStyles.bodyMedium.copyWith(
+                  fontSize: isMobile ? 14 : 16,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.medium),
-          Text(
-            widget.club.description,
-            style: AppTextStyles.bodyMedium,
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Icon(
+                Icons.location_on,
+                size: isMobile ? 16 : 18,
+                color: AppColors.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  location,
+                  style: AppTextStyles.bodyMedium.copyWith(
+                    fontSize: isMobile ? 14 : 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.large),
-          
-          // Contact information
-          Text(
-            'Contact Information',
-            style: AppTextStyles.headline3,
-          ),
-          const SizedBox(height: AppSpacing.medium),
-          
-          ListTile(
-            leading: const Icon(Icons.email, color: AppColors.primary),
-            title: Text(widget.club.contactEmail),
-            contentPadding: EdgeInsets.zero,
-            onTap: () {
-              // TODO: Open email client
-            },
-          ),
-          
-          if (widget.club.website != null)
-            ListTile(
-              leading: const Icon(Icons.web, color: AppColors.primary),
-              title: Text(widget.club.website!),
-              contentPadding: EdgeInsets.zero,
-              onTap: () {
-                // TODO: Open website
-              },
+          if (description.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: isMobile ? 13 : 15,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
             ),
-          
-          ListTile(
-            leading: const Icon(Icons.location_on, color: AppColors.primary),
-            title: Text(widget.club.location),
-            contentPadding: EdgeInsets.zero,
-            onTap: () {
-              // TODO: Open maps
-            },
-          ),
+          ],
         ],
+      ),
+    );
+  }
+
+  Widget _buildGalleryTab(BuildContext context) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.photo_library,
+              size: isMobile ? 48 : 64,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context)),
+            Text(
+              'Club Gallery',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: isMobile ? 20 : 24,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 4.0)),
+            Text(
+              'Photos and videos coming soon',
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: isMobile ? 14 : 16,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForumTab(BuildContext context) {
+    final bool isMobile = ResponsiveHelper.isMobile(context);
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.forum,
+              size: isMobile ? 48 : 64,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context)),
+            Text(
+              'Club Forum',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: isMobile ? 20 : 24,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 4.0)),
+            Text(
+              'Discussions and announcements coming soon',
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: isMobile ? 14 : 16,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
       ),
     );
   }

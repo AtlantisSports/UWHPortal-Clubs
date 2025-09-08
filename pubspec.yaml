@@ -43,6 +43,12 @@ dependencies:
   
   # URL launcher for opening external links
   url_launcher: ^6.2.2
+  
+  # State management and dependency injection
+  provider: ^6.1.2
+  
+  # Service locator for dependency injection
+  get_it: ^8.0.2
 
 dev_dependencies:
   flutter_test:

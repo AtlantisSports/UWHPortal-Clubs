@@ -15,11 +15,11 @@ class PhoneFrame extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 375, // iPhone width
-      height: 812, // iPhone height
+      width: 393, // Galaxy S23 width
+      height: 851, // Galaxy S23 height
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(40),
+        borderRadius: BorderRadius.circular(25), // Galaxy S23 rounded corners
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -29,7 +29,7 @@ class PhoneFrame extends StatelessWidget {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(40),
+        borderRadius: BorderRadius.circular(20), // Match Galaxy S23 inner radius
         child: Column(
           children: [
             // Status Bar
@@ -170,15 +170,35 @@ class PhoneFrame extends StatelessWidget {
           _buildNavButton(
             icon: Icons.arrow_back,
             onTap: () {
-              // Use custom callback if provided, otherwise try default navigation
+              // Use custom callback if provided
               if (onBackPressed != null) {
                 onBackPressed!();
-              } else {
-                // Fallback to trying to pop the navigation stack
-                final navContext = NavigationService.context;
-                if (navContext != null && Navigator.of(navContext).canPop()) {
-                  Navigator.of(navContext).pop();
+                return;
+              }
+              
+              // Try to get the current navigator state
+              final navigator = NavigationService.navigator;
+              if (navigator == null) return;
+              
+              // First, try to close drawer if it's open
+              // We'll look for the current route's context that has a Scaffold
+              final context = navigator.context;
+              if (context != null) {
+                try {
+                  // Try to find if there's a drawer open and close it
+                  final scaffoldState = Scaffold.maybeOf(context);
+                  if (scaffoldState != null && scaffoldState.isEndDrawerOpen) {
+                    navigator.pop(); // This closes the drawer
+                    return;
+                  }
+                } catch (e) {
+                  // If we can't find a scaffold, just continue with normal navigation
                 }
+              }
+              
+              // If drawer is not open, try to navigate back in the navigation stack
+              if (navigator.canPop()) {
+                navigator.pop();
               }
             },
           ),
