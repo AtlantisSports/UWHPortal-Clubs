@@ -2,11 +2,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/buttons.dart';
-import '../../base/widgets/next_practice_card.dart';
+import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/responsive_helper.dart';
 
 class ClubDetailScreen extends StatefulWidget {
@@ -45,6 +46,46 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     final nextPractice = _getNextPractice();
     if (nextPractice != null) {
       _currentRSVPStatus = nextPractice.getRSVPStatus(widget.currentUserId);
+    }
+  }
+
+  void _updateRSVP(RSVPStatus status) {
+    final nextPractice = _getNextPractice();
+    if (nextPractice != null) {
+      setState(() {
+        _currentRSVPStatus = status;
+      });
+      // Call the parent callback if provided
+      widget.onRSVPChanged?.call(nextPractice.id, status);
+    }
+  }
+
+  void _handleLocationTap() async {
+    final nextPractice = _getNextPractice();
+    if (nextPractice != null) {
+      // Create a Google Maps search URL for the location
+      final encodedLocation = Uri.encodeComponent(nextPractice.location);
+      final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedLocation');
+      
+      try {
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+        } else {
+          // Fallback: show a snackbar if URL launcher fails
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not open location: ${nextPractice.location}')),
+            );
+          }
+        }
+      } catch (e) {
+        // Handle any errors
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error opening location: ${nextPractice.location}')),
+          );
+        }
+      }
     }
   }
 
@@ -139,30 +180,35 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Club header section with image/icon
-            Container(
-              width: double.infinity,
-              height: 200.0, // Mobile height
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    AppColors.primary,
-                    AppColors.primaryDark,
-                  ],
+            // Club header section with image/icon - added padding to match event details
+            Padding(
+              padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 2.0, bottom: 0.0), // No bottom padding
+              child: Container(
+                width: double.infinity,
+                height: 200.0, // Mobile height
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12.0), // Add rounded corners like event page
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primaryDark,
+                    ],
+                  ),
                 ),
+                clipBehavior: Clip.hardEdge, // Ensure image respects border radius
+                child: widget.club.logoUrl != null
+                    ? Image.network(
+                        widget.club.logoUrl!,
+                        fit: BoxFit.cover,
+                      )
+                    : Icon(
+                        Icons.group,
+                        size: 80, // Mobile size
+                        color: Colors.white54,
+                      ),
               ),
-              child: widget.club.logoUrl != null
-                  ? Image.network(
-                      widget.club.logoUrl!,
-                      fit: BoxFit.cover,
-                    )
-                  : Icon(
-                      Icons.group,
-                      size: 80, // Mobile size
-                      color: Colors.white54,
-                    ),
             ),
             
             // Club info content
@@ -171,36 +217,18 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(height: ResponsiveHelper.getSpacing(context)),
+                  SizedBox(height: 0), // No padding above club name
                   
-                  // Location
-                  Row(
-                    children: [
-                      const Icon(
-                        Icons.location_on,
-                        color: AppColors.textSecondary,
-                        size: 20,
+                  // Full club name - centered
+                  Center(
+                    child: Text(
+                      widget.club.longName,
+                      style: AppTextStyles.headline2.copyWith(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          widget.club.location,
-                          style: AppTextStyles.bodyMedium.copyWith(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 8.0)),
-                  
-                  // Description
-                  Text(
-                    widget.club.description,
-                    style: AppTextStyles.bodyMedium.copyWith(
-                      fontSize: 14,
+                      textAlign: TextAlign.center,
                     ),
                   ),
                   
@@ -240,17 +268,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   
                   SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
                   
-                  // Next Practice Card (reusing from ClubCard)
+                  // Next Practice Card (same as clubs page)
                   Builder(builder: (context) {
                     final nextPractice = _getNextPractice();
                     if (nextPractice == null) return const SizedBox.shrink();
                     
                     return NextPracticeCard(
                       practice: nextPractice,
-                      isRSVPed: _currentRSVPStatus != null && _currentRSVPStatus != RSVPStatus.pending,
-                      onRSVPPressed: () {
-                        // TODO: Handle RSVP button press - could open RSVP dialog
-                      },
+                      currentRSVP: _currentRSVPStatus,
+                      onRSVPChanged: (status) => _updateRSVP(status),
+                      onLocationTap: _handleLocationTap,
                     );
                   }),
                   

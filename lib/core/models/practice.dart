@@ -34,7 +34,7 @@ extension RSVPStatusExtension on RSVPStatus {
       case RSVPStatus.yes:
         return Icons.check;
       case RSVPStatus.maybe:
-        return Icons.help; // Plain question mark without any circle
+        return Icons.question_mark; // Plain question mark
       case RSVPStatus.no:
         return Icons.close; // X mark for "no"
       case RSVPStatus.pending:

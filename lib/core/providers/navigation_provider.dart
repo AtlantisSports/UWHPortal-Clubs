@@ -38,6 +38,15 @@ class NavigationProvider extends ChangeNotifier {
       
       _selectedIndex = index;
       
+      // If navigating to clubs tab (index 3), always reset to clubs list
+      if (index == 3) {
+        final clubsTabHandler = _tabBackHandlers[3];
+        if (clubsTabHandler != null) {
+          debugPrint('DEBUG: Navigating to Clubs tab - resetting to list view');
+          clubsTabHandler();
+        }
+      }
+      
       notifyListeners();
       
       debugPrint('DEBUG: Tab changed from ${_navigationHistory.last} to $index');

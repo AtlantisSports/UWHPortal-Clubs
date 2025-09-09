@@ -85,8 +85,12 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
     }
     
     if (widget.status == RSVPStatus.maybe) {
-      // Return empty container for maybe option (no icon)
-      return Container();
+      // Try plain question mark icon first (option 3)
+      return Icon(
+        Icons.question_mark,
+        size: widget.size * 0.52, // Same size as other icons
+        color: widget.status.color,
+      );
     }
     
     // Use icons for yes/no only
@@ -183,13 +187,15 @@ class RSVPStatusDisplay extends StatelessWidget {
           ),
           child: status == RSVPStatus.pending
               ? null
-              : status == RSVPStatus.maybe
-                  ? null  // No icon for maybe option
-                  : Icon(
-                      status.overlayIcon,
-                      size: (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
-                      color: status.color,
-                    ),
+              : Icon(
+                  status == RSVPStatus.maybe
+                      ? Icons.question_mark  // Plain question mark for maybe option
+                      : status.overlayIcon,
+                  size: status == RSVPStatus.maybe 
+                      ? size * 0.7  // Smaller question mark
+                      : (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
+                  color: status.color,
+                ),
         ),
         const SizedBox(width: 8),
         Text(
@@ -470,13 +476,13 @@ class NextPracticeCard extends StatelessWidget {
               ),
               color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent, // Light background when selected
             ),
-            child: status == RSVPStatus.maybe 
-              ? null  // No icon for maybe option
-              : Icon(
-                  _getOverlayIcon(status),
-                  size: 23.4, // Increased by 30% (18 * 1.3 = 23.4)
-                  color: color,
-                ),
+            child: Icon(
+              _getOverlayIcon(status),
+              size: status == RSVPStatus.maybe 
+                ? 18.954 // 10% smaller than current size (21.06 * 0.9)
+                : 23.4, // Increased by 30% (18 * 1.3 = 23.4)
+              color: color,
+            ),
           ),
         ),
       ),
@@ -531,7 +537,7 @@ class NextPracticeCard extends StatelessWidget {
       case RSVPStatus.yes:
         return Icons.check;
       case RSVPStatus.maybe:
-        return Icons.help_outline; // Not used anymore, but kept for consistency
+        return Icons.question_mark; // Plain question mark
       case RSVPStatus.no:
         return Icons.close;
       case RSVPStatus.pending:

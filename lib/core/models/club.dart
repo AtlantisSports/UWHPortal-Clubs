@@ -5,7 +5,9 @@ import 'base_model.dart';
 import 'practice.dart';
 
 class Club extends BaseModel {
-  final String name;
+  final String name; // Keep for backwards compatibility
+  final String shortName;
+  final String longName;
   final String description;
   final String? logoUrl;
   final String location;
@@ -19,6 +21,8 @@ class Club extends BaseModel {
   Club({
     required super.id,
     required this.name,
+    required this.shortName,
+    required this.longName,
     required this.description,
     this.logoUrl,
     required this.location,
@@ -37,6 +41,8 @@ class Club extends BaseModel {
     return Club(
       id: json['id'] as String,
       name: json['name'] as String,
+      shortName: json['shortName'] as String? ?? json['name'] as String, // Fallback to name if shortName not provided
+      longName: json['longName'] as String? ?? json['name'] as String, // Fallback to name if longName not provided
       description: json['description'] as String,
       logoUrl: json['logoUrl'] as String?,
       location: json['location'] as String,
@@ -62,6 +68,8 @@ class Club extends BaseModel {
     return {
       ...super.toJson(),
       'name': name,
+      'shortName': shortName,
+      'longName': longName,
       'description': description,
       'logoUrl': logoUrl,
       'location': location,
@@ -77,6 +85,8 @@ class Club extends BaseModel {
   @override
   Club copyWith({
     String? name,
+    String? shortName,
+    String? longName,
     String? description,
     String? logoUrl,
     String? location,
@@ -90,6 +100,8 @@ class Club extends BaseModel {
     return Club(
       id: id,
       name: name ?? this.name,
+      shortName: shortName ?? this.shortName,
+      longName: longName ?? this.longName,
       description: description ?? this.description,
       logoUrl: logoUrl ?? this.logoUrl,
       location: location ?? this.location,

@@ -139,6 +139,8 @@ class ClubsRepositoryImpl implements ClubsRepository {
       Club(
         id: 'denver-uwh',
         name: 'Denver UWH',
+        shortName: 'DENVER UWH',
+        longName: 'DENVER AREA UNDERWATER HOCKEY CLUB',
         description: 'Denver Underwater Hockey - Multiple practice sessions throughout the week at VMAC and Carmody facilities.',
         location: 'Denver, CO',
         contactEmail: 'contact@denveruwh.com',
@@ -231,6 +233,8 @@ class ClubsRepositoryImpl implements ClubsRepository {
       Club(
         id: 'sydney-uwh',
         name: 'Sydney Kings',
+        shortName: 'SYDNEY KINGS',
+        longName: 'SYDNEY KINGS UNDERWATER HOCKEY',
         description: 'Sydney Kings Underwater Hockey Club - All levels welcome; bring fins & mouthguard.',
         location: 'Sydney, NSW',
         contactEmail: 'info@sydneykingsuwh.com.au',
