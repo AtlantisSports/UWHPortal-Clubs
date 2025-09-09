@@ -9,6 +9,10 @@ import '../../core/constants/app_constants.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/responsive_helper.dart';
+import '../../core/utils/app_error_handler.dart';
+import 'widgets/club_header.dart';
+import 'widgets/club_action_buttons.dart';
+import 'widgets/club_detail_tabs.dart';
 
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
