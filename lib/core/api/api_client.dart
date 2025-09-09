@@ -100,16 +100,6 @@ class ApiClient {
       );
     }
   }
-
-  /// Extract error message from response body
-  String _extractErrorMessage(http.Response response) {
-    try {
-      final body = json.decode(response.body) as Map<String, dynamic>;
-      return body['message'] ?? body['error'] ?? 'Unknown error';
-    } catch (e) {
-      return response.body.isNotEmpty ? response.body : 'Unknown error';
-    }
-  }
   
   void dispose() {
     _client.close();

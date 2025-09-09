@@ -183,17 +183,15 @@ class PhoneFrame extends StatelessWidget {
               // First, try to close drawer if it's open
               // We'll look for the current route's context that has a Scaffold
               final context = navigator.context;
-              if (context != null) {
-                try {
-                  // Try to find if there's a drawer open and close it
-                  final scaffoldState = Scaffold.maybeOf(context);
-                  if (scaffoldState != null && scaffoldState.isEndDrawerOpen) {
-                    navigator.pop(); // This closes the drawer
-                    return;
-                  }
-                } catch (e) {
-                  // If we can't find a scaffold, just continue with normal navigation
+              try {
+                // Try to find if there's a drawer open and close it
+                final scaffoldState = Scaffold.maybeOf(context);
+                if (scaffoldState != null && scaffoldState.isEndDrawerOpen) {
+                  navigator.pop(); // This closes the drawer
+                  return;
                 }
+              } catch (e) {
+                // If we can't find a scaffold, just continue with normal navigation
               }
               
               // If drawer is not open, try to navigate back in the navigation stack

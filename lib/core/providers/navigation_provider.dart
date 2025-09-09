@@ -6,8 +6,8 @@ class NavigationProvider extends ChangeNotifier {
   final List<int> _navigationHistory = [];
   bool _isDrawerOpen = false;
   
-  // Map of tab-specific back handlers
-  final Map<int, VoidCallback?> _tabBackHandlers = {};
+  // Map of tab-specific back handlers that return true if they handled internal navigation
+  final Map<int, bool Function()> _tabBackHandlers = {};
 
   // Getters
   int get selectedIndex => _selectedIndex;
@@ -15,8 +15,8 @@ class NavigationProvider extends ChangeNotifier {
   bool get isDrawerOpen => _isDrawerOpen;
   bool get canGoBack => _navigationHistory.isNotEmpty;
 
-  /// Register a back handler for a specific tab
-  void registerTabBackHandler(int tabIndex, VoidCallback? handler) {
+  /// Register a back handler for a specific tab that returns true if it handled internal navigation
+  void registerTabBackHandler(int tabIndex, bool Function() handler) {
     _tabBackHandlers[tabIndex] = handler;
   }
 
@@ -37,15 +37,16 @@ class NavigationProvider extends ChangeNotifier {
       }
       
       _selectedIndex = index;
+      
       notifyListeners();
       
-      debugPrint('DEBUG: Tab changed from $_selectedIndex to $index');
+      debugPrint('DEBUG: Tab changed from ${_navigationHistory.last} to $index');
       debugPrint('DEBUG: Navigation history: $_navigationHistory');
     } else if (index == 3) {
       // If clicking on the same clubs tab (index 3), reset to clubs list
       final clubsTabHandler = _tabBackHandlers[3];
       if (clubsTabHandler != null) {
-        debugPrint('DEBUG: Clubs tab clicked - resetting to list view');
+        debugPrint('DEBUG: Clubs tab clicked - attempting to reset to list view');
         clubsTabHandler();
       }
     }
@@ -58,15 +59,18 @@ class NavigationProvider extends ChangeNotifier {
       return false; // Let the drawer handle the back press
     }
 
-    // Check if current tab has its own back handler
+    // Check if current tab has its own back handler and if it can handle internal navigation
     final currentTabHandler = _tabBackHandlers[_selectedIndex];
     if (currentTabHandler != null) {
-      debugPrint('DEBUG: Using tab-specific back handler for tab: $_selectedIndex');
-      currentTabHandler();
-      return true;
+      final handledInternally = currentTabHandler();
+      if (handledInternally) {
+        debugPrint('DEBUG: Tab-specific handler handled internal navigation for tab: $_selectedIndex');
+        return true;
+      }
+      debugPrint('DEBUG: Tab-specific handler had no internal navigation to handle for tab: $_selectedIndex');
     }
 
-    // Try to go back in tab history
+    // Try to go back in tab history if no internal navigation was handled
     if (_navigationHistory.isNotEmpty) {
       final previousTab = _navigationHistory.removeLast();
       _selectedIndex = previousTab;

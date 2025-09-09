@@ -63,16 +63,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     upcomingPractices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return upcomingPractices.first;
   }
-
-  void _handleRSVPChange(RSVPStatus newStatus) {
-    final nextPractice = _getNextPractice();
-    if (nextPractice != null && widget.onRSVPChanged != null) {
-      setState(() {
-        _currentRSVPStatus = newStatus;
-      });
-      widget.onRSVPChanged!(nextPractice.id, newStatus);
-    }
-  }
   
   @override
   void dispose() {
@@ -89,15 +79,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       
       setState(() => _isMember = !_isMember);
       
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isMember ? 'Joined club successfully!' : 'Left club successfully!'),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(_isMember ? 'Joined club successfully!' : 'Left club successfully!'),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
     } finally {
       setState(() => _isLoading = false);
     }
@@ -106,7 +100,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   @override
   Widget build(BuildContext context) {
     // Force mobile layout since we're always within a phone frame
-    final bool isMobile = true;
     final EdgeInsets responsivePadding = const EdgeInsets.all(16.0);
     
     // Ensure content fits within phone frame constraints
@@ -123,16 +116,18 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         automaticallyImplyLeading: false,
         actions: [
           IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.notifications_outlined,
-              size: isMobile ? 24.0 : 28.8,
+              size: 24.0, // Mobile size
             ),
-            onPressed: () {},
+            onPressed: () {
+              // TODO: Implement notifications functionality
+            },
           ),
           IconButton(
-            icon: Icon(
+            icon: const Icon(
               Icons.menu,
-              size: isMobile ? 24.0 : 28.8,
+              size: 24.0, // Mobile size
             ),
             onPressed: () {
               Scaffold.of(context).openEndDrawer();
@@ -165,7 +160,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                     )
                   : Icon(
                       Icons.group,
-                      size: isMobile ? 80 : 100,
+                      size: 80, // Mobile size
                       color: Colors.white54,
                     ),
             ),
@@ -191,7 +186,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         child: Text(
                           widget.club.location,
                           style: AppTextStyles.bodyMedium.copyWith(
-                            fontSize: isMobile ? 14 : 16,
+                            fontSize: 14,
                             color: AppColors.textSecondary,
                           ),
                         ),
@@ -205,7 +200,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   Text(
                     widget.club.description,
                     style: AppTextStyles.bodyMedium.copyWith(
-                      fontSize: isMobile ? 14 : 16,
+                      fontSize: 14,
                     ),
                   ),
                   
@@ -275,11 +270,11 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         unselectedLabelColor: AppColors.textSecondary,
                         indicatorColor: AppColors.primary,
                         labelStyle: TextStyle(
-                          fontSize: isMobile ? 14 : 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.w500,
                         ),
                         unselectedLabelStyle: TextStyle(
-                          fontSize: isMobile ? 14 : 16,
+                          fontSize: 14,
                           fontWeight: FontWeight.normal,
                         ),
                         tabs: const [
@@ -314,9 +309,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildRSVPTab(BuildContext context) {
-    // Force mobile layout since we're always within a phone frame
-    final bool isMobile = true;
-    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
@@ -326,14 +318,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             Text(
               'RSVP Management',
               style: AppTextStyles.headline3.copyWith(
-                fontSize: isMobile ? 20 : 24,
+                fontSize: 20,
               ),
             ),
             SizedBox(height: ResponsiveHelper.getSpacing(context)),
             Text(
               'Manage your RSVP status for upcoming practices and events.',
               style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: isMobile ? 14 : 16,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
             ),
@@ -344,9 +336,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildTypicalPracticesTab(BuildContext context) {
-    // Force mobile layout since we're always within a phone frame
-    final bool isMobile = true;
-    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
@@ -356,7 +345,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             Text(
               'Typical Practice Schedule',
               style: AppTextStyles.headline3.copyWith(
-                fontSize: isMobile ? 20 : 24,
+                fontSize: 20,
               ),
             ),
             SizedBox(height: ResponsiveHelper.getSpacing(context)),
@@ -392,8 +381,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     required String location,
     required String description,
   }) {
-    final bool isMobile = ResponsiveHelper.isMobile(context);
-    
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16.0),
@@ -417,7 +404,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 child: Text(
                   day,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: isMobile ? 12 : 14,
+                    fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primary,
                   ),
@@ -427,7 +414,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               Text(
                 time,
                 style: AppTextStyles.bodyMedium.copyWith(
-                  fontSize: isMobile ? 14 : 16,
+                  fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
               ),
@@ -438,7 +425,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             children: [
               Icon(
                 Icons.location_on,
-                size: isMobile ? 16 : 18,
+                size: 16,
                 color: AppColors.textSecondary,
               ),
               const SizedBox(width: 4),
@@ -446,7 +433,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 child: Text(
                   location,
                   style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: isMobile ? 14 : 16,
+                    fontSize: 14,
                     color: AppColors.textSecondary,
                   ),
                 ),
@@ -458,7 +445,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             Text(
               description,
               style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: isMobile ? 13 : 15,
+                fontSize: 13,
                 color: AppColors.textSecondary,
                 fontStyle: FontStyle.italic,
               ),
@@ -470,9 +457,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildGalleryTab(BuildContext context) {
-    // Force mobile layout since we're always within a phone frame
-    final bool isMobile = true;
-    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Center(
@@ -481,14 +465,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           children: [
             Icon(
               Icons.photo_library,
-              size: isMobile ? 48 : 64,
+              size: 48,
               color: AppColors.textDisabled,
             ),
             SizedBox(height: ResponsiveHelper.getSpacing(context)),
             Text(
               'Club Gallery',
               style: AppTextStyles.headline3.copyWith(
-                fontSize: isMobile ? 20 : 24,
+                fontSize: 20,
               ),
               textAlign: TextAlign.center,
             ),
@@ -496,7 +480,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             Text(
               'Photos and videos coming soon',
               style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: isMobile ? 14 : 16,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,
@@ -508,9 +492,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildForumTab(BuildContext context) {
-    // Force mobile layout since we're always within a phone frame
-    final bool isMobile = true;
-    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Center(
@@ -519,14 +500,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           children: [
             Icon(
               Icons.forum,
-              size: isMobile ? 48 : 64,
+              size: 48,
               color: AppColors.textDisabled,
             ),
             SizedBox(height: ResponsiveHelper.getSpacing(context)),
             Text(
               'Club Forum',
               style: AppTextStyles.headline3.copyWith(
-                fontSize: isMobile ? 20 : 24,
+                fontSize: 20,
               ),
               textAlign: TextAlign.center,
             ),
@@ -534,7 +515,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             Text(
               'Discussions and announcements coming soon',
               style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: isMobile ? 14 : 16,
+                fontSize: 14,
                 color: AppColors.textSecondary,
               ),
               textAlign: TextAlign.center,

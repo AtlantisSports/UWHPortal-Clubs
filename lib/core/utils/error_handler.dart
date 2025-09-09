@@ -20,42 +20,36 @@ abstract class AppException implements Exception {
 
 /// Network-related errors
 class NetworkException extends AppException {
-  const NetworkException(String message, {String? code, dynamic originalError})
-      : super(message, code: code, originalError: originalError);
+  const NetworkException(super.message, {super.code, super.originalError});
 }
 
 /// API-specific errors
 class ApiException extends AppException {
   final int? statusCode;
   
-  const ApiException(String message, {this.statusCode, String? code, dynamic originalError})
-      : super(message, code: code, originalError: originalError);
+  const ApiException(super.message, {this.statusCode, super.code, super.originalError});
 }
 
 /// Validation errors
 class ValidationException extends AppException {
   final Map<String, List<String>>? fieldErrors;
   
-  const ValidationException(String message, {this.fieldErrors, String? code})
-      : super(message, code: code);
+  const ValidationException(super.message, {this.fieldErrors, super.code});
 }
 
 /// Authentication/Authorization errors
 class AuthException extends AppException {
-  const AuthException(String message, {String? code, dynamic originalError})
-      : super(message, code: code, originalError: originalError);
+  const AuthException(super.message, {super.code, super.originalError});
 }
 
 /// Data parsing/serialization errors
 class DataException extends AppException {
-  const DataException(String message, {String? code, dynamic originalError})
-      : super(message, code: code, originalError: originalError);
+  const DataException(super.message, {super.code, super.originalError});
 }
 
 /// Generic app exception for unhandled cases
 class GenericAppException extends AppException {
-  const GenericAppException(String message, {String? code, dynamic originalError})
-      : super(message, code: code, originalError: originalError);
+  const GenericAppException(super.message, {super.code, super.originalError});
 }
 
 /// Centralized error handler

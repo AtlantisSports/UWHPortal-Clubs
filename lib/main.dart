@@ -98,11 +98,11 @@ class MyApp extends StatelessWidget {
           builder: (context, navigationProvider, child) {
             return PhoneFrameWrapper(
               onBackPressed: () {
-                print('📱 Back button pressed');
+                debugPrint('📱 Back button pressed');
                 
                 // First check if drawer is open
                 if (navigationProvider.isDrawerOpen) {
-                  print('📱 Drawer is open, closing it');
+                  debugPrint('📱 Drawer is open, closing it');
                   final navContext = NavigationService.context;
                   if (navContext != null) {
                     Navigator.of(navContext).pop();
@@ -112,17 +112,17 @@ class MyApp extends StatelessWidget {
                 
                 // Try tab navigation history
                 if (navigationProvider.handlePhoneBackNavigation()) {
-                  print('📱 Phone back navigation succeeded');
+                  debugPrint('📱 Phone back navigation succeeded');
                   return;
                 }
                 
                 // Fallback to regular navigation
                 final navContext = NavigationService.context;
                 if (navContext != null && Navigator.of(navContext).canPop()) {
-                  print('📱 Using regular navigation pop');
+                  debugPrint('📱 Using regular navigation pop');
                   Navigator.of(navContext).pop();
                 } else {
-                  print('📱 Cannot pop navigation stack');
+                  debugPrint('📱 Cannot pop navigation stack');
                 }
               },
               child: const MainNavigationScreen(),
@@ -159,7 +159,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
   }
 
   void _onDrawerNavigate(int index) {
-    print('DEBUG: Drawer navigate to index: $index');
+    debugPrint('DEBUG: Drawer navigate to index: $index');
     final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
     
     // Handle navigation from drawer

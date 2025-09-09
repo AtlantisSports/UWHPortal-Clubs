@@ -131,10 +131,10 @@ class NextPracticeCard extends StatelessWidget {
               ],
             ),
             
-            if (practice!.description != null && practice!.description!.isNotEmpty) ...[
+            if (practice!.description.isNotEmpty) ...[
               const SizedBox(height: 8),
               Text(
-                practice!.description!,
+                practice!.description,
                 style: AppTextStyles.bodyMedium.copyWith(
                   fontSize: isMobile ? 13 : 15,
                   color: AppColors.textSecondary,
