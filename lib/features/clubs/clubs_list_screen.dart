@@ -8,6 +8,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/navigation_provider.dart';
+import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
@@ -70,7 +71,25 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
   
   void _handleRSVPChange(String practiceId, RSVPStatus newStatus) {
-    context.read<ClubsProvider>().handleRSVPChange(practiceId, newStatus);
+    // Use centralized RSVP provider
+    final rsvpProvider = context.read<RSVPProvider>();
+    
+    // Find the club that has this practice
+    final clubsProvider = context.read<ClubsProvider>();
+    String? clubId;
+    for (final club in clubsProvider.clubs) {
+      for (final practice in club.upcomingPractices) {
+        if (practice.id == practiceId) {
+          clubId = club.id;
+          break;
+        }
+      }
+      if (clubId != null) break;
+    }
+    
+    if (clubId != null) {
+      rsvpProvider.updateRSVP(clubId, practiceId, newStatus);
+    }
     
     // Show confirmation message
     if (mounted) {
@@ -287,6 +306,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               nextPractice: nextPractice,
                               currentRSVP: currentRSVP,
                               allPractices: club.upcomingPractices, // Add all practices for dropdown
+                              clubId: club.id, // Pass clubId for RSVP synchronization
                               onRSVPChanged: (status) {
                                 if (nextPractice != null) {
                                   _handleRSVPChange(nextPractice.id, status);

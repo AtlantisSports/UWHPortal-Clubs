@@ -2,7 +2,9 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
+import '../../core/providers/rsvp_provider.dart';
 
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
@@ -288,168 +290,189 @@ class RSVPSummary extends StatelessWidget {
 
 /// Next Practice Card component with circle-based RSVP design
 /// Shows upcoming practice details with circle RSVP buttons
-class NextPracticeCard extends StatelessWidget {
+class NextPracticeCard extends StatefulWidget {
   final Practice practice;
-  final RSVPStatus? currentRSVP;
-  final Function(RSVPStatus) onRSVPChanged;
+  final String? clubId; // Add clubId for RSVP updates
+  final RSVPStatus? currentRSVP; // Keep for backward compatibility
+  final Function(RSVPStatus)? onRSVPChanged; // Keep for backward compatibility
   final VoidCallback? onLocationTap;
   
   const NextPracticeCard({
     super.key,
     required this.practice,
+    this.clubId,
     this.currentRSVP,
-    required this.onRSVPChanged,
+    this.onRSVPChanged,
     this.onLocationTap,
   });
   
   @override
+  State<NextPracticeCard> createState() => _NextPracticeCardState();
+}
+
+class _NextPracticeCardState extends State<NextPracticeCard> {
+  
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB), // Light gray background
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with title and RSVP text positioned over buttons
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Consumer<RSVPProvider>(
+      builder: (context, rsvpProvider, child) {
+        // Get current RSVP status from provider, fallback to widget parameter
+        final currentRSVP = rsvpProvider.getRSVPStatus(widget.practice.id);
+        
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF9FAFB), // Light gray background
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Next Practice',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
-                ),
-              ),
-              // Spacer to position RSVP text over buttons
-              SizedBox(
-                width: 160, // Width of 3 buttons (48) + 2 gaps (8) + padding = ~160
-                child: Center(
-                  child: Text(
-                    _getRSVPHeaderText(),
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
-                      color: _getRSVPHeaderColor(),
+              // Header with title and RSVP text positioned over buttons
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Next Practice',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF374151),
                     ),
                   ),
-                ),
+                  // Spacer to position RSVP text over buttons
+                  SizedBox(
+                    width: 160, // Width of 3 buttons (48) + 2 gaps (8) + padding = ~160
+                    child: Center(
+                      child: Text(
+                        _getRSVPHeaderText(currentRSVP),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                          color: _getRSVPHeaderColor(currentRSVP),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          
-          // Practice details
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Date
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.calendar_today,
-                          size: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _formatDate(practice.dateTime),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF374151),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    
-                    // Time
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.access_time,
-                          size: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          _formatTime(practice.dateTime),
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Color(0xFF6B7280),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 2),
-                    
-                    // Location
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: Color(0xFF6B7280),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: GestureDetector(
-                            onTap: onLocationTap,
-                            child: Text(
-                              practice.location,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: onLocationTap != null 
-                                    ? const Color(0xFF0284C7) 
-                                    : const Color(0xFF6B7280),
-                                decoration: onLocationTap != null 
-                                    ? TextDecoration.underline 
-                                    : null,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
+              const SizedBox(height: 6),
               
-              // RSVP buttons
+              // Practice details
               Row(
                 children: [
-                  _buildRSVPButton(RSVPStatus.yes),
-                  const SizedBox(width: 8),
-                  _buildRSVPButton(RSVPStatus.maybe),
-                  const SizedBox(width: 8),
-                  _buildRSVPButton(RSVPStatus.no),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Date
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.calendar_today,
+                              size: 16,
+                              color: Color(0xFF6B7280),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatDate(widget.practice.dateTime),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        
+                        // Time
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.access_time,
+                              size: 16,
+                              color: Color(0xFF6B7280),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _formatTime(widget.practice.dateTime),
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Color(0xFF6B7280),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        
+                        // Location
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.location_on,
+                              size: 16,
+                              color: Color(0xFF6B7280),
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: widget.onLocationTap,
+                                child: Text(
+                                  widget.practice.location,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: widget.onLocationTap != null 
+                                        ? const Color(0xFF0284C7) 
+                                        : const Color(0xFF6B7280),
+                                    decoration: widget.onLocationTap != null 
+                                        ? TextDecoration.underline 
+                                        : null,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  // RSVP buttons
+                  Row(
+                    children: [
+                      _buildRSVPButton(RSVPStatus.yes, currentRSVP, rsvpProvider),
+                      const SizedBox(width: 8),
+                      _buildRSVPButton(RSVPStatus.maybe, currentRSVP, rsvpProvider),
+                      const SizedBox(width: 8),
+                      _buildRSVPButton(RSVPStatus.no, currentRSVP, rsvpProvider),
+                    ],
+                  ),
                 ],
               ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
   
-  Widget _buildRSVPButton(RSVPStatus status) {
+  Widget _buildRSVPButton(RSVPStatus status, RSVPStatus currentRSVP, RSVPProvider rsvpProvider) {
     final isSelected = currentRSVP == status;
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
     
     return GestureDetector(
-      onTap: () {
+      onTap: () async {
         // Only change if clicking a different option
         if (currentRSVP != status) {
-          onRSVPChanged(status);
+          // Use RSVPProvider for centralized state management
+          if (widget.clubId != null) {
+            await rsvpProvider.updateRSVP(widget.clubId!, widget.practice.id, status);
+          }
+          
+          // Call legacy callback if provided for backward compatibility
+          widget.onRSVPChanged?.call(status);
         }
         // If already selected, do nothing (no toast, no change)
       },
@@ -479,17 +502,15 @@ class NextPracticeCard extends StatelessWidget {
             child: Icon(
               _getOverlayIcon(status),
               size: status == RSVPStatus.maybe 
-                ? 18.954 // 10% smaller than current size (21.06 * 0.9)
-                : 23.4, // Increased by 30% (18 * 1.3 = 23.4)
+                  ? 18.954 // 10% smaller than current size (21.06 * 0.9)
+                  : 23.4, // Increased by 30% (18 * 1.3 = 23.4)
               color: color,
             ),
           ),
         ),
       ),
     );
-  }
-  
-  Color _getFadedBackground(RSVPStatus status) {
+  }  Color _getFadedBackground(RSVPStatus status) {
     switch (status) {
       case RSVPStatus.yes:
         return const Color(0xFFECFDF5);
@@ -502,7 +523,7 @@ class NextPracticeCard extends StatelessWidget {
     }
   }
 
-  String _getRSVPHeaderText() {
+  String _getRSVPHeaderText(RSVPStatus? currentRSVP) {
     switch (currentRSVP) {
       case RSVPStatus.yes:
         return 'You are going';
@@ -517,7 +538,7 @@ class NextPracticeCard extends StatelessWidget {
     }
   }
 
-  Color _getRSVPHeaderColor() {
+  Color _getRSVPHeaderColor(RSVPStatus? currentRSVP) {
     switch (currentRSVP) {
       case RSVPStatus.yes:
         return const Color(0xFF10B981); // Green

@@ -9,11 +9,14 @@ import 'package:provider/provider.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/providers/navigation_provider.dart';
+import 'core/providers/rsvp_provider.dart';
+import 'core/providers/user_provider.dart';
 import 'features/clubs/clubs_list_screen.dart';
 import 'features/clubs/clubs_provider.dart';
 import 'features/home/home_screen.dart';
 import 'features/events/events_screen.dart';
 import 'features/programs/programs_screen.dart';
+import 'features/profile/profile_screen_new.dart';
 import 'base/widgets/phone_frame.dart';
 import 'base/widgets/right_drawer.dart';
 import 'core/utils/navigation_service.dart';
@@ -35,7 +38,13 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => ClubsProvider()),
+        ChangeNotifierProvider(create: (_) => UserProvider()),
+        ChangeNotifierProvider(create: (_) => RSVPProvider()),
+        ChangeNotifierProxyProvider<RSVPProvider, ClubsProvider>(
+          create: (context) => ClubsProvider(rsvpProvider: context.read<RSVPProvider>()),
+          update: (context, rsvpProvider, clubsProvider) => 
+              clubsProvider ?? ClubsProvider(rsvpProvider: rsvpProvider),
+        ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         // Add more providers as features grow
       ],
@@ -150,7 +159,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     const EventsScreen(),
     const ProgramsScreen(),
     const ClubsListScreen(),
-    const ProfilePlaceholderScreen(),
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -267,40 +276,4 @@ class EventsPlaceholderScreen extends StatelessWidget {
   }
 }
 
-/// Placeholder screen for Profile feature
-class ProfilePlaceholderScreen extends StatelessWidget {
-  const ProfilePlaceholderScreen({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Profile'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-      ),
-      body: const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person,
-              size: 64,
-              color: AppColors.textDisabled,
-            ),
-            SizedBox(height: AppSpacing.medium),
-            Text(
-              'Profile Feature',
-              style: AppTextStyles.headline2,
-            ),
-            SizedBox(height: AppSpacing.small),
-            Text(
-              'Coming Soon',
-              style: AppTextStyles.bodyMedium,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

@@ -66,6 +66,7 @@ class ClubCard extends StatefulWidget {
   final Function(RSVPStatus)? onRSVPChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
+  final String? clubId; // Add clubId for RSVP synchronization
   
   const ClubCard({
     super.key,
@@ -78,6 +79,7 @@ class ClubCard extends StatefulWidget {
     this.onRSVPChanged,
     this.onTap,
     this.onLocationTap,
+    this.clubId,
   });
 
   @override
@@ -157,6 +159,7 @@ class _ClubCardState extends State<ClubCard> {
             const SizedBox(height: AppSpacing.medium),
             NextPracticeCard(
               practice: widget.nextPractice!,
+              clubId: widget.clubId,
               currentRSVP: widget.currentRSVP,
               onRSVPChanged: widget.onRSVPChanged ?? (_) {},
               onLocationTap: widget.onLocationTap,

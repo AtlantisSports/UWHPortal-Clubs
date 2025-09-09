@@ -8,14 +8,17 @@ import 'package:flutter/foundation.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/utils/error_handler.dart';
+import '../../core/providers/rsvp_provider.dart';
 import 'clubs_repository.dart';
 import '../../core/di/service_locator.dart';
 
 class ClubsProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
+  final RSVPProvider? _rsvpProvider;
   
-  ClubsProvider({ClubsRepository? clubsRepository}) 
-    : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
+  ClubsProvider({ClubsRepository? clubsRepository, RSVPProvider? rsvpProvider}) 
+    : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository,
+      _rsvpProvider = rsvpProvider;
 
   // State
   List<Club> _clubs = [];
@@ -45,6 +48,15 @@ class ClubsProvider with ChangeNotifier {
     try {
       _clubs = await _clubsRepository.getClubs();
       _applyFilters();
+      
+      // Initialize RSVP statuses for all practices
+      if (_rsvpProvider != null) {
+        final allPractices = <Practice>[];
+        for (final club in _clubs) {
+          allPractices.addAll(club.upcomingPractices);
+        }
+        _rsvpProvider!.initializePracticesRSVP(allPractices);
+      }
     } catch (error) {
       final errorMessage = AppErrorHandler.getErrorMessage(error);
       _setError(errorMessage);
@@ -102,24 +114,48 @@ class ClubsProvider with ChangeNotifier {
   Future<void> handleRSVPChange(String practiceId, RSVPStatus status) async {
     if (_selectedClub == null) return;
 
-    try {
-      await _clubsRepository.updateRSVP(_selectedClub!.id, practiceId, status);
+    // Delegate to RSVPProvider if available, otherwise fall back to old method
+    if (_rsvpProvider != null) {
+      await _rsvpProvider!.updateRSVP(_selectedClub!.id, practiceId, status);
       
-      // Refresh the selected club data
-      _selectedClub = await _clubsRepository.getClub(_selectedClub!.id);
-      
-      // Update in the main clubs list
-      final clubIndex = _clubs.indexWhere((c) => c.id == _selectedClub!.id);
-      if (clubIndex != -1) {
-        _clubs[clubIndex] = _selectedClub!;
-        _applyFilters();
+      // Refresh club data to get updated practice information
+      try {
+        _selectedClub = await _clubsRepository.getClub(_selectedClub!.id);
+        
+        // Update in the main clubs list
+        final clubIndex = _clubs.indexWhere((c) => c.id == _selectedClub!.id);
+        if (clubIndex != -1) {
+          _clubs[clubIndex] = _selectedClub!;
+          _applyFilters();
+        }
+        
+        notifyListeners();
+      } catch (error) {
+        final errorMessage = AppErrorHandler.getErrorMessage(error);
+        _setError(errorMessage);
+        AppErrorHandler.handleError(error);
       }
+    } else {
+      // Fallback to old method if RSVPProvider is not available
+      try {
+        await _clubsRepository.updateRSVP(_selectedClub!.id, practiceId, status);
+        
+        // Refresh the selected club data
+        _selectedClub = await _clubsRepository.getClub(_selectedClub!.id);
+        
+        // Update in the main clubs list
+        final clubIndex = _clubs.indexWhere((c) => c.id == _selectedClub!.id);
+        if (clubIndex != -1) {
+          _clubs[clubIndex] = _selectedClub!;
+          _applyFilters();
+        }
 
-      notifyListeners();
-    } catch (error) {
-      final errorMessage = AppErrorHandler.getErrorMessage(error);
-      _setError(errorMessage);
-      AppErrorHandler.handleError(error);
+        notifyListeners();
+      } catch (error) {
+        final errorMessage = AppErrorHandler.getErrorMessage(error);
+        _setError(errorMessage);
+        AppErrorHandler.handleError(error);
+      }
     }
   }
 

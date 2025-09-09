@@ -2,10 +2,12 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/responsive_helper.dart';
@@ -53,13 +55,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     }
   }
 
-  void _updateRSVP(RSVPStatus status) {
+  void _updateRSVP(RSVPStatus status) async {
     final nextPractice = _getNextPractice();
     if (nextPractice != null) {
+      // Use centralized RSVP provider
+      final rsvpProvider = context.read<RSVPProvider>();
+      await rsvpProvider.updateRSVP(widget.club.id, nextPractice.id, status);
+      
+      // Update local state for immediate UI feedback
       setState(() {
         _currentRSVPStatus = status;
       });
-      // Call the parent callback if provided
+      
+      // Call the parent callback if provided for backward compatibility
       widget.onRSVPChanged?.call(nextPractice.id, status);
     }
   }
@@ -163,7 +171,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           IconButton(
             icon: const Icon(
               Icons.notifications_outlined,
-              size: 24.0, // Mobile size
+              size: 28.8, // Match other tabs
             ),
             onPressed: () {
               // TODO: Implement notifications functionality
@@ -172,7 +180,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           IconButton(
             icon: const Icon(
               Icons.menu,
-              size: 24.0, // Mobile size
+              size: 28.8, // Match other tabs
             ),
             onPressed: () {
               Scaffold.of(context).openEndDrawer();
@@ -273,13 +281,17 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
                   
                   // Next Practice Card (same as clubs page)
-                  Builder(builder: (context) {
+                  Consumer<RSVPProvider>(builder: (context, rsvpProvider, child) {
                     final nextPractice = _getNextPractice();
                     if (nextPractice == null) return const SizedBox.shrink();
                     
+                    // Initialize RSVP status if needed
+                    rsvpProvider.initializePracticeRSVP(nextPractice);
+                    
                     return NextPracticeCard(
                       practice: nextPractice,
-                      currentRSVP: _currentRSVPStatus,
+                      clubId: widget.club.id,
+                      currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),
                       onRSVPChanged: (status) => _updateRSVP(status),
                       onLocationTap: _handleLocationTap,
                     );
