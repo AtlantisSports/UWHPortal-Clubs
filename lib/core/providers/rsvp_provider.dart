@@ -1,8 +1,4 @@
-/// Centralized RSVP state management with bulk operations support
-/// 
-/// This provider manages RSVP status across all practices and clubs
-/// ensuring synchronization between home, club list, and club detail screens
-library;
+
 
 import 'package:flutter/foundation.dart';
 import '../models/practice.dart';

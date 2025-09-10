@@ -1,5 +1,4 @@
-/// User role model for role-based access control
-library;
+
 
 enum UserRole {
   clubAdmin('Club Admin'),

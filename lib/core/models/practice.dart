@@ -1,5 +1,4 @@
-/// Practice model for club practice sessions with bulk RSVP support
-library;
+
 
 import 'package:flutter/material.dart';
 import 'base_model.dart';
@@ -51,7 +50,7 @@ class BulkRSVPResult {
     if (isFullSuccess) {
       return '${successfulIds.length} practices updated to ${appliedStatus.displayText}';
     } else if (isPartialSuccess) {
-      return '${successfulIds.length}/${totalProcessed} practices updated successfully';
+  return '${successfulIds.length}/$totalProcessed practices updated successfully';
     } else {
       return 'Failed to update practices';
     }

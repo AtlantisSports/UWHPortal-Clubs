@@ -1,5 +1,4 @@
-/// RSVP icon button component with circle-based design and bulk RSVP support
-library;
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';

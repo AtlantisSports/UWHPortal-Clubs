@@ -1,202 +1,101 @@
-/// Clubs state management using Provider pattern
-/// 
-/// This centralizes all clubs-related state and business logic,
-/// removing it from UI widgets and improving testability.
-library;
-
 import 'package:flutter/foundation.dart';
 import '../../core/models/club.dart';
-import '../../core/models/practice.dart';
-import '../../core/utils/error_handler.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/utils/error_handler.dart';
 import 'clubs_repository.dart';
 import '../../core/di/service_locator.dart';
 
 class ClubsProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
-  final RSVPProvider? _rsvpProvider;
+  final RSVPProvider rsvpProvider;
   
-  ClubsProvider({ClubsRepository? clubsRepository, RSVPProvider? rsvpProvider}) 
-    : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository,
-      _rsvpProvider = rsvpProvider;
+  ClubsProvider({
+    required this.rsvpProvider,
+    ClubsRepository? clubsRepository,
+  }) : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
 
   // State
   List<Club> _clubs = [];
-  List<Club> _filteredClubs = [];
-  Club? _selectedClub;
   bool _isLoading = false;
   String? _error;
-  String _searchQuery = '';
-  String? _selectedLocation;
-  List<String> _selectedTags = [];
 
   // Getters
-  List<Club> get clubs => _filteredClubs;
-  Club? get selectedClub => _selectedClub;
+  List<Club> get clubs => _clubs;
   bool get isLoading => _isLoading;
   String? get error => _error;
-  String get searchQuery => _searchQuery;
-  String? get selectedLocation => _selectedLocation;
-  List<String> get selectedTags => _selectedTags;
-  bool get hasClubs => _clubs.isNotEmpty;
 
-  /// Load all clubs from API
+  /// Load all clubs from the repository
   Future<void> loadClubs() async {
+    if (_isLoading) return;
+    
     _setLoading(true);
-    _setError(null);
-
+    _clearError();
+    
     try {
       _clubs = await _clubsRepository.getClubs();
-      _applyFilters();
       
-      // Initialize RSVP statuses for all practices
-      if (_rsvpProvider != null) {
-        final allPractices = <Practice>[];
-        for (final club in _clubs) {
-          allPractices.addAll(club.upcomingPractices);
+      // Initialize RSVP status for all upcoming practices
+      for (final club in _clubs) {
+        for (final practice in club.upcomingPractices) {
+          rsvpProvider.initializePracticeRSVP(practice);
         }
-        _rsvpProvider!.initializePracticesRSVP(allPractices);
       }
-    } catch (error) {
-      final errorMessage = AppErrorHandler.getErrorMessage(error);
-      _setError(errorMessage);
       
-      // Log error for debugging
-      AppErrorHandler.handleError(error);
+      notifyListeners();
+    } catch (e) {
+      _error = AppErrorHandler.getErrorMessage(e);
+      notifyListeners();
     } finally {
       _setLoading(false);
     }
   }
 
-  /// Refresh clubs data
-  Future<void> refreshClubs() async {
-    await _clubsRepository.refreshClubs();
-    await loadClubs();
-  }
-
-  /// Search clubs by query
-  void searchClubs(String query) {
-    _searchQuery = query;
-    _applyFilters();
-    notifyListeners();
-  }
-
-  /// Filter clubs by location
-  void filterByLocation(String? location) {
-    _selectedLocation = location;
-    _applyFilters();
-    notifyListeners();
-  }
-
-  /// Filter clubs by tags
-  void filterByTags(List<String> tags) {
-    _selectedTags = tags;
-    _applyFilters();
-    notifyListeners();
-  }
-
-  /// Clear all filters
-  void clearFilters() {
-    _searchQuery = '';
-    _selectedLocation = null;
-    _selectedTags = [];
-    _applyFilters();
-    notifyListeners();
-  }
-
-  /// Select a specific club
-  void selectClub(Club club) {
-    _selectedClub = club;
-    notifyListeners();
-  }
-
-  /// Handle RSVP change for a practice
-  Future<void> handleRSVPChange(String practiceId, RSVPStatus status) async {
-    if (_selectedClub == null) return;
-
-    // Delegate to RSVPProvider if available, otherwise fall back to old method
-    if (_rsvpProvider != null) {
-      await _rsvpProvider!.updateRSVP(_selectedClub!.id, practiceId, status);
-      
-      // Refresh club data to get updated practice information
-      try {
-        _selectedClub = await _clubsRepository.getClub(_selectedClub!.id);
-        
-        // Update in the main clubs list
-        final clubIndex = _clubs.indexWhere((c) => c.id == _selectedClub!.id);
-        if (clubIndex != -1) {
-          _clubs[clubIndex] = _selectedClub!;
-          _applyFilters();
-        }
-        
-        notifyListeners();
-      } catch (error) {
-        final errorMessage = AppErrorHandler.getErrorMessage(error);
-        _setError(errorMessage);
-        AppErrorHandler.handleError(error);
-      }
-    } else {
-      // Fallback to old method if RSVPProvider is not available
-      try {
-        await _clubsRepository.updateRSVP(_selectedClub!.id, practiceId, status);
-        
-        // Refresh the selected club data
-        _selectedClub = await _clubsRepository.getClub(_selectedClub!.id);
-        
-        // Update in the main clubs list
-        final clubIndex = _clubs.indexWhere((c) => c.id == _selectedClub!.id);
-        if (clubIndex != -1) {
-          _clubs[clubIndex] = _selectedClub!;
-          _applyFilters();
-        }
-
-        notifyListeners();
-      } catch (error) {
-        final errorMessage = AppErrorHandler.getErrorMessage(error);
-        _setError(errorMessage);
-        AppErrorHandler.handleError(error);
-      }
+  /// Get a club by ID
+  Club? getClubById(String clubId) {
+    try {
+      return _clubs.firstWhere((club) => club.id == clubId);
+    } catch (e) {
+      return null;
     }
   }
 
-  /// Private helper methods
+  /// Refresh clubs data
+  Future<void> refreshClubs() async {
+    await loadClubs();
+  }
+
+  /// Filter clubs by tags
+  List<Club> getClubsByTags(List<String> tags) {
+    return _clubs.where((club) {
+      return tags.any((tag) => club.tags.contains(tag));
+    }).toList();
+  }
+
+  /// Search clubs by name or description
+  List<Club> searchClubs(String query) {
+    if (query.isEmpty) return _clubs;
+    
+    final lowercaseQuery = query.toLowerCase();
+    return _clubs.where((club) {
+      return club.name.toLowerCase().contains(lowercaseQuery) ||
+             club.description.toLowerCase().contains(lowercaseQuery) ||
+             club.shortName.toLowerCase().contains(lowercaseQuery) ||
+             club.longName.toLowerCase().contains(lowercaseQuery);
+    }).toList();
+  }
+
+  /// Get active clubs only
+  List<Club> get activeClubs {
+    return _clubs.where((club) => club.isActive).toList();
+  }
+
+  // Private helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
 
-  void _setError(String? error) {
-    _error = error;
-    if (error != null) {
-      notifyListeners();
-    }
-  }
-
-  void _applyFilters() {
-    _filteredClubs = _clubs.where((club) {
-      // Search filter
-      if (_searchQuery.isNotEmpty) {
-        final query = _searchQuery.toLowerCase();
-        if (!club.name.toLowerCase().contains(query) &&
-            !club.description.toLowerCase().contains(query) &&
-            !club.location.toLowerCase().contains(query)) {
-          return false;
-        }
-      }
-
-      // Location filter
-      if (_selectedLocation != null && 
-          club.location != _selectedLocation) {
-        return false;
-      }
-
-      // Tags filter
-      if (_selectedTags.isNotEmpty &&
-          !_selectedTags.every((tag) => club.tags.contains(tag))) {
-        return false;
-      }
-
-      return true;
-    }).toList();
+  void _clearError() {
+    _error = null;
   }
 }

@@ -1,5 +1,4 @@
-/// User provider for managing current user state and role
-library;
+
 
 import 'package:flutter/foundation.dart';
 import '../models/user_role.dart';

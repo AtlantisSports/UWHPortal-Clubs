@@ -1,5 +1,4 @@
-/// Profile feature - Simple profile screen with role selection for testing
-library;
+
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -55,18 +54,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   child: SingleChildScrollView(
                     child: Column(
                       children: UserRole.values.map((role) {
-                        return RadioListTile<UserRole>(
-                          value: role,
-                          groupValue: tempSelectedRole,
-                          onChanged: (UserRole? value) {
-                            if (value != null) {
-                              setState(() {
-                                tempSelectedRole = value;
-                              });
-                            }
+                        return InkWell(
+                          onTap: () {
+                            setState(() {
+                              tempSelectedRole = role;
+                            });
                           },
-                          title: Text(role.displayName),
-                          activeColor: AppColors.primary,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  tempSelectedRole == role 
+                                    ? Icons.radio_button_checked 
+                                    : Icons.radio_button_unchecked,
+                                  color: AppColors.primary,
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Text(role.displayName),
+                                ),
+                              ],
+                            ),
+                          ),
                         );
                       }).toList(),
                     ),
