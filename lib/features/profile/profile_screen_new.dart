@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/providers/user_provider.dart';
 import '../../core/models/user_role.dart';
 import '../../core/constants/app_constants.dart';
+import '../../base/widgets/phone_modal_utils.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -15,147 +16,101 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  void _showRoleSelectionModal(BuildContext context) {
+  void _showRoleSelectionModal(BuildContext context) async {
     final userProvider = Provider.of<UserProvider>(context, listen: false);
     UserRole tempSelectedRole = userProvider.currentRole;
 
-    showGeneralDialog(
+    await PhoneModalUtils.showPhoneModal(
       context: context,
-      barrierDismissible: true,
-      barrierLabel: "Role Selection",
-      barrierColor: Colors.transparent, // No default barrier
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Material(
-              type: MaterialType.transparency,
-              child: Center(
-                child: Container(
-                  width: 393, // Match phone width exactly
-                  height: double.infinity,
-                  child: Stack(
-                    children: [
-                      // Custom backdrop only within phone bounds
-                      Positioned.fill(
-                        top: 100, // Space for app bar
-                        bottom: 100, // Space for bottom nav
-                        child: Container(
-                          color: Colors.black54,
-                          child: GestureDetector(
-                            onTap: () => Navigator.of(context).pop(),
-                            child: Container(),
-                          ),
-                        ),
+      child: StatefulBuilder(
+        builder: (context, setState) {
+          return Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Select Role',
+                      style: TextStyle(
+                        fontSize: 18, // Mobile-friendly size
+                        fontWeight: FontWeight.bold,
                       ),
-                      // Modal content
-                      Positioned(
-                        top: 120,
-                        bottom: 120,
-                        left: 20,
-                        right: 20,
-                        child: Center(
-                          child: Material(
-                            borderRadius: BorderRadius.circular(12),
-                            elevation: 8,
-                            child: Container(
-                              constraints: const BoxConstraints(
-                                maxHeight: 450,
-                              ),
-                              padding: const EdgeInsets.all(20),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  // Header
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                    children: [
-                                      const Text(
-                                        'Select Role',
-                                        style: TextStyle(
-                                          fontSize: 18, // Mobile-friendly size
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.close),
-                                        iconSize: 20, // Smaller close button
-                                        onPressed: () => Navigator.of(context).pop(),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 12),
-                                  
-                                  // Role selection list
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      child: Column(
-                                        children: UserRole.values.map((role) {
-                                          return RadioListTile<UserRole>(
-                                            value: role,
-                                            groupValue: tempSelectedRole,
-                                            onChanged: (UserRole? value) {
-                                              if (value != null) {
-                                                setState(() {
-                                                  tempSelectedRole = value;
-                                                });
-                                              }
-                                            },
-                                            title: Text(role.displayName),
-                                            activeColor: AppColors.primary,
-                                          );
-                                        }).toList(),
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  const SizedBox(height: 16),
-                                  
-                                  // Action buttons
-                                  Row(
-                                    mainAxisAlignment: MainAxisAlignment.end,
-                                    children: [
-                                      TextButton(
-                                        onPressed: () => Navigator.of(context).pop(),
-                                        child: Text(
-                                          'Cancel',
-                                          style: TextStyle(color: Colors.grey[600]),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      ElevatedButton(
-                                        onPressed: () {
-                                          userProvider.updateRole(tempSelectedRole);
-                                          Navigator.of(context).pop();
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            SnackBar(
-                                              content: Text('Role updated to ${tempSelectedRole.displayName}'),
-                                              duration: const Duration(seconds: 2),
-                                            ),
-                                          );
-                                        },
-                                        style: ElevatedButton.styleFrom(
-                                          backgroundColor: AppColors.primary,
-                                          foregroundColor: Colors.white,
-                                        ),
-                                        child: const Text('Apply'),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close),
+                      iconSize: 20, // Smaller close button
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                
+                // Role selection list
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      children: UserRole.values.map((role) {
+                        return RadioListTile<UserRole>(
+                          value: role,
+                          groupValue: tempSelectedRole,
+                          onChanged: (UserRole? value) {
+                            if (value != null) {
+                              setState(() {
+                                tempSelectedRole = value;
+                              });
+                            }
+                          },
+                          title: Text(role.displayName),
+                          activeColor: AppColors.primary,
+                        );
+                      }).toList(),
+                    ),
                   ),
                 ),
-              ),
-            );
-          },
-        );
-      },
+                
+                const SizedBox(height: 16),
+                
+                // Action buttons
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: Text(
+                        'Cancel',
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    ElevatedButton(
+                      onPressed: () {
+                        userProvider.updateRole(tempSelectedRole);
+                        Navigator.of(context).pop();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Role updated to ${tempSelectedRole.displayName}'),
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 

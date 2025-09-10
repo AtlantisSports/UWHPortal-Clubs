@@ -1,4 +1,4 @@
-/// Centralized RSVP state management
+/// Centralized RSVP state management with bulk operations support
 /// 
 /// This provider manages RSVP status across all practices and clubs
 /// ensuring synchronization between home, club list, and club detail screens
@@ -24,12 +24,18 @@ class RSVPProvider with ChangeNotifier {
   // Map to track loading states for each practice
   final Map<String, bool> _loadingStates = {};
   
+  // Bulk operation tracking
+  bool _isBulkOperationInProgress = false;
+  String? _bulkOperationStatus;
+  
   // Error tracking
   String? _error;
 
   // Getters
   String? get error => _error;
   String get currentUserId => _currentUserId;
+  bool get isBulkOperationInProgress => _isBulkOperationInProgress;
+  String? get bulkOperationStatus => _bulkOperationStatus;
 
   /// Get RSVP status for a specific practice
   RSVPStatus getRSVPStatus(String practiceId) {
@@ -91,6 +97,92 @@ class RSVPProvider with ChangeNotifier {
     }
   }
   
+  /// Bulk update RSVP status for multiple practices
+  Future<BulkRSVPResult> bulkUpdateRSVP(BulkRSVPRequest request) async {
+    if (_isBulkOperationInProgress) {
+      throw Exception('Another bulk operation is already in progress');
+    }
+    
+    _isBulkOperationInProgress = true;
+    _bulkOperationStatus = 'Processing ${request.practiceIds.length} practices...';
+    _setError(null);
+    notifyListeners();
+
+    final successfulIds = <String>[];
+    final failedIds = <String>[];
+    final errors = <String, String>{};
+
+    try {
+      // Process each practice individually for better error handling
+      for (int i = 0; i < request.practiceIds.length; i++) {
+        final practiceId = request.practiceIds[i];
+        
+        // Update status message
+        _bulkOperationStatus = 'Updating practice ${i + 1} of ${request.practiceIds.length}...';
+        notifyListeners();
+        
+        try {
+          // Update the repository
+          await _clubsRepository.updateRSVP(request.clubId, practiceId, request.newStatus);
+          
+          // Update local state
+          _rsvpStatusMap[practiceId] = request.newStatus;
+          successfulIds.add(practiceId);
+          
+        } catch (error) {
+          final errorMessage = AppErrorHandler.getErrorMessage(error);
+          errors[practiceId] = errorMessage;
+          failedIds.add(practiceId);
+          debugPrint('Failed to update RSVP for practice $practiceId: $errorMessage');
+        }
+        
+        // Small delay to prevent overwhelming the server
+        await Future.delayed(const Duration(milliseconds: 100));
+      }
+      
+      // Create result
+      final result = BulkRSVPResult(
+        successfulIds: successfulIds,
+        failedIds: failedIds,
+        errors: errors,
+        appliedStatus: request.newStatus,
+      );
+      
+      // Notify listeners of the changes
+      if (successfulIds.isNotEmpty) {
+        notifyListeners();
+      }
+      
+      return result;
+      
+    } catch (error) {
+      final errorMessage = AppErrorHandler.getErrorMessage(error);
+      _setError('Bulk RSVP operation failed: $errorMessage');
+      AppErrorHandler.handleError(error);
+      
+      // Return failure result
+      return BulkRSVPResult(
+        successfulIds: successfulIds,
+        failedIds: request.practiceIds.where((id) => !successfulIds.contains(id)).toList(),
+        errors: {for (final id in request.practiceIds) id: errorMessage},
+        appliedStatus: request.newStatus,
+      );
+    } finally {
+      _isBulkOperationInProgress = false;
+      _bulkOperationStatus = null;
+      notifyListeners();
+    }
+  }
+  
+  /// Get RSVP statuses for multiple practices
+  Map<String, RSVPStatus> getBulkRSVPStatuses(List<String> practiceIds) {
+    final result = <String, RSVPStatus>{};
+    for (final id in practiceIds) {
+      result[id] = getRSVPStatus(id);
+    }
+    return result;
+  }
+
   /// Refresh RSVP status for a specific practice
   Future<void> refreshPracticeRSVP(String clubId, String practiceId) async {
     try {

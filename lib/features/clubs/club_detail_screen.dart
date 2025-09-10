@@ -12,6 +12,7 @@ import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/responsive_helper.dart';
 import '../../core/utils/app_error_handler.dart';
+import '../bulk_rsvp/bulk_rsvp_screen.dart';
 import 'widgets/club_header.dart';
 import 'widgets/club_action_buttons.dart';
 import 'widgets/club_detail_tabs.dart';
@@ -358,18 +359,34 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'RSVP Management',
-              style: AppTextStyles.headline3.copyWith(
-                fontSize: 20,
-              ),
-            ),
-            SizedBox(height: ResponsiveHelper.getSpacing(context)),
-            Text(
-              'Manage your RSVP status for upcoming practices and events.',
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: 14,
-                color: AppColors.textSecondary,
+            // Bulk RSVP Button
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => BulkRSVPScreen(clubId: widget.club.id),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0284C7),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  elevation: 2,
+                ),
+                child: const Text(
+                  'Bulk RSVP',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
             ),
           ],

@@ -1,4 +1,4 @@
-/// RSVP icon button component with circle-based design
+/// RSVP icon button component with circle-based design and bulk RSVP support
 library;
 
 import 'package:flutter/material.dart';
@@ -581,5 +581,546 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
     final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
     
     return '$displayHour:$minute $period';
+  }
+}
+
+/// Selectable practice card for bulk RSVP operations
+class SelectablePracticeCard extends StatelessWidget {
+  final Practice practice;
+  final String currentUserId;
+  final bool isSelected;
+  final Function(String practiceId, bool selected) onSelectionChanged;
+  final VoidCallback? onTap;
+  final bool showRSVPSummary;
+  
+  const SelectablePracticeCard({
+    super.key,
+    required this.practice,
+    required this.currentUserId,
+    required this.isSelected,
+    required this.onSelectionChanged,
+    this.onTap,
+    this.showRSVPSummary = true,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    final userRSVPStatus = practice.getRSVPStatus(currentUserId);
+    final rsvpCounts = practice.getRSVPCounts();
+    final isUpcoming = practice.isUpcoming;
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      elevation: isSelected ? 4 : 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: isSelected 
+          ? const BorderSide(color: Color(0xFF0284C7), width: 2)
+          : BorderSide.none,
+      ),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          color: isSelected ? const Color(0xFFEFF6FF) : null,
+        ),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header with checkbox, title, and date
+                Row(
+                  children: [
+                    // Selection checkbox
+                    Transform.scale(
+                      scale: 1.2,
+                      child: Checkbox(
+                        value: isSelected,
+                        onChanged: (value) {
+                          onSelectionChanged(practice.id, value ?? false);
+                        },
+                        activeColor: const Color(0xFF0284C7),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    
+                    // Practice title and date
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            practice.title,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatDateTime(practice.dateTime),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // Current RSVP status display (small)
+                    if (isUpcoming)
+                      RSVPStatusDisplay(
+                        status: userRSVPStatus,
+                        size: 20,
+                      ),
+                  ],
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // Location and description
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      size: 16,
+                      color: Color(0xFF6B7280),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        practice.location,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                
+                if (practice.description.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    practice.description,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF6B7280),
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                
+                // RSVP Summary
+                if (showRSVPSummary) ...[
+                  const SizedBox(height: 12),
+                  RSVPSummary(
+                    counts: rsvpCounts,
+                    totalInvited: practice.maxParticipants,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+  
+  String _formatDateTime(DateTime dateTime) {
+    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    final weekday = weekdays[dateTime.weekday - 1];
+    final month = months[dateTime.month - 1];
+    final day = dateTime.day;
+    final hour = dateTime.hour;
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    
+    return '$weekday, $month $day • $displayHour:$minute $period';
+  }
+}
+
+/// Floating bulk action panel for RSVP operations
+class BulkRSVPActionPanel extends StatelessWidget {
+  final int selectedCount;
+  final Function(RSVPStatus) onBulkRSVP;
+  final VoidCallback onClearSelection;
+  final bool isLoading;
+  
+  const BulkRSVPActionPanel({
+    super.key,
+    required this.selectedCount,
+    required this.onBulkRSVP,
+    required this.onClearSelection,
+    this.isLoading = false,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    if (selectedCount == 0) return const SizedBox.shrink();
+    
+    return Container(
+      width: 393, // Phone boundary constraint
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -2),
+          ),
+        ],
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Selection count and clear button
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '$selectedCount practice${selectedCount == 1 ? '' : 's'} selected',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              TextButton(
+                onPressed: isLoading ? null : onClearSelection,
+                child: const Text(
+                  'Clear',
+                  style: TextStyle(
+                    color: Color(0xFF6B7280),
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Bulk RSVP action buttons
+          Row(
+            children: [
+              Expanded(
+                child: _buildActionButton(
+                  RSVPStatus.yes,
+                  'Yes',
+                  Icons.check,
+                  isLoading,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildActionButton(
+                  RSVPStatus.maybe,
+                  'Maybe',
+                  Icons.question_mark,
+                  isLoading,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildActionButton(
+                  RSVPStatus.no,
+                  'No',
+                  Icons.close,
+                  isLoading,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildActionButton(RSVPStatus status, String label, IconData icon, bool isLoading) {
+    return ElevatedButton(
+      onPressed: isLoading ? null : () => onBulkRSVP(status),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: status.color.withValues(alpha: 0.1),
+        foregroundColor: status.color,
+        elevation: 0,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: status.color, width: 1),
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: status.color.withValues(alpha: 0.1),
+              border: Border.all(color: status.color, width: 2),
+            ),
+            child: Icon(icon, size: 18, color: status.color),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: status.color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Bulk RSVP confirmation modal
+class BulkRSVPConfirmationModal extends StatelessWidget {
+  final List<Practice> practices;
+  final RSVPStatus newStatus;
+  final VoidCallback onConfirm;
+  final VoidCallback onCancel;
+  final bool isLoading;
+  
+  const BulkRSVPConfirmationModal({
+    super.key,
+    required this.practices,
+    required this.newStatus,
+    required this.onConfirm,
+    required this.onCancel,
+    this.isLoading = false,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(
+        maxWidth: 393, // Phone boundary constraint
+        maxHeight: 450, // Reduced height to fit better
+      ),
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: newStatus.color.withValues(alpha: 0.1),
+                  border: Border.all(color: newStatus.color, width: 2),
+                ),
+                child: Icon(
+                  newStatus.overlayIcon,
+                  size: 20,
+                  color: newStatus.color,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Bulk RSVP Update',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    Text(
+                      'Change to "${newStatus.displayText}"',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: newStatus.color,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Practice list preview
+          Text(
+            'Practices to update (${practices.length}):',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF374151),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Compact scrollable practice list
+          Flexible(
+            child: Container(
+              constraints: const BoxConstraints(maxHeight: 160), // Reduced height
+              child: SingleChildScrollView(
+                child: Column(
+                  children: practices.map((practice) {
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 6), // Reduced margin
+                      padding: const EdgeInsets.all(10), // Reduced padding
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF9FAFB),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: const Color(0xFFE5E7EB)),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  practice.title,
+                                  style: const TextStyle(
+                                    fontSize: 13, // Reduced font size
+                                    fontWeight: FontWeight.w500,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                const SizedBox(height: 1), // Reduced spacing
+                                Text(
+                                  _formatDateTime(practice.dateTime),
+                                  style: const TextStyle(
+                                    fontSize: 11, // Reduced font size
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            Icons.arrow_forward,
+                            size: 14, // Reduced icon size
+                            color: newStatus.color,
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16), // Reduced spacing
+          
+          // Action buttons
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: isLoading ? null : onCancel,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 10), // Reduced padding
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: isLoading ? null : onConfirm,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: newStatus.color,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 10), // Reduced padding
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: isLoading
+                    ? const SizedBox(
+                        width: 18, // Reduced size
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Text(
+                        'Confirm',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  String _formatDateTime(DateTime dateTime) {
+    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    final weekday = weekdays[dateTime.weekday - 1];
+    final month = months[dateTime.month - 1];
+    final day = dateTime.day;
+    final hour = dateTime.hour;
+    final minute = dateTime.minute.toString().padLeft(2, '0');
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    
+    return '$weekday, $month $day • $displayHour:$minute $period';
   }
 }

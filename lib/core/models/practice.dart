@@ -1,8 +1,62 @@
-/// Practice model for club practice sessions
+/// Practice model for club practice sessions with bulk RSVP support
 library;
 
 import 'package:flutter/material.dart';
 import 'base_model.dart';
+
+/// Bulk RSVP request model for updating multiple practices
+class BulkRSVPRequest {
+  final List<String> practiceIds;
+  final RSVPStatus newStatus;
+  final String clubId;
+  final String userId;
+  
+  const BulkRSVPRequest({
+    required this.practiceIds,
+    required this.newStatus,
+    required this.clubId,
+    required this.userId,
+  });
+  
+  Map<String, dynamic> toJson() {
+    return {
+      'practiceIds': practiceIds,
+      'newStatus': newStatus.name,
+      'clubId': clubId,
+      'userId': userId,
+    };
+  }
+}
+
+/// Result of bulk RSVP operation
+class BulkRSVPResult {
+  final List<String> successfulIds;
+  final List<String> failedIds;
+  final Map<String, String> errors; // practiceId -> error message
+  final RSVPStatus appliedStatus;
+  
+  const BulkRSVPResult({
+    required this.successfulIds,
+    required this.failedIds,
+    required this.errors,
+    required this.appliedStatus,
+  });
+  
+  bool get isFullSuccess => failedIds.isEmpty;
+  bool get isPartialSuccess => successfulIds.isNotEmpty && failedIds.isNotEmpty;
+  bool get isCompleteFailure => successfulIds.isEmpty;
+  int get totalProcessed => successfulIds.length + failedIds.length;
+  
+  String get summaryText {
+    if (isFullSuccess) {
+      return '${successfulIds.length} practices updated to ${appliedStatus.displayText}';
+    } else if (isPartialSuccess) {
+      return '${successfulIds.length}/${totalProcessed} practices updated successfully';
+    } else {
+      return 'Failed to update practices';
+    }
+  }
+}
 
 /// RSVP status enum with circle-based UI design
 enum RSVPStatus {
