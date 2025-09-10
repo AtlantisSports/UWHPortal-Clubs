@@ -10,7 +10,7 @@ import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/responsive_helper.dart';
-import '../bulk_rsvp/bulk_rsvp_screen.dart';
+import '../../base/widgets/phone_modal_utils.dart';
 // ...existing code...
 
 class ClubDetailScreen extends StatefulWidget {
@@ -340,12 +340,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const BulkRSVPScreen(),
-                    ),
-                  );
+                  _showBulkRSVPModal(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0284C7),
@@ -556,6 +551,49 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               ),
               textAlign: TextAlign.center,
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showBulkRSVPModal(BuildContext context) async {
+    await PhoneModalUtils.showPhoneModal(
+      context: context,
+      child: const Padding(
+        padding: EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Bulk RSVP',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(width: 24), // Space for close button
+              ],
+            ),
+            SizedBox(height: 40),
+            
+            // Placeholder content
+            Text(
+              'BULK RSVP PLACEHOLDER',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+                color: Color(0xFF374151),
+              ),
+              textAlign: TextAlign.center,
+            ),
+            
+            SizedBox(height: 40),
           ],
         ),
       ),
