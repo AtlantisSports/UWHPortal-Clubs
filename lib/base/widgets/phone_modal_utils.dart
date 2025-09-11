@@ -43,10 +43,10 @@ class PhoneModalUtils {
                           : Container(),
                     ),
                   ),
-                  // Modal content centered within the backdrop
+                  // Modal content positioned closer to header (75% padding reduction)
                   Positioned(
                     left: (MediaQuery.of(context).size.width - 345) / 2, // Center modal on screen
-                    top: (MediaQuery.of(context).size.height - 400) / 2, // Center modal vertically
+                    top: (MediaQuery.of(context).size.height - 851) / 2 + 86 + 50, // Phone center + status bar + app bar offset + closer to top
                     child: Material(
                       borderRadius: BorderRadius.circular(12),
                       elevation: 8,
