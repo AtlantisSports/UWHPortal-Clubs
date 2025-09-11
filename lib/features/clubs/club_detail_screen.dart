@@ -408,6 +408,18 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                           fontSize: 14,
                           fontWeight: FontWeight.normal,
                         ),
+                        onTap: (index) {
+                          // Very short delay for RSVP tab to prevent animation conflict
+                          if (index == 0) {
+                            // Minimal delay for RSVP tab
+                            Future.delayed(const Duration(milliseconds: 50), () {
+                              _autoScrollToTabsPosition();
+                            });
+                          } else {
+                            // Immediate scroll for other tabs
+                            _autoScrollToTabsPosition();
+                          }
+                        },
                         tabs: const [
                           Tab(text: 'RSVP'),
                           Tab(text: 'Typical Practices'),
