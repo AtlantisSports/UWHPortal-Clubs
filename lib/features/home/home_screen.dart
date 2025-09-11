@@ -590,12 +590,37 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: Text(
-                              _getTimeframeDisplayText(timeframe),
-                              style: const TextStyle(
-                                fontSize: 13,
-                                color: Color(0xFF374151),
-                              ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    _getTimeframeDisplayText(timeframe),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF374151),
+                                    ),
+                                  ),
+                                ),
+                                // Add tooltip icons for specific timeframes
+                                if (timeframe == 'Only announced' || timeframe == 'All future')
+                                  GestureDetector(
+                                    onTap: () => _showTimeframeTooltip(timeframe),
+                                    child: Container(
+                                      margin: const EdgeInsets.only(left: 4),
+                                      width: 14,
+                                      height: 14,
+                                      decoration: const BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        color: Color(0xFF9CA3AF),
+                                      ),
+                                      child: const Icon(
+                                        Icons.question_mark,
+                                        size: 10,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                         ],
@@ -670,7 +695,7 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
           borderRadius: BorderRadius.circular(16),
         ),
         child: StatefulBuilder(
-          builder: (context, setState) {
+          builder: (context, setDialogState) {
             return Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -728,7 +753,7 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                                   lastDate: DateTime.now().add(const Duration(days: 365)),
                                 );
                                 if (date != null) {
-                                  setState(() {
+                                  setDialogState(() {
                                     startDate = date;
                                   });
                                 }
@@ -774,7 +799,7 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                                   lastDate: DateTime.now().add(const Duration(days: 365)),
                                 );
                                 if (date != null) {
-                                  setState(() {
+                                  setDialogState(() {
                                     endDate = date;
                                   });
                                 }
@@ -807,7 +832,14 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                     children: [
                       Expanded(
                         child: TextButton(
-                          onPressed: () => Navigator.of(context).pop(),
+                          onPressed: () {
+                            // Reset timeframe to "Only announced" when canceling custom date range
+                            // Close dialog first, then update parent state
+                            Navigator.of(context).pop();
+                            setState(() {
+                              _selectedTimeframe = 'Only announced';
+                            });
+                          },
                           child: const Text(
                             'Cancel',
                             style: TextStyle(color: Color(0xFF6B7280)),
@@ -819,7 +851,7 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                         child: ElevatedButton(
                           onPressed: () {
                             if (startDate != null && endDate != null) {
-                              this.setState(() {
+                              setState(() {
                                 _customStartDate = startDate;
                                 _customEndDate = endDate;
                               });
@@ -841,6 +873,92 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
               ],
             );
           },
+        ),
+      ),
+    );
+  }
+
+  void _showTimeframeTooltip(String timeframe) {
+    String tooltipText;
+    switch (timeframe) {
+      case 'Only announced':
+        tooltipText = 'Applies to all future practices that have been announced/scheduled';
+        break;
+      case 'All future':
+        tooltipText = 'Applies to all future practices that match the day and time until the practice details change';
+        break;
+      default:
+        return;
+    }
+
+    PhoneModalUtils.showPhoneModal(
+      context: context,
+      child: Container(
+        width: 280,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    timeframe,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                  GestureDetector(
+                    onTap: () => Navigator.of(context).pop(),
+                    child: const Icon(Icons.close, size: 24, color: Color(0xFF6B7280)),
+                  ),
+                ],
+              ),
+            ),
+            // Content
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                tooltipText,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF374151),
+                  height: 1.4,
+                ),
+              ),
+            ),
+            // OK button
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF3B82F6),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),
+                  child: const Text('OK'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
