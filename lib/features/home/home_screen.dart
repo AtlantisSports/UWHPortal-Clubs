@@ -113,12 +113,12 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
   final Set<String> _selectedLocations = {'All locations'};
   final Set<String> _selectedDays = {'All days'};
   RSVPStatus _selectedRSVPStatus = RSVPStatus.yes;
-  String _selectedTimeframe = 'Only announced';
+  String _selectedTimeframe = 'Announced';
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   
   final List<String> _locations = ['All locations', 'VMAC', 'Carmody'];
-  final List<String> _timeframes = ['Only announced', 'Custom', 'All future'];
+  final List<String> _timeframes = ['Announced', 'Custom', 'All future'];
 
   List<String> _getAvailableDays() {
     final clubsProvider = Provider.of<ClubsProvider>(context, listen: false);
@@ -833,11 +833,11 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
                       Expanded(
                         child: TextButton(
                           onPressed: () {
-                            // Reset timeframe to "Only announced" when canceling custom date range
+                            // Reset timeframe to "Announced" when canceling custom date range
                             // Close dialog first, then update parent state
                             Navigator.of(context).pop();
                             setState(() {
-                              _selectedTimeframe = 'Only announced';
+                              _selectedTimeframe = 'Announced';
                             });
                           },
                           child: const Text(
@@ -881,7 +881,7 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
   void _showTimeframeTooltip(String timeframe) {
     String tooltipText;
     switch (timeframe) {
-      case 'Only announced':
+      case 'Announced':
         tooltipText = 'Applies to all future practices that have been announced/scheduled';
         break;
       case 'All future':

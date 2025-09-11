@@ -225,6 +225,9 @@ class ClubsRepositoryImpl implements ClubsRepository {
               'user123': RSVPStatus.pending, // Current user starts with no selection
               'user456': RSVPStatus.yes,
               'user789': RSVPStatus.maybe,
+              'user101': RSVPStatus.yes,
+              'user202': RSVPStatus.no,
+              'user303': RSVPStatus.yes,
             },
           ),
         ],
