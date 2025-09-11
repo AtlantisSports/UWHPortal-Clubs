@@ -474,8 +474,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           const SizedBox(height: 16),
           
           // Practice Calendar
-          const Expanded(
-            child: PracticeCalendar(),
+          Expanded(
+            child: PracticeCalendar(club: widget.club),
           ),
         ],
       ),
