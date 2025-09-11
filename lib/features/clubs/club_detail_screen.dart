@@ -9,8 +9,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
+import '../../base/widgets/phone_modal_utils.dart';
 import '../../core/utils/responsive_helper.dart';
-import '../bulk_rsvp/bulk_rsvp_screen.dart';
 // ...existing code...
 
 class ClubDetailScreen extends StatefulWidget {
@@ -36,6 +36,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   late TabController _tabController;
   final bool _isMember = false;
   bool _isLoading = false;
+  bool _showingBulkRSVP = false;
 // ...existing code...
   
   @override
@@ -91,6 +92,42 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     upcomingPractices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return upcomingPractices.first;
   }
+
+  void _showBulkRSVPModal(BuildContext context) {
+    setState(() {
+      _showingBulkRSVP = true;
+    });
+  }
+
+  Widget _buildBulkRSVPContent() {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      color: Colors.white,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.construction,
+              size: 64,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'BULK RSVPs COMING SOON',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.grey[600],
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
   
   @override
   void dispose() {
@@ -137,11 +174,28 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
       child: Scaffold(
       appBar: AppBar(
-        title: Text('Clubs - ${widget.club.name}'),
+        title: Text(_showingBulkRSVP ? 'BULK RSVP' : widget.club.name),
         backgroundColor: Colors.grey[100],
         foregroundColor: Colors.black87,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (_showingBulkRSVP) {
+              // Close the bulk RSVP modal
+              setState(() {
+                _showingBulkRSVP = false;
+              });
+            } else {
+              // Go back to clubs list
+              if (widget.onBackPressed != null) {
+                widget.onBackPressed!();
+              } else {
+                Navigator.pop(context);
+              }
+            }
+          },
+        ),
         actions: [
           IconButton(
             icon: const Icon(
@@ -163,7 +217,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           ),
         ],
       ),
-      body: SingleChildScrollView(
+      body: _showingBulkRSVP 
+          ? _buildBulkRSVPContent()
+          : SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -340,12 +396,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => const BulkRSVPScreen(),
-                    ),
-                  );
+                  _showBulkRSVPModal(context);
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF0284C7),
