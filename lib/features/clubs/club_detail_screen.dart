@@ -11,6 +11,7 @@ import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 import '../../base/widgets/calendar_widget.dart';
+import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../core/utils/responsive_helper.dart';
 // ...existing code...
 
@@ -112,33 +113,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildBulkRSVPContent() {
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.white,
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.construction,
-              size: 64,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'BULK RSVPs COMING SOON',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey[600],
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+    return BulkRSVPManager(club: widget.club);
   }
   
   @override
