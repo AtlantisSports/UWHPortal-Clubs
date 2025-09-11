@@ -118,8 +118,25 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
   DateTime? _customEndDate;
   
   final List<String> _locations = ['All locations', 'VMAC', 'Carmody'];
-  final List<String> _days = ['All days', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   final List<String> _timeframes = ['Only announced', 'Custom', 'All future'];
+
+  List<String> _getAvailableDays() {
+    final clubsProvider = Provider.of<ClubsProvider>(context, listen: false);
+    List<Practice> practices = [];
+    
+    // Get all practices from all clubs
+    for (final club in clubsProvider.clubs) {
+      practices.addAll(club.upcomingPractices.where((p) => p.isUpcoming));
+    }
+    
+    final dayNames = practices.map((p) => _getDayName(p.dateTime.weekday)).toSet().toList();
+    dayNames.sort((a, b) {
+      const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      return dayOrder.indexOf(a).compareTo(dayOrder.indexOf(b));
+    });
+    
+    return ['All days', ...dayNames];
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -184,11 +201,12 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
   }
 
   Widget _buildFiltersRow() {
+    final availableDays = _getAvailableDays();
     return Row(
       children: [
         Expanded(child: _buildMultiSelectDropdown('Location', _locations, _selectedLocations)),
         const SizedBox(width: 12),
-        Expanded(child: _buildMultiSelectDropdown('Day', _days, _selectedDays)),
+        Expanded(child: _buildMultiSelectDropdown('Day', availableDays, _selectedDays)),
       ],
     );
   }
@@ -225,57 +243,134 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
   }
 
   Future<void> _showMultiSelectDialog(String label, List<String> items, Set<String> selectedItems) async {
-    await showDialog(
+    await PhoneModalUtils.showPhoneModal(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
+      child: Container(
+        width: 320,
+        constraints: const BoxConstraints(maxHeight: 400),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: Text('Select ${label}s'),
-              content: SizedBox(
-                width: double.maxFinite,
-                child: ListView.builder(
-                  shrinkWrap: true,
-                  itemCount: items.length,
-                  itemBuilder: (context, index) {
-                    final item = items[index];
-                    final isSelected = selectedItems.contains(item);
-                    
-                    return CheckboxListTile(
-                      title: Text(item),
-                      value: isSelected,
-                      onChanged: (bool? value) {
-                        setState(() {
-                          if (value == true) {
-                            if (item.startsWith('All')) {
-                              selectedItems.clear();
-                              selectedItems.add(item);
-                            } else {
-                              selectedItems.remove(items.first); // Remove "All" option
-                              selectedItems.add(item);
-                            }
-                          } else {
-                            selectedItems.remove(item);
-                            if (selectedItems.isEmpty) {
-                              selectedItems.add(items.first); // Add back "All" if empty
-                            }
-                          }
-                        });
-                      },
-                    );
-                  },
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Select ${label}s',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Icon(Icons.close, size: 24, color: Color(0xFF6B7280)),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Done'),
+                // Content
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    itemCount: items.length,
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      final isSelected = selectedItems.contains(item);
+                      
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (isSelected) {
+                              selectedItems.remove(item);
+                              if (selectedItems.isEmpty) {
+                                selectedItems.add(items.first); // Add back "All" if empty
+                              }
+                            } else {
+                              if (item.startsWith('All')) {
+                                selectedItems.clear();
+                                selectedItems.add(item);
+                              } else {
+                                selectedItems.remove(items.first); // Remove "All" option
+                                selectedItems.add(item);
+                              }
+                            }
+                          });
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  border: Border.all(
+                                    color: isSelected ? const Color(0xFF3B82F6) : const Color(0xFFD1D5DB),
+                                    width: 2,
+                                  ),
+                                  borderRadius: BorderRadius.circular(4),
+                                  color: isSelected ? const Color(0xFF3B82F6) : Colors.transparent,
+                                ),
+                                child: isSelected
+                                  ? const Icon(Icons.check, size: 14, color: Colors.white)
+                                  : null,
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  item,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF374151),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // Done button
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+                  ),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF3B82F6),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      child: const Text('Done'),
+                    ),
+                  ),
                 ),
               ],
             );
           },
-        );
-      },
+        ),
+      ),
     ).then((_) {
       setState(() {}); // Refresh the main modal
     });
@@ -364,17 +459,76 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
             const SizedBox(width: 4),
             GestureDetector(
               onTap: () {
-                // Show tooltip
-                showDialog(
+                // Show tooltip using PhoneModalUtils
+                PhoneModalUtils.showPhoneModal(
                   context: context,
-                  builder: (context) => AlertDialog(
-                    content: const Text('You can use to apply Yes/No RSVPs for future practices and/or overwrite any current Yes/Maybe/No RSVPs'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('OK'),
-                      ),
-                    ],
+                  child: Container(
+                    width: 280,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Header
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text(
+                                'Bulk RSVP Info',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF111827),
+                                ),
+                              ),
+                              GestureDetector(
+                                onTap: () => Navigator.of(context).pop(),
+                                child: const Icon(Icons.close, size: 24, color: Color(0xFF6B7280)),
+                              ),
+                            ],
+                          ),
+                        ),
+                        // Content
+                        Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: const Text(
+                            'You can use to apply Yes/No RSVPs for future practices and/or overwrite any current Yes/Maybe/No RSVPs',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF374151),
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        // OK button
+                        Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: const BoxDecoration(
+                            border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+                          ),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF3B82F6),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                              child: const Text('OK'),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },
@@ -507,114 +661,188 @@ class _BulkRSVPModalState extends State<BulkRSVPModal> {
     DateTime? startDate = _customStartDate ?? DateTime.now();
     DateTime? endDate = _customEndDate ?? DateTime.now().add(const Duration(days: 7));
 
-    await showDialog(
+    await PhoneModalUtils.showPhoneModal(
       context: context,
-      builder: (BuildContext context) {
-        return StatefulBuilder(
+      child: Container(
+        width: 320,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: StatefulBuilder(
           builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Select Date Range'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Start Date
-                  Row(
+            return Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Header
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    border: Border(bottom: BorderSide(color: Color(0xFFE5E5E5))),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text('Start Date'),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: startDate ?? DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              setState(() {
-                                startDate = date;
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFD1D5DB)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              startDate != null ? _formatDate(startDate!) : 'Select date',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
+                      const Text(
+                        'Select Date Range',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF111827),
                         ),
+                      ),
+                      GestureDetector(
+                        onTap: () => Navigator.of(context).pop(),
+                        child: const Icon(Icons.close, size: 24, color: Color(0xFF6B7280)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // End Date
-                  Row(
-                    children: [
-                      const Text('End Date'),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () async {
-                            final date = await showDatePicker(
-                              context: context,
-                              initialDate: endDate ?? DateTime.now().add(const Duration(days: 7)),
-                              firstDate: startDate ?? DateTime.now(),
-                              lastDate: DateTime.now().add(const Duration(days: 365)),
-                            );
-                            if (date != null) {
-                              setState(() {
-                                endDate = date;
-                              });
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              border: Border.all(color: const Color(0xFFD1D5DB)),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              endDate != null ? _formatDate(endDate!) : 'Select date',
-                              style: const TextStyle(fontSize: 13),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
                 ),
-                ElevatedButton(
-                  onPressed: () {
-                    if (startDate != null && endDate != null) {
-                      this.setState(() {
-                        _customStartDate = startDate;
-                        _customEndDate = endDate;
-                      });
-                    }
-                    Navigator.of(context).pop();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0EA5E9),
+                // Content
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      // Start Date
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 70,
+                            child: Text(
+                              'Start Date',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: startDate ?? DateTime.now(),
+                                  firstDate: DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date != null) {
+                                  setState(() {
+                                    startDate = date;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  startDate != null ? _formatDate(startDate!) : 'Select date',
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF111827)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // End Date
+                      Row(
+                        children: [
+                          const SizedBox(
+                            width: 70,
+                            child: Text(
+                              'End Date',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: Color(0xFF374151),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () async {
+                                final date = await showDatePicker(
+                                  context: context,
+                                  initialDate: endDate ?? DateTime.now().add(const Duration(days: 7)),
+                                  firstDate: startDate ?? DateTime.now(),
+                                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                                );
+                                if (date != null) {
+                                  setState(() {
+                                    endDate = date;
+                                  });
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: const Color(0xFFD1D5DB)),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Text(
+                                  endDate != null ? _formatDate(endDate!) : 'Select date',
+                                  style: const TextStyle(fontSize: 13, color: Color(0xFF111827)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                  child: const Text('Submit', style: TextStyle(color: Colors.white)),
+                ),
+                // Action buttons
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: Color(0xFFE5E5E5))),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text(
+                            'Cancel',
+                            style: TextStyle(color: Color(0xFF6B7280)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () {
+                            if (startDate != null && endDate != null) {
+                              this.setState(() {
+                                _customStartDate = startDate;
+                                _customEndDate = endDate;
+                              });
+                            }
+                            Navigator.of(context).pop();
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF3B82F6),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text('Submit'),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             );
           },
-        );
-      },
+        ),
+      ),
     );
   }
 
