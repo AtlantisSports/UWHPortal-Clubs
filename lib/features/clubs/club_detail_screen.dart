@@ -10,6 +10,7 @@ import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/phone_modal_utils.dart';
+import '../../base/widgets/calendar_widget.dart';
 import '../../core/utils/responsive_helper.dart';
 // ...existing code...
 
@@ -441,37 +442,42 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   Widget _buildRSVPTab(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Bulk RSVP Button
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  _showBulkRSVPModal(context);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0284C7),
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  elevation: 2,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Bulk RSVP Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: () {
+                _showBulkRSVPModal(context);
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF0284C7),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'Bulk RSVP',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                elevation: 2,
+              ),
+              child: const Text(
+                'Bulk RSVP',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Practice Calendar
+          const Expanded(
+            child: PracticeCalendar(),
+          ),
+        ],
       ),
     );
   }
