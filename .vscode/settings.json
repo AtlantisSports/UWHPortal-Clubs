@@ -81,5 +81,18 @@
         "*.freezed.dart",
         "*.mocks.dart",
         "pubspec.lock"
-    ]
+    ],
+    "github.copilot.enable": true,
+    "github.copilot.chat.enable": true,
+    "github.copilot.chat.welcomeMessage": "default",
+    "github.copilot.editor.enableAutoCompletions": true,
+    "github.copilot.advanced": {
+        "debug.overrideEngine": "default",
+        "debug.testOverrideProxyUrl": "",
+        "debug.overrideProxyUrl": "",
+        "length": 500,
+        "temperature": ""
+    },
+    "github.copilot.chat.localeOverride": "auto",
+    "extensions.autoUpdate": "onlyEnabledExtensions"
 }
