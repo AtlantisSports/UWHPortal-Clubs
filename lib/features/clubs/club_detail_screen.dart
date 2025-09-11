@@ -34,6 +34,7 @@ class ClubDetailScreen extends StatefulWidget {
 class _ClubDetailScreenState extends State<ClubDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
+  late ScrollController _scrollController;
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
@@ -43,6 +44,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _scrollController = ScrollController();
+    
+    // Add listener to auto-scroll when tab is clicked (after frame is built)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _tabController.addListener(() {
+        if (_tabController.indexIsChanging) {
+          _autoScrollToTabsPosition();
+        }
+      });
+    });
   // Removed call to _initializeRSVPStatus (method no longer exists)
   }
 
@@ -132,6 +143,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   @override
   void dispose() {
     _tabController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
   
@@ -160,6 +172,47 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  /// Calculate dynamic height for tab content to allow tab bar to stick at top when scrolled
+  double _calculateDynamicTabHeight(BuildContext context) {
+    // Since this is a phone mockup in a browser, use realistic phone screen dimensions
+    // Galaxy S23 dimensions: 393x852 dp
+    const phoneScreenHeight = 852.0;
+    const phoneStatusBarHeight = 44.0; // From phone frame implementation
+    const appBottomNavHeight = 56.0; // App's bottom navigation bar (Home, Events, etc.)
+    const systemNavBarHeight = 48.0; // System navigation bar (black bar with home button)
+    const tabBarHeight = 48.0; // The tab bar itself (RSVP, Typical Practices, etc.)
+    const paddingAdjustment = 16.0; // Account for various paddings and margins
+    final appBarHeight = AppBar().preferredSize.height; // 56px
+    
+    // Calculate the space available for tab content when tab bar is at the desired position
+    // Tab bar should remain visible, so subtract its height too
+    final tabContentHeight = phoneScreenHeight - phoneStatusBarHeight - appBarHeight - tabBarHeight - appBottomNavHeight - systemNavBarHeight - paddingAdjustment;
+    
+    // Ensure minimum usable height for calendar content
+    const minHeight = 300.0;
+    
+    final finalHeight = tabContentHeight > minHeight ? tabContentHeight : minHeight;
+    
+    // Return the larger of calculated height or minimum height
+    return finalHeight;
+  }
+
+  /// Auto-scroll to the position where tab bar is at the top
+  void _autoScrollToTabsPosition() {
+    if (!_scrollController.hasClients) return;
+    
+    // Scroll to the maximum extent to bring tab bar to the sticky position
+    // This matches the height calculation we did for the tab content
+    final maxScrollExtent = _scrollController.position.maxScrollExtent;
+    
+    // Animate to the maximum scroll position (full scroll down)
+    _scrollController.animateTo(
+      maxScrollExtent,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
   }
   
   @override
@@ -220,6 +273,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       body: _showingBulkRSVP 
           ? _buildBulkRSVPContent()
           : SingleChildScrollView(
+        controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -361,7 +415,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         ],
                       ),
                       SizedBox(
-                        height: 300.0, // Mobile height
+                        height: _calculateDynamicTabHeight(context),
                         child: TabBarView(
                           controller: _tabController,
                           children: [
