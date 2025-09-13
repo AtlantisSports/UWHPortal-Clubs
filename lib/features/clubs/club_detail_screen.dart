@@ -40,6 +40,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
+  bool _showingPracticeDetail = false;
+  Practice? _selectedPractice;
 // ...existing code...
   
   @override
@@ -114,6 +116,228 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
 
   Widget _buildBulkRSVPContent() {
     return BulkRSVPManager(club: widget.club);
+  }
+
+  void _handlePracticeSelected(Practice practice) {
+    setState(() {
+      _selectedPractice = practice;
+      _showingPracticeDetail = true;
+    });
+  }
+
+  void _handleBackFromPracticeDetail() {
+    setState(() {
+      _showingPracticeDetail = false;
+      _selectedPractice = null;
+    });
+  }
+
+  Widget _buildPracticeDetailContent() {
+    if (_selectedPractice == null) return Container();
+    
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Practice Header
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    _selectedPractice!.title,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(Icons.calendar_today, 
+                           color: AppColors.primary, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        '${_selectedPractice!.dateTime.day}/${_selectedPractice!.dateTime.month}/${_selectedPractice!.dateTime.year}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.access_time, 
+                           color: AppColors.primary, size: 16),
+                      SizedBox(width: 8),
+                      Text(
+                        _formatPracticeTime(_selectedPractice!.dateTime),
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(Icons.location_on, 
+                           color: AppColors.primary, size: 16),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          _selectedPractice!.location,
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24),
+            
+            // Description
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Description',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    _selectedPractice!.description,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: 24),
+            
+            // RSVP Placeholder
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'RSVP Status',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    '📝 RSVP functionality coming soon!',
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: null, // Disabled for now
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[300],
+                            foregroundColor: Colors.grey[600],
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text('Going'),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: null, // Disabled for now
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[300],
+                            foregroundColor: Colors.grey[600],
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text('Maybe'),
+                        ),
+                      ),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: null, // Disabled for now
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.grey[300],
+                            foregroundColor: Colors.grey[600],
+                            padding: EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: Text('Not Going'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _formatPracticeTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $amPm';
   }
   
   @override
@@ -203,7 +427,11 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
       child: Scaffold(
       appBar: AppBar(
-        title: Text(_showingBulkRSVP ? 'BULK RSVP' : widget.club.name),
+        title: Text(_showingBulkRSVP 
+            ? 'BULK RSVP' 
+            : _showingPracticeDetail 
+                ? 'Practice Details'
+                : widget.club.name),
         backgroundColor: Colors.grey[100],
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -215,6 +443,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               setState(() {
                 _showingBulkRSVP = false;
               });
+            } else if (_showingPracticeDetail) {
+              // Close the practice detail view
+              _handleBackFromPracticeDetail();
             } else {
               // Go back to clubs list
               if (widget.onBackPressed != null) {
@@ -248,7 +479,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
       body: _showingBulkRSVP 
           ? _buildBulkRSVPContent()
-          : SingleChildScrollView(
+          : _showingPracticeDetail
+              ? _buildPracticeDetailContent()
+              : SingleChildScrollView(
         controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -462,7 +695,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           
           // Practice Calendar
           Expanded(
-            child: PracticeCalendar(club: widget.club),
+            child: PracticeCalendar(
+              club: widget.club,
+              onPracticeSelected: _handlePracticeSelected,
+            ),
           ),
         ],
       ),

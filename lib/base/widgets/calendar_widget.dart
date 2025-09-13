@@ -4,6 +4,9 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
+import '../../core/models/practice.dart';
+import '../../features/clubs/practice_detail_screen.dart';
+import '../../base/widgets/phone_modal_utils.dart';
 
 enum PracticeStatus {
   attended,
@@ -23,8 +26,13 @@ class PracticeDay {
 
 class PracticeCalendar extends StatelessWidget {
   final Club club;
+  final Function(Practice)? onPracticeSelected;
   
-  const PracticeCalendar({super.key, required this.club});
+  const PracticeCalendar({
+    super.key, 
+    required this.club,
+    this.onPracticeSelected,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -155,39 +163,42 @@ class PracticeCalendar extends StatelessWidget {
                 final practicesForDay = practices[date] ?? [];
 
                 return Expanded(
-                  child: Container(
-                    height: 40,
-                    decoration: BoxDecoration(
-                      border: Border(
-                        right: dayIndex < 6 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
-                        bottom: weekIndex < ((daysInMonth + startingWeekday + 6) ~/ 7) - 1 
-                            ? BorderSide(color: Colors.grey[300]!) 
-                            : BorderSide.none,
+                  child: GestureDetector(
+                    onTap: () => _onDayTapped(context, date, practicesForDay),
+                    child: Container(
+                      height: 40,
+                      decoration: BoxDecoration(
+                        border: Border(
+                          right: dayIndex < 6 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                          bottom: weekIndex < ((daysInMonth + startingWeekday + 6) ~/ 7) - 1 
+                              ? BorderSide(color: Colors.grey[300]!) 
+                              : BorderSide.none,
+                        ),
                       ),
-                    ),
-                    child: Stack(
-                      children: [
-                        // Day number
-                        Positioned(
-                          top: 2,
-                          left: 4,
-                          child: Text(
-                            dayNumber.toString(),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: _isToday(date) ? AppColors.primary : AppColors.textPrimary,
-                              fontWeight: _isToday(date) ? FontWeight.bold : FontWeight.normal,
+                      child: Stack(
+                        children: [
+                          // Day number
+                          Positioned(
+                            top: 2,
+                            left: 4,
+                            child: Text(
+                              dayNumber.toString(),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: _isToday(date) ? AppColors.primary : AppColors.textPrimary,
+                                fontWeight: _isToday(date) ? FontWeight.bold : FontWeight.normal,
+                              ),
                             ),
                           ),
-                        ),
-                        // Practice indicators
-                        if (practicesForDay.isNotEmpty)
-                          Positioned(
-                            bottom: 2,
-                            right: 2,
-                            child: _buildPracticeIndicators(practicesForDay),
-                          ),
-                      ],
+                          // Practice indicators
+                          if (practicesForDay.isNotEmpty)
+                            Positioned(
+                              bottom: 2,
+                              right: 2,
+                              child: _buildPracticeIndicators(practicesForDay),
+                            ),
+                        ],
+                      ),
                     ),
                   ),
                 );
@@ -388,5 +399,233 @@ class PracticeCalendar extends StatelessWidget {
     }
     
     return practices;
+  }
+
+  void _onDayTapped(BuildContext context, DateTime date, List<PracticeStatus> practicesForDay) {
+    // Only navigate if there are practices on this day
+    if (practicesForDay.isNotEmpty) {
+      // Get practice schedule to generate actual Practice objects
+      final practicesForDate = _getPracticesForDate(date);
+      
+      if (practicesForDate.length == 1) {
+        // Single practice - call callback directly
+        onPracticeSelected?.call(practicesForDate.first);
+      } else if (practicesForDate.length > 1) {
+        // Multiple practices - show selection modal
+        _showPracticeSelectionModal(context, practicesForDate);
+      }
+    }
+  }
+
+  List<Practice> _getPracticesForDate(DateTime date) {
+    final practices = <Practice>[];
+    
+    // Get practice schedule based on club
+    List<Map<String, dynamic>> practiceSchedule = [];
+    
+    if (club.id == 'denver-uwh') {
+      practiceSchedule = [
+        {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
+        {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
+        {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
+        {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC'},
+        {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
+      ];
+    } else if (club.id == 'sydney-uwh') {
+      practiceSchedule = [
+        {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
+      ];
+    }
+    
+    // Find practices for this day of week
+    final dayPractices = practiceSchedule.where((p) => p['day'] == date.weekday).toList();
+    
+    for (int i = 0; i < dayPractices.length; i++) {
+      final practiceInfo = dayPractices[i];
+      
+      // Create a proper DateTime for the practice
+      final practiceDateTime = _parseTimeToDateTime(date, practiceInfo['time']);
+      
+      practices.add(Practice(
+        id: 'practice_${date.millisecondsSinceEpoch}_$i',
+        clubId: club.id,
+        title: _getPracticeTitle(practiceInfo['location'], practiceInfo['time']),
+        description: _getPracticeDescription(practiceInfo['location'], practiceInfo['time']),
+        dateTime: practiceDateTime,
+        location: practiceInfo['location'],
+        address: club.location, // Use club's address for now
+        duration: Duration(hours: 2), // Default 2 hour duration
+        maxParticipants: 20,
+        participants: [],
+        rsvpResponses: {},
+      ));
+    }
+    
+    return practices;
+  }
+
+  String _getPracticeTitle(String location, String time) {
+    if (time.contains('AM')) {
+      return 'Morning Practice';
+    } else if (time.contains('10:') || time.contains('11:') || time.contains('12:') || time.contains('1:') || time.contains('2:') || time.contains('3:')) {
+      return 'Afternoon Practice';
+    } else {
+      return 'Evening Practice';
+    }
+  }
+
+  String _getPracticeDescription(String location, String time) {
+    final timeOfDay = time.contains('AM') ? 'morning' : 
+                     (time.contains('10:') || time.contains('11:') || time.contains('12:') || time.contains('1:') || time.contains('2:') || time.contains('3:')) ? 'afternoon' : 'evening';
+    return 'Regular $timeOfDay practice session at $location. Come ready to train and improve your underwater hockey skills!';
+  }
+
+  DateTime _parseTimeToDateTime(DateTime date, String timeString) {
+    // Parse time string like "8:15 PM" or "10:00 AM"
+    final parts = timeString.split(' ');
+    final timePart = parts[0];
+    final amPm = parts[1];
+    
+    final timeComponents = timePart.split(':');
+    int hour = int.parse(timeComponents[0]);
+    int minute = int.parse(timeComponents[1]);
+    
+    // Convert to 24-hour format
+    if (amPm == 'PM' && hour != 12) {
+      hour += 12;
+    } else if (amPm == 'AM' && hour == 12) {
+      hour = 0;
+    }
+    
+    return DateTime(date.year, date.month, date.day, hour, minute);
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $amPm';
+  }
+
+  void _showPracticeSelectionModal(BuildContext context, List<Practice> practices) {
+    PhoneModalUtils.showPhoneModal(
+      context: context,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
+                  'Select Practice',
+                  style: TextStyle(
+                    fontSize: 18, // Mobile-friendly size
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  iconSize: 20, // Smaller close button
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Practice selection list
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: practices.map((practice) {
+                    return InkWell(
+                      onTap: () {
+                        Navigator.of(context).pop(); // Close modal
+                        onPracticeSelected?.call(practice);
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 8,
+                              height: 8,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                shape: BoxShape.circle,
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    practice.title,
+                                    style: const TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        _formatTime(practice.dateTime),
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                      const SizedBox(width: 16),
+                                      Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        practice.location,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          color: Colors.grey[600],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+            
+            const SizedBox(height: 16),
+            
+            // Action buttons
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey[600]),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
