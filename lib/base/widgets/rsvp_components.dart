@@ -287,16 +287,16 @@ class RSVPSummary extends StatelessWidget {
   }
 }
 
-/// Next Practice Card component with circle-based RSVP design
-/// Shows upcoming practice details with circle RSVP buttons
-class NextPracticeCard extends StatefulWidget {
+/// Practice RSVP Card component with circle-based RSVP design
+/// Shows practice details with circle RSVP buttons
+class PracticeRSVPCard extends StatefulWidget {
   final Practice practice;
   final String? clubId; // Add clubId for RSVP updates
   final RSVPStatus? currentRSVP; // Keep for backward compatibility
   final Function(RSVPStatus)? onRSVPChanged; // Keep for backward compatibility
   final VoidCallback? onLocationTap;
   
-  const NextPracticeCard({
+  const PracticeRSVPCard({
     super.key,
     required this.practice,
     this.clubId,
@@ -306,10 +306,10 @@ class NextPracticeCard extends StatefulWidget {
   });
   
   @override
-  State<NextPracticeCard> createState() => _NextPracticeCardState();
+  State<PracticeRSVPCard> createState() => _PracticeRSVPCardState();
 }
 
-class _NextPracticeCardState extends State<NextPracticeCard> {
+class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   
   @override
   Widget build(BuildContext context) {
@@ -319,7 +319,7 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
         final currentRSVP = rsvpProvider.getRSVPStatus(widget.practice.id);
         
         return Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), // Reduced top padding by 25% (16 * 0.75 = 12)
           decoration: BoxDecoration(
             color: const Color(0xFFF9FAFB), // Light gray background
             borderRadius: BorderRadius.circular(8),
@@ -328,33 +328,16 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with title and RSVP text positioned over buttons
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Next Practice',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: Color(0xFF374151),
-                    ),
+              // Header with RSVP text centered
+              Center(
+                child: Text(
+                  _getRSVPHeaderText(currentRSVP),
+                  style: TextStyle(
+                    fontSize: 17, // Increased from 12 to 17 (12 + 5)
+                    fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                    color: _getRSVPHeaderColor(currentRSVP),
                   ),
-                  // Spacer to position RSVP text over buttons
-                  SizedBox(
-                    width: 160, // Width of 3 buttons (48) + 2 gaps (8) + padding = ~160
-                    child: Center(
-                      child: Text(
-                        _getRSVPHeaderText(currentRSVP),
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
-                          color: _getRSVPHeaderColor(currentRSVP),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
               const SizedBox(height: 6),
               
@@ -476,8 +459,8 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
         // If already selected, do nothing (no toast, no change)
       },
       child: Container(
-        width: 48,
-        height: 48,
+        width: 53, // Increased from 48 to 53 (48 * 1.1 = 52.8, rounded to 53)
+        height: 53, // Increased from 48 to 53 (48 * 1.1 = 52.8, rounded to 53)
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
@@ -488,8 +471,8 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
         ),
         child: Center(
           child: Container(
-            width: 32,
-            height: 32,
+            width: 35, // Increased from 32 to 35 (32 * 1.1 = 35.2, rounded to 35)
+            height: 35, // Increased from 32 to 35 (32 * 1.1 = 35.2, rounded to 35)
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
@@ -501,8 +484,8 @@ class _NextPracticeCardState extends State<NextPracticeCard> {
             child: Icon(
               _getOverlayIcon(status),
               size: status == RSVPStatus.maybe 
-                  ? 18.954 // 10% smaller than current size (21.06 * 0.9)
-                  : 23.4, // Increased by 30% (18 * 1.3 = 23.4)
+                  ? 20.8 // Increased by 10% (18.954 * 1.1 = 20.8)
+                  : 25.7, // Increased by 10% (23.4 * 1.1 = 25.7)
               color: color,
             ),
           ),

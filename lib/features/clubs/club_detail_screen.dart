@@ -211,6 +211,31 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             ),
             SizedBox(height: 24),
             
+            // RSVP Section (positioned above description)
+            Consumer<RSVPProvider>(
+              builder: (context, rsvpProvider, child) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'RSVP',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    PracticeRSVPCard(
+                      practice: _selectedPractice!,
+                      clubId: widget.club.id,
+                    ),
+                  ],
+                );
+              },
+            ),
+            SizedBox(height: 24),
+            
             // Description
             Container(
               padding: EdgeInsets.all(20),
@@ -238,88 +263,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       color: AppColors.textSecondary,
                       height: 1.5,
                     ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-            
-            // RSVP Placeholder
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'RSVP Status',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    '📝 RSVP functionality coming soon!',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                  SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: null, // Disabled for now
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
-                            foregroundColor: Colors.grey[600],
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text('Going'),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: null, // Disabled for now
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
-                            foregroundColor: Colors.grey[600],
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text('Maybe'),
-                        ),
-                      ),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: null, // Disabled for now
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.grey[300],
-                            foregroundColor: Colors.grey[600],
-                            padding: EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                          child: Text('Not Going'),
-                        ),
-                      ),
-                    ],
                   ),
                 ],
               ),
@@ -573,7 +516,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   
                   SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
                   
-                  // Next Practice Card (same as clubs page)
+                  // Next Practice Section
                   Consumer<RSVPProvider>(builder: (context, rsvpProvider, child) {
                     final nextPractice = _getNextPractice();
                     if (nextPractice == null) return const SizedBox.shrink();
@@ -581,14 +524,28 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                     // Initialize RSVP status if needed
                     rsvpProvider.initializePracticeRSVP(nextPractice);
                     
-                    return NextPracticeCard(
-                      practice: nextPractice,
-                      clubId: widget.club.id,
-                      currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),
-                                                onRSVPChanged: (status) {
-                                                  // Implement RSVP update logic here if needed
-                                                },
-                      onLocationTap: _handleLocationTap,
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Next Practice',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        SizedBox(height: 12),
+                        PracticeRSVPCard(
+                          practice: nextPractice,
+                          clubId: widget.club.id,
+                          currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),
+                                                        onRSVPChanged: (status) {
+                                                            // Implement RSVP update logic here if needed
+                                                          },
+                          onLocationTap: _handleLocationTap,
+                        ),
+                      ],
                     );
                   }),
                   

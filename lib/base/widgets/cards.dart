@@ -154,10 +154,21 @@ class _ClubCardState extends State<ClubCard> {
             ],
           ),
           
-          // Next Practice Card
+          // Next Practice Section
           if (widget.nextPractice != null) ...[
             const SizedBox(height: AppSpacing.medium),
-            NextPracticeCard(
+            // Next Practice Label
+            Text(
+              'Next Practice',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Practice RSVP Card
+            PracticeRSVPCard(
               practice: widget.nextPractice!,
               clubId: widget.clubId,
               currentRSVP: widget.currentRSVP,

@@ -477,7 +477,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                     // Initialize RSVP status if needed
                     rsvpProvider.initializePracticeRSVP(nextPractice);
                     
-                    return NextPracticeCard(
+                    return PracticeRSVPCard(
                       practice: nextPractice,
                       clubId: widget.club.id,
                       currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),

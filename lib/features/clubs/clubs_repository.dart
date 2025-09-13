@@ -201,7 +201,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-sunday-morning',
             clubId: 'denver-uwh',
-            title: 'Sunday Morning Training',
+            title: 'Sunday Morning Practice',
             description: 'Drills + conditioning.',
             dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
             location: 'VMAC',
