@@ -154,7 +154,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-monday',
             clubId: 'denver-uwh',
-            title: 'Monday Practice',
+            title: 'Monday Evening',
             description: 'Beginner-friendly; arrive 10 min early.',
             dateTime: _getNextPracticeDate(now, DateTime.monday, 20, 15), // 8:15 PM
             location: 'VMAC',
@@ -170,7 +170,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-wednesday',
             clubId: 'denver-uwh',
-            title: 'Wednesday Practice',
+            title: 'Wednesday Evening',
             description: 'Shallow end reserved. High-level participants only.',
             dateTime: _getNextPracticeDate(now, DateTime.wednesday, 19, 0), // 7:00 PM
             location: 'Carmody',
@@ -185,7 +185,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-thursday',
             clubId: 'denver-uwh',
-            title: 'Thursday Scrimmage',
+            title: 'Thursday Evening',
             description: 'Scrimmage heavy. High-level participants only.',
             dateTime: _getNextPracticeDate(now, DateTime.thursday, 20, 15), // 8:15 PM
             location: 'VMAC',
@@ -201,7 +201,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-sunday-morning',
             clubId: 'denver-uwh',
-            title: 'Sunday Morning Practice',
+            title: 'Sunday Morning',
             description: 'Drills + conditioning.',
             dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
             location: 'VMAC',
@@ -216,7 +216,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'denver-sunday-afternoon',
             clubId: 'denver-uwh',
-            title: 'Sunday Afternoon Session',
+            title: 'Sunday Afternoon',
             description: 'Afternoon session.',
             dateTime: _getNextPracticeDate(now, DateTime.sunday, 15, 0), // 3:00 PM
             location: 'Carmody',
@@ -248,7 +248,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
           Practice(
             id: 'sydney-friday',
             clubId: 'sydney-uwh',
-            title: 'Friday Night Practice',
+            title: 'Friday Evening',
             description: 'All levels; bring fins & mouthguard.',
             dateTime: _getNextPracticeDate(now, DateTime.friday, 19, 0), // 7:00 PM
             location: 'Ryde Pool',

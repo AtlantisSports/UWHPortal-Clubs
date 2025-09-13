@@ -26,6 +26,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   
   // Internal navigation state
   Club? _selectedClub;
+  Practice? _selectedPractice; // Add selected practice state
   bool _showingClubDetail = false;
   
   // Toast state
@@ -131,9 +132,18 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     });
   }
   
+  void _onPracticeInfoTap(Club club, Practice practice) {
+    setState(() {
+      _selectedClub = club;
+      _selectedPractice = practice; // Store the selected practice
+      _showingClubDetail = true;
+    });
+  }
+  
   void _navigateBackToList() {
     setState(() {
       _selectedClub = null;
+      _selectedPractice = null; // Reset selected practice
       _showingClubDetail = false;
     });
   }
@@ -175,6 +185,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         currentUserId: _currentUserId,
         onRSVPChanged: _handleRSVPChange,
         onBackPressed: _navigateBackToList,
+        initialSelectedPractice: _selectedPractice, // Pass the selected practice
       );
     }
     
@@ -315,6 +326,9 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               onTap: () => _onClubTap(club),
                               onLocationTap: nextPractice != null ? () {
                                 _openMapForPractice(nextPractice);
+                              } : null,
+                              onPracticeInfoTap: nextPractice != null ? () {
+                                _onPracticeInfoTap(club, nextPractice);
                               } : null,
                             );
                           },

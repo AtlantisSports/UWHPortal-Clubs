@@ -295,6 +295,7 @@ class PracticeRSVPCard extends StatefulWidget {
   final RSVPStatus? currentRSVP; // Keep for backward compatibility
   final Function(RSVPStatus)? onRSVPChanged; // Keep for backward compatibility
   final VoidCallback? onLocationTap;
+  final VoidCallback? onInfoTap; // Add callback for info icon
   
   const PracticeRSVPCard({
     super.key,
@@ -303,6 +304,7 @@ class PracticeRSVPCard extends StatefulWidget {
     this.currentRSVP,
     this.onRSVPChanged,
     this.onLocationTap,
+    this.onInfoTap,
   });
   
   @override
@@ -328,16 +330,48 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with RSVP text centered
-              Center(
-                child: Text(
-                  _getRSVPHeaderText(currentRSVP),
-                  style: TextStyle(
-                    fontSize: 17, // Increased from 12 to 17 (12 + 5)
-                    fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
-                    color: _getRSVPHeaderColor(currentRSVP),
+              // Header with RSVP label, centered text, and info icon
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // Left: RSVP label
+                  const Text(
+                    'RSVP',
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF374151),
+                    ),
                   ),
-                ),
+                  // Center: Will you attend text
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        _getRSVPHeaderText(currentRSVP),
+                        style: TextStyle(
+                          fontSize: 17, // Increased from 12 to 17 (12 + 5)
+                          fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                          color: _getRSVPHeaderColor(currentRSVP),
+                        ),
+                      ),
+                    ),
+                  ),
+                  // Right: Info icon
+                  if (widget.onInfoTap != null)
+                    GestureDetector(
+                      onTap: widget.onInfoTap,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
+                        child: const Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: Color(0xFF0284C7),
+                        ),
+                      ),
+                    )
+                  else
+                    const SizedBox(width: 24), // Placeholder to maintain alignment
+                ],
               ),
               const SizedBox(height: 6),
               

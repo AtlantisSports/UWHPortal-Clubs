@@ -66,6 +66,7 @@ class ClubCard extends StatefulWidget {
   final Function(RSVPStatus)? onRSVPChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
+  final VoidCallback? onPracticeInfoTap; // Add callback for practice info
   final String? clubId; // Add clubId for RSVP synchronization
   
   const ClubCard({
@@ -79,6 +80,7 @@ class ClubCard extends StatefulWidget {
     this.onRSVPChanged,
     this.onTap,
     this.onLocationTap,
+    this.onPracticeInfoTap,
     this.clubId,
   });
 
@@ -174,6 +176,7 @@ class _ClubCardState extends State<ClubCard> {
               currentRSVP: widget.currentRSVP,
               onRSVPChanged: widget.onRSVPChanged ?? (_) {},
               onLocationTap: widget.onLocationTap,
+              onInfoTap: widget.onPracticeInfoTap,
             ),
           ],
           

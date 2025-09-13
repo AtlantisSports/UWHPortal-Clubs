@@ -19,6 +19,7 @@ class ClubDetailScreen extends StatefulWidget {
   final String currentUserId;
   final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
   final VoidCallback? onBackPressed;
+  final Practice? initialSelectedPractice; // Add parameter for initial practice selection
   
   const ClubDetailScreen({
     super.key,
@@ -26,6 +27,7 @@ class ClubDetailScreen extends StatefulWidget {
     required this.currentUserId,
     this.onRSVPChanged,
     this.onBackPressed,
+    this.initialSelectedPractice,
   });
   
   @override
@@ -48,6 +50,12 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _scrollController = ScrollController();
+    
+    // Initialize with the provided practice if available
+    if (widget.initialSelectedPractice != null) {
+      _selectedPractice = widget.initialSelectedPractice;
+      _showingPracticeDetail = true;
+    }
     
     // Add listener to auto-scroll when tab is clicked (after frame is built)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -217,18 +225,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      'RSVP',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    SizedBox(height: 12),
                     PracticeRSVPCard(
                       practice: _selectedPractice!,
                       clubId: widget.club.id,
+                      // No onInfoTap here since we're already in practice details
                     ),
                   ],
                 );
@@ -544,6 +544,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                                                             // Implement RSVP update logic here if needed
                                                           },
                           onLocationTap: _handleLocationTap,
+                          onInfoTap: () => _handlePracticeSelected(nextPractice),
                         ),
                       ],
                     );
