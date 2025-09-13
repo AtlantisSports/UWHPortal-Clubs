@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
-import '../../features/clubs/practice_detail_screen.dart';
+import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 
 enum PracticeStatus {
@@ -27,11 +27,13 @@ class PracticeDay {
 class PracticeCalendar extends StatelessWidget {
   final Club club;
   final Function(Practice)? onPracticeSelected;
+  final RSVPProvider? rsvpProvider;
   
   const PracticeCalendar({
     super.key, 
     required this.club,
     this.onPracticeSelected,
+    this.rsvpProvider,
   });
 
   @override
@@ -43,8 +45,8 @@ class PracticeCalendar extends StatelessWidget {
         border: Border.all(color: Colors.grey[300]!),
       ),
       child: Column(
-        children: [
-          // Calendar header
+            children: [
+              // Calendar header
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -76,11 +78,11 @@ class PracticeCalendar extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildMonth(context, 'September 2025', 2025, 9),
+                  _buildMonth(context, 'September 2025', 2025, 9, rsvpProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'October 2025', 2025, 10),
+                  _buildMonth(context, 'October 2025', 2025, 10, rsvpProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'November 2025', 2025, 11),
+                  _buildMonth(context, 'November 2025', 2025, 11, rsvpProvider),
                 ],
               ),
             ),
@@ -90,7 +92,7 @@ class PracticeCalendar extends StatelessWidget {
     );
   }
 
-  Widget _buildMonth(BuildContext context, String title, int year, int month) {
+  Widget _buildMonth(BuildContext context, String title, int year, int month, RSVPProvider? rsvpProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -103,13 +105,13 @@ class PracticeCalendar extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        _buildCalendarGrid(context, year, month),
+        _buildCalendarGrid(context, year, month, rsvpProvider),
       ],
     );
   }
 
-  Widget _buildCalendarGrid(BuildContext context, int year, int month) {
-    final practices = _generatePracticesForMonth(year, month);
+  Widget _buildCalendarGrid(BuildContext context, int year, int month, RSVPProvider? rsvpProvider) {
+    final practices = _generatePracticesForMonth(year, month, rsvpProvider);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final firstDayOfMonth = DateTime(year, month, 1);
     final startingWeekday = firstDayOfMonth.weekday % 7; // Convert to 0-6 (Sunday = 0)
@@ -163,18 +165,22 @@ class PracticeCalendar extends StatelessWidget {
                 final practicesForDay = practices[date] ?? [];
 
                 return Expanded(
-                  child: GestureDetector(
-                    onTap: () => _onDayTapped(context, date, practicesForDay),
-                    child: Container(
-                      height: 40,
-                      decoration: BoxDecoration(
-                        border: Border(
-                          right: dayIndex < 6 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
-                          bottom: weekIndex < ((daysInMonth + startingWeekday + 6) ~/ 7) - 1 
-                              ? BorderSide(color: Colors.grey[300]!) 
-                              : BorderSide.none,
+                  child: MouseRegion(
+                    cursor: practicesForDay.isNotEmpty ? SystemMouseCursors.click : SystemMouseCursors.basic,
+                    child: GestureDetector(
+                      onTap: () => _onDayTapped(context, date, practicesForDay),
+                      child: Container(
+                        height: 40,
+                        decoration: BoxDecoration(
+                          border: Border(
+                            top: weekIndex > 0 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                            left: dayIndex > 0 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                            right: dayIndex < 6 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                            bottom: weekIndex < ((daysInMonth + startingWeekday + 6) ~/ 7) - 1 
+                                ? BorderSide(color: Colors.grey[300]!) 
+                                : BorderSide.none,
+                          ),
                         ),
-                      ),
                       child: Stack(
                         children: [
                           // Day number
@@ -201,6 +207,7 @@ class PracticeCalendar extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
                 );
               }),
             );
@@ -334,15 +341,15 @@ class PracticeCalendar extends StatelessWidget {
            date.day == today.day;
   }
 
-  Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month) {
+  Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month, RSVPProvider? rsvpProvider) {
     final practices = <DateTime, List<PracticeStatus>>{};
     final today = DateTime.now();
     
-    // Get practice schedule based on club
-    List<Map<String, dynamic>> practiceSchedule = [];
+    // Get typical practice schedule for this club
+    List<Map<String, dynamic>> typicalSchedule = [];
     
     if (club.id == 'denver-uwh') {
-      practiceSchedule = [
+      typicalSchedule = [
         {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
         {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
         {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
@@ -350,7 +357,7 @@ class PracticeCalendar extends StatelessWidget {
         {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
       ];
     } else if (club.id == 'sydney-uwh') {
-      practiceSchedule = [
+      typicalSchedule = [
         {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
       ];
     }
@@ -360,41 +367,63 @@ class PracticeCalendar extends StatelessWidget {
       final date = DateTime(year, month, day);
       final dayOfWeek = date.weekday;
       
-      // Find practices for this day of week
-      final dayPractices = practiceSchedule.where((p) => p['day'] == dayOfWeek).toList();
+      // Find typical practices for this day of week
+      final typicalPracticesForDay = typicalSchedule.where((p) => p['day'] == dayOfWeek).toList();
       
-      if (dayPractices.isNotEmpty) {
+      if (typicalPracticesForDay.isNotEmpty) {
         final practiceStatuses = <PracticeStatus>[];
         
-        for (var practice in dayPractices) {
-          if (date.isBefore(today)) {
-            // Past practice - randomly assign attended/not attended
+        if (date.isBefore(today)) {
+          // Past practices - use mock data based on typical schedule
+          for (int i = 0; i < typicalPracticesForDay.length; i++) {
+            var practice = typicalPracticesForDay[i];
             final hash = date.hashCode + practice['location'].hashCode;
             practiceStatuses.add(hash % 3 == 0 
                 ? PracticeStatus.notAttended 
                 : PracticeStatus.attended);
-          } else {
-            // Future practice - randomly assign RSVP status
-            final hash = date.hashCode + practice['location'].hashCode;
-            final rsvpChoice = hash % 4;
-            switch (rsvpChoice) {
-              case 0:
-                practiceStatuses.add(PracticeStatus.rsvpYes);
-                break;
-              case 1:
-                practiceStatuses.add(PracticeStatus.rsvpMaybe);
-                break;
-              case 2:
-                practiceStatuses.add(PracticeStatus.rsvpNo);
-                break;
-              default:
+          }
+        } else {
+          // Future practices - check for real practices first, then fall back to typical schedule
+          final realPracticesForDay = club.upcomingPractices.where((practice) {
+            final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+          }).toList();
+          
+          if (realPracticesForDay.isNotEmpty) {
+            // Use real practice data with RSVP status
+            for (final practice in realPracticesForDay) {
+              if (rsvpProvider != null) {
+                final rsvpStatus = rsvpProvider.getRSVPStatus(practice.id);
+                
+                switch (rsvpStatus) {
+                  case RSVPStatus.yes:
+                    practiceStatuses.add(PracticeStatus.rsvpYes);
+                    break;
+                  case RSVPStatus.maybe:
+                    practiceStatuses.add(PracticeStatus.rsvpMaybe);
+                    break;
+                  case RSVPStatus.no:
+                    practiceStatuses.add(PracticeStatus.rsvpNo);
+                    break;
+                  case RSVPStatus.pending:
+                    practiceStatuses.add(PracticeStatus.noRsvp);
+                    break;
+                }
+              } else {
                 practiceStatuses.add(PracticeStatus.noRsvp);
-                break;
+              }
+            }
+          } else {
+            // No real practice data - use typical schedule with no RSVP status
+            for (int i = 0; i < typicalPracticesForDay.length; i++) {
+              practiceStatuses.add(PracticeStatus.noRsvp);
             }
           }
         }
         
-        practices[date] = practiceStatuses;
+        if (practiceStatuses.isNotEmpty) {
+          practices[date] = practiceStatuses;
+        }
       }
     }
     
@@ -420,45 +449,58 @@ class PracticeCalendar extends StatelessWidget {
   List<Practice> _getPracticesForDate(DateTime date) {
     final practices = <Practice>[];
     
-    // Get practice schedule based on club
-    List<Map<String, dynamic>> practiceSchedule = [];
-    
-    if (club.id == 'denver-uwh') {
-      practiceSchedule = [
-        {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
-        {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
-        {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
-        {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC'},
-        {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
-      ];
-    } else if (club.id == 'sydney-uwh') {
-      practiceSchedule = [
-        {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
-      ];
+    // First, check for real practices from club data
+    for (final practice in club.upcomingPractices) {
+      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+      final targetDate = DateTime(date.year, date.month, date.day);
+      
+      if (practiceDate.isAtSameMomentAs(targetDate)) {
+        practices.add(practice);
+      }
     }
     
-    // Find practices for this day of week
-    final dayPractices = practiceSchedule.where((p) => p['day'] == date.weekday).toList();
-    
-    for (int i = 0; i < dayPractices.length; i++) {
-      final practiceInfo = dayPractices[i];
+    // If no real practices found, generate from typical schedule
+    if (practices.isEmpty) {
+      // Get typical practice schedule for this club
+      List<Map<String, dynamic>> typicalSchedule = [];
       
-      // Create a proper DateTime for the practice
-      final practiceDateTime = _parseTimeToDateTime(date, practiceInfo['time']);
+      if (club.id == 'denver-uwh') {
+        typicalSchedule = [
+          {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
+          {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
+          {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
+          {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC'},
+          {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
+        ];
+      } else if (club.id == 'sydney-uwh') {
+        typicalSchedule = [
+          {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
+        ];
+      }
       
-      practices.add(Practice(
-        id: 'practice_${date.millisecondsSinceEpoch}_$i',
-        clubId: club.id,
-        title: _getPracticeTitle(practiceInfo['location'], practiceInfo['time']),
-        description: _getPracticeDescription(practiceInfo['location'], practiceInfo['time']),
-        dateTime: practiceDateTime,
-        location: practiceInfo['location'],
-        address: club.location, // Use club's address for now
-        duration: Duration(hours: 2), // Default 2 hour duration
-        maxParticipants: 20,
-        participants: [],
-        rsvpResponses: {},
-      ));
+      // Find practices for this day of week
+      final dayPractices = typicalSchedule.where((p) => p['day'] == date.weekday).toList();
+      
+      for (int i = 0; i < dayPractices.length; i++) {
+        final practiceInfo = dayPractices[i];
+        
+        // Create a proper DateTime for the practice
+        final practiceDateTime = _parseTimeToDateTime(date, practiceInfo['time']);
+        
+        practices.add(Practice(
+          id: 'typical_${date.millisecondsSinceEpoch}_$i',
+          clubId: club.id,
+          title: _getPracticeTitle(practiceInfo['location'], practiceInfo['time']),
+          description: _getPracticeDescription(practiceInfo['location'], practiceInfo['time']),
+          dateTime: practiceDateTime,
+          location: practiceInfo['location'],
+          address: club.location, // Use club's address for now
+          duration: Duration(hours: 2), // Default 2 hour duration
+          maxParticipants: 20,
+          participants: [],
+          rsvpResponses: {},
+        ));
+      }
     }
     
     return practices;

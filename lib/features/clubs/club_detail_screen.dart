@@ -9,7 +9,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
-import '../../base/widgets/phone_modal_utils.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../core/utils/responsive_helper.dart';
@@ -695,9 +694,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           
           // Practice Calendar
           Expanded(
-            child: PracticeCalendar(
-              club: widget.club,
-              onPracticeSelected: _handlePracticeSelected,
+            child: Consumer<RSVPProvider>(
+              builder: (context, rsvpProvider, child) {
+                return PracticeCalendar(
+                  club: widget.club,
+                  onPracticeSelected: _handlePracticeSelected,
+                  rsvpProvider: rsvpProvider,
+                );
+              },
             ),
           ),
         ],
