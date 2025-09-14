@@ -124,6 +124,7 @@ class Practice extends BaseModel {
   final Map<String, RSVPStatus> rsvpResponses;
   final bool isRecurring;
   final String? recurringPattern;
+  final String? tag; // Practice level/type tag (e.g., "Open", "High-Level", "Intermediate")
   
   Practice({
     required super.id,
@@ -139,6 +140,7 @@ class Practice extends BaseModel {
     this.rsvpResponses = const {},
     this.isRecurring = false,
     this.recurringPattern,
+    this.tag,
     super.createdAt,
     super.updatedAt,
   });

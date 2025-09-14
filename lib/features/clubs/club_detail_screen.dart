@@ -682,24 +682,41 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             ),
             SizedBox(height: ResponsiveHelper.getSpacing(context)),
             
-            // Sample practice items
-            _buildPracticeItem(context,
-              day: 'Monday',
-              time: '7:00 PM - 9:00 PM', 
-              location: 'UBC Pool',
-              description: 'Regular team practice with scrimmage',
-            ),
-            _buildPracticeItem(context,
-              day: 'Wednesday', 
-              time: '7:00 PM - 9:00 PM',
-              location: 'UBC Pool',
-              description: 'Skills training and conditioning',
-            ),
-            _buildPracticeItem(context,
-              day: 'Saturday',
-              time: '10:00 AM - 12:00 PM',
-              location: 'UBC Pool', 
-              description: 'Game strategy and team building',
+            // Single container for all practices
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Practice items with dividers
+                  ...widget.club.upcomingPractices.asMap().entries.map((entry) {
+                    final index = entry.key;
+                    final practice = entry.value;
+                    final isLast = index == widget.club.upcomingPractices.length - 1;
+                    
+                    return Column(
+                      children: [
+                        _buildPracticeRow(practice),
+                        if (!isLast) ...[
+                          const SizedBox(height: 12),
+                          Divider(
+                            color: Colors.grey.shade200,
+                            thickness: 1,
+                            height: 1,
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      ],
+                    );
+                  }),
+                ],
+              ),
             ),
           ],
         ),
@@ -707,84 +724,116 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  Widget _buildPracticeItem(BuildContext context, {
-    required String day,
-    required String time,
-    required String location,
-    required String description,
-  }) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 16.0),
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
+  Widget _buildPracticeRow(Practice practice) {
+    final dayName = _getDayName(practice.dateTime.weekday);
+    final startTime = practice.dateTime;
+    final endTime = practice.dateTime.add(practice.duration);
+    final timeStr = '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Main row with day, time, and location
+        Row(
+          children: [
+            // Day text (no background)
+            Text(
+              dayName,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.black,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Time
+            Text(
+              timeStr,
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Separator
+            Text(
+              '•',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary.withValues(alpha: 0.6),
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Location (clickable)
+            Expanded(
+              child: GestureDetector(
+                onTap: () => _launchLocationUrl(practice.mapsUrl),
                 child: Text(
-                  day,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Text(
-                time,
-                style: AppTextStyles.bodyMedium.copyWith(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Icon(
-                Icons.location_on,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Expanded(
-                child: Text(
-                  location,
+                  practice.location,
                   style: AppTextStyles.bodyMedium.copyWith(
                     fontSize: 14,
-                    color: AppColors.textSecondary,
+                    color: const Color(0xFF0284C7), // Blue color to indicate it's clickable
+                    decoration: TextDecoration.underline,
                   ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
-          ),
-          if (description.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            Text(
-              description,
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
               ),
             ),
           ],
+        ),
+        // Second row with description and tag
+        if (practice.tag != null || practice.description.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Padding(
+            padding: const EdgeInsets.only(left: 8.0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Description text (left side)
+                if (practice.description.isNotEmpty) ...[
+                  Expanded(
+                    child: Text(
+                      practice.description,
+                      style: AppTextStyles.bodyMedium.copyWith(
+                        fontSize: 13,
+                        color: AppColors.textSecondary,
+                        fontStyle: FontStyle.italic,
+                      ),
+                      textAlign: TextAlign.left,
+                    ),
+                  ),
+                ] else ...[
+                  // Empty space when no description
+                  const Expanded(child: SizedBox()),
+                ],
+                // Practice tag (right side)
+                if (practice.tag != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.shade50,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(
+                        color: Colors.blue.withValues(alpha: 0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Text(
+                      practice.tag!,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.blue,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
-      ),
+      ],
     );
   }
 
@@ -856,5 +905,63 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
+  }
+
+  /// Helper method to get day name from weekday number
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday: return 'Monday';
+      case DateTime.tuesday: return 'Tuesday';
+      case DateTime.wednesday: return 'Wednesday';
+      case DateTime.thursday: return 'Thursday';
+      case DateTime.friday: return 'Friday';
+      case DateTime.saturday: return 'Saturday';
+      case DateTime.sunday: return 'Sunday';
+      default: return '';
+    }
+  }
+
+  /// Helper method to format time in 12-hour format
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final period = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $period';
+  }
+
+  /// Launch location URL in maps app or browser
+  Future<void> _launchLocationUrl(String url) async {
+    try {
+      // For web, this will open in a new tab
+      // For mobile, this will try to open in maps app
+      if (await canLaunchUrl(Uri.parse(url))) {
+        await launchUrl(
+          Uri.parse(url),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        // Fallback: show a snackbar with the address
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not open location: $url'),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      // Error handling: show snackbar
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening location: ${e.toString()}'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
   }
 }

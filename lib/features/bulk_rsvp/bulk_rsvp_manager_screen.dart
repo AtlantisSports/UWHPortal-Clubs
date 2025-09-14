@@ -7,10 +7,6 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/rsvp_provider.dart';
-import '../../features/clubs/clubs_provider.dart';
-import '../../base/widgets/rsvp_components.dart';
-import '../../core/constants/app_constants.dart';
-import '../../core/utils/responsive_helper.dart';
 
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
 class BulkRSVPManagerScreen extends StatefulWidget {
@@ -457,7 +453,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
   
   Widget _buildLocationFilter() {
     return DropdownButtonFormField<String>(
-      value: _selectedLocation,
+      initialValue: _selectedLocation,
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.location_on, size: 16, color: Color(0xFF6B7280)),
         hintText: 'Any location',
@@ -498,7 +494,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
   
   Widget _buildQuickPresetsFilter() {
     return DropdownButtonFormField<String>(
-      value: _selectedQuickPreset,
+      initialValue: _selectedQuickPreset,
       decoration: InputDecoration(
         prefixIcon: const Icon(Icons.flash_on, size: 16, color: Color(0xFF6B7280)),
         hintText: 'Quick selection presets',

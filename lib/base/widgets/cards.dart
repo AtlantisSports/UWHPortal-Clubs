@@ -90,6 +90,7 @@ class ClubCard extends StatefulWidget {
 
 class _ClubCardState extends State<ClubCard> {
   bool _isExpanded = false;
+  final Map<String, bool> _expandedDescriptions = {}; // Track which descriptions are expanded
   
   @override
   Widget build(BuildContext context) {
@@ -253,6 +254,9 @@ class _ClubCardState extends State<ClubCard> {
     final endTime = practice.dateTime.add(practice.duration);
     final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}-${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
     
+    final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
+    final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
+    
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -260,59 +264,117 @@ class _ClubCardState extends State<ClubCard> {
         color: AppColors.surface.withValues(alpha: 0.3),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Day badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              dayName,
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Time range
-          Text(
-            timeStr,
-            style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Separator
-          Text(
-            '•',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary.withValues(alpha: 0.6),
-            ),
-          ),
-          const SizedBox(width: 8),
-          // Location (clickable)
-          Expanded(
-            child: GestureDetector(
-              onTap: () => _launchLocationUrl(practice.mapsUrl),
-              child: Text(
-                practice.location,
+          Row(
+            children: [
+              // Day text (no background)
+              Text(
+                dayName,
                 style: const TextStyle(
                   fontSize: 13,
-                  color: Color(0xFF0284C7), // Blue color to indicate it's clickable
-                  decoration: TextDecoration.underline,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
                 ),
-                overflow: TextOverflow.ellipsis,
               ),
-            ),
+              const SizedBox(width: 8),
+              // Time range
+              Text(
+                timeStr,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Separator
+              Text(
+                '•',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Location (clickable)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _launchLocationUrl(practice.mapsUrl),
+                  child: Text(
+                    practice.location,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF0284C7), // Blue color to indicate it's clickable
+                      decoration: TextDecoration.underline,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              // Practice tag
+              if (practice.tag != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    practice.tag!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
+          // Practice description
+          if (practice.description.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    shouldTruncateDescription && !isDescriptionExpanded
+                        ? _getTruncatedDescription(practice.description)
+                        : practice.description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary.withValues(alpha: 0.8),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                if (shouldTruncateDescription)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _expandedDescriptions[practice.id] = !isDescriptionExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(
+                        isDescriptionExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 16,
+                        color: AppColors.textSecondary.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -363,5 +425,28 @@ class _ClubCardState extends State<ClubCard> {
       case DateTime.sunday: return 'Sun';
       default: return '';
     }
+  }
+
+  /// Determines if a description should be truncated based on visual length
+  bool _shouldTruncateDescription(String description) {
+    // Estimate if description would wrap to second line
+    // Rough estimate: more than 40 characters likely to wrap
+    return description.length > 40;
+  }
+
+  /// Returns truncated description with ellipsis
+  String _getTruncatedDescription(String description) {
+    if (description.length <= 40) return description;
+    
+    // Find a good break point (prefer word boundaries)
+    String truncated = description.substring(0, 37);
+    int lastSpace = truncated.lastIndexOf(' ');
+    
+    // If we can break at a word boundary and it's not too short, do so
+    if (lastSpace > 25) {
+      truncated = truncated.substring(0, lastSpace);
+    }
+    
+    return '$truncated...';
   }
 }

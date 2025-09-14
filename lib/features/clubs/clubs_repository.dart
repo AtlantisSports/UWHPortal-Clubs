@@ -159,6 +159,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.monday, 20, 15), // 8:15 PM
             location: 'VMAC',
             address: '5310 E 136th Ave, Thornton, CO',
+            tag: 'Open',
             rsvpResponses: {
               'user123': RSVPStatus.pending, // Current user starts with no selection
               'user456': RSVPStatus.maybe,
@@ -175,6 +176,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.wednesday, 19, 0), // 7:00 PM
             location: 'Carmody',
             address: '2200 S Kipling St, Lakewood, CO',
+            tag: 'High-Level',
             rsvpResponses: {
               'user123': RSVPStatus.pending,
               'user456': RSVPStatus.yes,
@@ -190,6 +192,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.thursday, 20, 15), // 8:15 PM
             location: 'VMAC',
             address: '5310 E 136th Ave, Thornton, CO',
+            tag: 'High-Level',
             rsvpResponses: {
               'user123': RSVPStatus.pending, // Current user starts with no selection
               'user456': RSVPStatus.yes,
@@ -206,6 +209,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
             location: 'VMAC',
             address: '5310 E 136th Ave, Thornton, CO',
+            tag: 'Intermediate',
             rsvpResponses: {
               'user123': RSVPStatus.pending, // Current user starts with no selection
               'user456': RSVPStatus.pending,
@@ -221,6 +225,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.sunday, 15, 0), // 3:00 PM
             location: 'Carmody',
             address: '2200 S Kipling St, Lakewood, CO',
+            tag: 'Open',
             rsvpResponses: {
               'user123': RSVPStatus.pending, // Current user starts with no selection
               'user456': RSVPStatus.yes,
@@ -253,6 +258,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
             dateTime: _getNextPracticeDate(now, DateTime.friday, 19, 0), // 7:00 PM
             location: 'Ryde Pool',
             address: '504 Victoria Rd, Ryde, NSW',
+            tag: 'Open',
             rsvpResponses: {
               'user123': RSVPStatus.pending,
               'user456': RSVPStatus.yes,
