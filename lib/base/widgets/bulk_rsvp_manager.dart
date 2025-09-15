@@ -28,6 +28,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   // Filter state
   Set<int> _selectedDaysOfWeek = <int>{};
   String? _selectedLocation;
+  String? _selectedLevel;
   
   // Selection state
   final Set<String> _selectedPracticeIds = <String>{};
@@ -49,6 +50,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   // Available options (populated from data)
   List<String> _availableLocations = [];
+  List<String> _availableLevels = [];
   
   @override
   void initState() {
@@ -58,8 +60,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _initializeFilters() {
-    // Initialize available locations from club practices
+    // Initialize available locations and levels from club practices
     _updateAvailableLocations();
+    _updateAvailableLevels();
   }
   
   void _initializeRSVPProvider() {
@@ -78,6 +81,21 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     
     setState(() {
       _availableLocations = locations;
+    });
+  }
+  
+  void _updateAvailableLevels() {
+    final clubPractices = _getClubPractices();
+    final levels = clubPractices
+        .map((p) => p.tag)
+        .where((tag) => tag != null)
+        .cast<String>()
+        .toSet()
+        .toList();
+    levels.sort();
+    
+    setState(() {
+      _availableLevels = levels;
     });
   }
   
@@ -161,6 +179,11 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       practices = practices.where((p) => p.location == _selectedLocation).toList();
     }
     
+    // Apply level filter
+    if (_selectedLevel != null && _selectedLevel!.isNotEmpty) {
+      practices = practices.where((p) => p.tag == _selectedLevel).toList();
+    }
+    
     return practices;
   }
   
@@ -239,18 +262,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Day of Week & Location Row
-          Row(
-            children: [
-              Expanded(
-                child: _buildDayOfWeekFilter(),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _buildLocationFilter(),
-              ),
-            ],
-          ),
+          // Dynamic filter row based on available options
+          _buildDynamicFilterRow(),
           
           const SizedBox(height: 4),
         ],
@@ -310,6 +323,49 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     }
   }
   
+  Widget _buildDynamicFilterRow() {
+    List<Widget> filters = [];
+    
+    // Always show day of week filter (it's always useful)
+    filters.add(Expanded(child: _buildDayOfWeekFilter()));
+    
+    // Show location filter only if there are multiple locations
+    if (_availableLocations.length > 1) {
+      filters.add(const SizedBox(width: 6));
+      filters.add(Expanded(child: _buildLocationFilter()));
+    }
+    
+    // Show level filter only if there are multiple levels
+    if (_availableLevels.length > 1) {
+      filters.add(const SizedBox(width: 6));
+      filters.add(Expanded(child: _buildLevelFilter()));
+    }
+    
+    // If we have 3 filters, use a column layout to prevent overflow
+    if (filters.length >= 5) { // 3 filters + 2 spacers = 5 widgets
+      return Column(
+        children: [
+          Row(
+            children: [
+              Expanded(child: _buildDayOfWeekFilter()),
+              const SizedBox(width: 8),
+              Expanded(child: _buildLocationFilter()),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildLevelFilter()),
+              const Spacer(), // Empty space to balance layout
+            ],
+          ),
+        ],
+      );
+    }
+    
+    return Row(children: filters);
+  }
+  
   Widget _buildLocationFilter() {
     return DropdownButtonFormField<String>(
       initialValue: _selectedLocation,
@@ -345,6 +401,46 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       onChanged: (value) {
         setState(() {
           _selectedLocation = value;
+        });
+      },
+    );
+  }
+  
+  Widget _buildLevelFilter() {
+    return DropdownButtonFormField<String>(
+      initialValue: _selectedLevel,
+      decoration: InputDecoration(
+        prefixIcon: const Icon(Icons.star, size: 16, color: Color(0xFF6B7280)),
+        hintText: 'Any level',
+        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: const BorderSide(color: Color(0xFF0284C7)),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        isDense: true,
+      ),
+      items: [
+        const DropdownMenuItem<String>(
+          value: null,
+          child: Text('Any level', style: TextStyle(fontSize: 14)),
+        ),
+        ..._availableLevels.map((level) => DropdownMenuItem<String>(
+          value: level,
+          child: Text(level, style: const TextStyle(fontSize: 14)),
+        )),
+      ],
+      onChanged: (value) {
+        setState(() {
+          _selectedLevel = value;
         });
       },
     );
@@ -404,7 +500,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               // Practice list
               ...filteredPractices.map((practice) {
             final isSelected = _selectedPracticeIds.contains(practice.id);
-            final currentRSVPStatus = rsvpProvider.getRSVPStatus(practice.id);
             
             return InkWell(
               onTap: () {
@@ -446,22 +541,27 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    // Current RSVP Status indicator
+                    // Level tag indicator
                     Container(
-                      width: 24,
+                      width: 32,
                       height: 24,
                       decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: currentRSVPStatus.color.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(4),
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
                         border: Border.all(
-                          color: currentRSVPStatus.color,
-                          width: 2,
+                          color: const Color(0xFF0284C7),
+                          width: 1.5,
                         ),
                       ),
-                      child: Icon(
-                        _getOverlayIcon(currentRSVPStatus),
-                        size: 12,
-                        color: currentRSVPStatus.color,
+                      child: Center(
+                        child: Text(
+                          _truncateLevel(practice.tag ?? ''),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF0284C7),
+                          ),
+                        ),
                       ),
                     ),
                   ],
@@ -966,7 +1066,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
            _selectedRSVPChoice != null || 
            _selectedTimeframe != 'only_announced' ||
            _selectedDaysOfWeek.isNotEmpty ||
-           _selectedLocation != null;
+           _selectedLocation != null ||
+           _selectedLevel != null;
   }
   
   void _applyBulkRSVP() async {
@@ -1106,6 +1207,28 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       return '$displayHour:$minuteStr–$endDisplayHour:$endMinuteStr $endPeriod';
     } else {
       return '$displayHour:$minuteStr $period–$endDisplayHour:$endMinuteStr $endPeriod';
+    }
+  }
+  
+  String _truncateLevel(String level) {
+    if (level.isEmpty) return '';
+    
+    // Special mappings for common levels to fit in 4 characters
+    switch (level.toLowerCase()) {
+      case 'high-level':
+      case 'high level':
+        return 'HIGH';
+      case 'intermediate':
+        return 'INT';
+      case 'beginner':
+        return 'BEG';
+      case 'advanced':
+        return 'ADV';
+      case 'open':
+        return 'OPEN';
+      default:
+        // Truncate to 4 characters and uppercase
+        return level.toUpperCase().substring(0, level.length > 4 ? 4 : level.length);
     }
   }
   
