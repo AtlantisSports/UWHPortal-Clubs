@@ -39,6 +39,9 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
   // Available options (populated from data)
   List<String> _availableLocations = [];
   
+  // Track expanded descriptions (same pattern as club cards)
+  final Map<String, bool> _expandedDescriptions = {};
+  
   @override
   void initState() {
     super.initState();
@@ -525,6 +528,11 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
                       ),
                     ],
                   ),
+                  // Practice description (same pattern as club cards)
+                  if (practice.description.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    _buildPracticeDescription(practice),
+                  ],
                 ],
               ),
             ),
@@ -1055,5 +1063,68 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
         ],
       ),
     );
+  }
+  
+  /// Build practice description with truncation/expansion (same pattern as club cards)
+  Widget _buildPracticeDescription(Practice practice) {
+    final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
+    final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
+    
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Text(
+            shouldTruncateDescription && !isDescriptionExpanded
+                ? _getTruncatedDescription(practice.description)
+                : practice.description,
+            style: const TextStyle(
+              fontSize: 12,
+              color: Color(0xFF6B7280),
+              fontStyle: FontStyle.italic,
+            ),
+          ),
+        ),
+        if (shouldTruncateDescription)
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _expandedDescriptions[practice.id] = !isDescriptionExpanded;
+              });
+            },
+            child: Padding(
+              padding: const EdgeInsets.only(left: 4),
+              child: Icon(
+                isDescriptionExpanded ? Icons.expand_less : Icons.expand_more,
+                size: 16,
+                color: const Color(0xFF6B7280),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+  
+  /// Determines if a description should be truncated based on visual length
+  bool _shouldTruncateDescription(String description) {
+    // Estimate if description would wrap to second line
+    // Rough estimate: more than 40 characters likely to wrap
+    return description.length > 40;
+  }
+
+  /// Returns truncated description with ellipsis
+  String _getTruncatedDescription(String description) {
+    if (description.length <= 40) return description;
+    
+    // Find a good break point (prefer word boundaries)
+    String truncated = description.substring(0, 37);
+    int lastSpace = truncated.lastIndexOf(' ');
+    
+    // If we can break at a word boundary and it's not too short, do so
+    if (lastSpace > 25) {
+      truncated = truncated.substring(0, lastSpace);
+    }
+    
+    return '$truncated...';
   }
 }

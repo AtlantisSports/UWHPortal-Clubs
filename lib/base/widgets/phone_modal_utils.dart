@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dependent_management_modal.dart';
 
 /// Utility functions for showing modals that respect phone frame boundaries
 class PhoneModalUtils {
@@ -126,5 +127,22 @@ class PhoneModalUtils {
       ),
     );
     return result ?? false;
+  }
+
+  /// Show the dependent management modal
+  static Future<void> showDependentManagementModal({
+    required BuildContext context,
+    required List<String> availableDependents,
+    required List<String> selectedDependents,
+    required Function(List<String>) onDependentsChanged,
+  }) async {
+    await showPhoneModal(
+      context: context,
+      child: DependentManagementModal(
+        availableDependents: availableDependents,
+        selectedDependents: selectedDependents,
+        onDependentsChanged: onDependentsChanged,
+      ),
+    );
   }
 }

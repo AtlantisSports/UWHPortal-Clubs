@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/rsvp_provider.dart';
+import 'phone_modal_utils.dart';
 
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
 class BulkRSVPManager extends StatefulWidget {
@@ -41,6 +42,18 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   // UI state
   bool _isLoading = false;
+  final Map<String, bool> _expandedDescriptions = <String, bool>{};
+  
+  // Dependent state
+  bool _includeDependents = false;
+  final List<String> _selectedDependents = <String>[];
+  final List<String> _availableDependents = [
+    'Sarah Johnson (Daughter)',
+    'Michael Johnson (Son)', 
+    'Emma Wilson (Daughter)',
+    'James Smith (Son)',
+    'Lily Chen (Daughter)',
+  ];
   
   // Toast state
   bool _showToast = false;
@@ -513,57 +526,65 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               },
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Checkbox(
-                      value: isSelected,
-                      onChanged: (value) {
-                        setState(() {
-                          if (value == true) {
-                            _selectedPracticeIds.add(practice.id);
-                          } else {
-                            _selectedPracticeIds.remove(practice.id);
-                          }
-                        });
-                      },
-                      activeColor: const Color(0xFF0284C7),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        '${_formatShortDay(practice.dateTime)} • ${_formatTimeRange(practice.dateTime)} • ${practice.location}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF111827),
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isSelected,
+                          onChanged: (value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedPracticeIds.add(practice.id);
+                              } else {
+                                _selectedPracticeIds.remove(practice.id);
+                              }
+                            });
+                          },
+                          activeColor: const Color(0xFF0284C7),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Level tag indicator
-                    Container(
-                      width: 32,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(4),
-                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                        border: Border.all(
-                          color: const Color(0xFF0284C7),
-                          width: 1.5,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          _truncateLevel(practice.tag ?? ''),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFF0284C7),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            '${_formatShortDay(practice.dateTime)} • ${_formatTimeRange(practice.dateTime)} • ${practice.location}',
+                            style: const TextStyle(
+                              fontSize: 15,
+                              color: Color(0xFF111827),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Level tag indicator
+                        Container(
+                          width: 32,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(4),
+                            color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                            border: Border.all(
+                              color: const Color(0xFF0284C7),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Center(
+                            child: Text(
+                              _truncateLevel(practice.tag ?? ''),
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
+                    // Practice description (similar to club card)
+                    if (practice.description.isNotEmpty) 
+                      _buildPracticeDescription(practice),
                   ],
                 ),
               ),
@@ -653,6 +674,70 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ],
           ),
+          
+          // Include dependents checkbox (shown when RSVP choice is made)
+          if (_selectedRSVPChoice != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Row(
+                children: [
+                  Transform.scale(
+                    scale: 0.9,
+                    child: Checkbox(
+                      value: _includeDependents,
+                      onChanged: (value) {
+                        setState(() {
+                          _includeDependents = value ?? false;
+                          if (!_includeDependents) {
+                            _selectedDependents.clear();
+                          }
+                        });
+                      },
+                      activeColor: const Color(0xFF1B365D),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _includeDependents = !_includeDependents;
+                          if (!_includeDependents) {
+                            _selectedDependents.clear();
+                          }
+                        });
+                      },
+                      child: Text(
+                        _includeDependents && _selectedDependents.isNotEmpty
+                            ? 'Include dependents (${_selectedDependents.length} selected)'
+                            : 'Include dependents',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  ),
+                  if (_includeDependents)
+                    TextButton(
+                      onPressed: () => _showDependentManagementModal(),
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text(
+                        'Manage',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF1B365D),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           
           // Affected practices count (shown as soon as practices are selected)
           if (_selectedPracticeIds.isNotEmpty)
@@ -951,6 +1036,20 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         _selectedTimeframe = 'only_announced';
       });
     }
+  }
+  
+  void _showDependentManagementModal() async {
+    await PhoneModalUtils.showDependentManagementModal(
+      context: context,
+      availableDependents: _availableDependents,
+      selectedDependents: _selectedDependents,
+      onDependentsChanged: (selectedDependents) {
+        setState(() {
+          _selectedDependents.clear();
+          _selectedDependents.addAll(selectedDependents);
+        });
+      },
+    );
   }
   
   bool _canApply() {
@@ -1282,6 +1381,72 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         );
       },
     );
+  }
+
+  /// Build practice description with truncation (similar to club card)
+  Widget _buildPracticeDescription(Practice practice) {
+    final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
+    final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
+    
+    return Padding(
+      padding: const EdgeInsets.only(left: 46, top: 4, right: 16, bottom: 4), // Align with text above (checkbox + spacing)
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(
+            child: Text(
+              shouldTruncateDescription && !isDescriptionExpanded
+                  ? _getTruncatedDescription(practice.description)
+                  : practice.description,
+              style: const TextStyle(
+                fontSize: 12,
+                color: Color(0xFF6B7280),
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ),
+          if (shouldTruncateDescription)
+            GestureDetector(
+              onTap: () {
+                setState(() {
+                  _expandedDescriptions[practice.id] = !isDescriptionExpanded;
+                });
+              },
+              child: Padding(
+                padding: const EdgeInsets.only(left: 4),
+                child: Icon(
+                  isDescriptionExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 16,
+                  color: const Color(0xFF6B7280),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Determines if a description should be truncated based on visual length
+  bool _shouldTruncateDescription(String description) {
+    // Estimate if description would wrap to second line
+    // Rough estimate: more than 40 characters likely to wrap
+    return description.length > 40;
+  }
+
+  /// Returns truncated description with ellipsis
+  String _getTruncatedDescription(String description) {
+    if (description.length <= 40) return description;
+    
+    // Find a good break point (prefer word boundaries)
+    String truncated = description.substring(0, 37);
+    int lastSpace = truncated.lastIndexOf(' ');
+    
+    // If we can break at a word boundary and it's not too short, do so
+    if (lastSpace > 25) {
+      truncated = truncated.substring(0, lastSpace);
+    }
+    
+    return '$truncated...';
   }
 }
 
