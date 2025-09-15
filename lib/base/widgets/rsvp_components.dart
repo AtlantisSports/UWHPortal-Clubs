@@ -3,7 +3,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
+import '../../core/models/guest.dart';
 import '../../core/providers/rsvp_provider.dart';
+import 'guest_management_modal.dart';
+import 'phone_modal_utils.dart';
 
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
@@ -312,6 +315,8 @@ class PracticeRSVPCard extends StatefulWidget {
 }
 
 class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
+  bool _bringGuest = false;
+  PracticeGuestList _guestList = const PracticeGuestList();
   
   @override
   Widget build(BuildContext context) {
@@ -466,10 +471,113 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   ),
                 ],
               ),
+              
+              // Bring a guest section (only show if user selected "Yes")
+              if (currentRSVP == RSVPStatus.yes) ...[
+                const SizedBox(height: 12),
+                _buildGuestSection(),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+  
+  Widget _buildGuestSection() {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Checkbox and label
+          Row(
+            children: [
+              Checkbox(
+                value: _bringGuest,
+                onChanged: (value) {
+                  setState(() {
+                    _bringGuest = value ?? false;
+                    if (!_bringGuest) {
+                      _guestList = const PracticeGuestList();
+                    }
+                  });
+                },
+                activeColor: const Color(0xFF0284C7),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'Bring a guest',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF374151),
+                ),
+              ),
+            ],
+          ),
+          
+          // Guest summary and manage button
+          if (_bringGuest) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: _guestList.totalGuests > 0
+                      ? Text(
+                          '${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'} added',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6B7280),
+                          ),
+                        )
+                      : const Text(
+                          'No guests added yet',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                ),
+                TextButton(
+                  onPressed: _showGuestManagementModal,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    _guestList.totalGuests > 0 ? 'Manage' : 'Add guests',
+                    style: const TextStyle(fontSize: 13),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  void _showGuestManagementModal() {
+    PhoneModalUtils.showPhoneModal(
+      context: context,
+      child: GuestManagementModal(
+        initialGuests: _guestList,
+        onGuestsChanged: (newGuestList) {
+          setState(() {
+            _guestList = newGuestList;
+          });
+        },
+        practiceId: widget.practice.id,
+      ),
     );
   }
   

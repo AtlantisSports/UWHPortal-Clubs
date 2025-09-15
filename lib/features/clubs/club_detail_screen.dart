@@ -153,6 +153,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   Widget _buildPracticeDetailContent() {
     if (_selectedPractice == null) return Container();
     
+    final isUpcoming = _selectedPractice!.isUpcoming;
+    
     return SingleChildScrollView(
       child: Padding(
         padding: EdgeInsets.all(16),
@@ -225,27 +227,68 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       ),
                     ],
                   ),
+                  
+                  // Add attendance indicator for past events
+                  if (!isUpcoming) ...[
+                    SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(Icons.group, 
+                             color: AppColors.primary, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          'Attendance: ${_calculateAttendanceCount(_selectedPractice!)} players',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    // Individual attendance indicator
+                    Row(
+                      children: [
+                        _buildAttendanceIndicator(_getUserAttendanceStatus(_selectedPractice!)),
+                        SizedBox(width: 8),
+                        Text(
+                          _getUserAttendanceStatus(_selectedPractice!)
+                              ? 'You attended this practice'
+                              : 'You did not attend this practice',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: AppColors.textSecondary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ),
             SizedBox(height: 24),
             
-            // RSVP Section (positioned above description)
-            Consumer<RSVPProvider>(
-              builder: (context, rsvpProvider, child) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    PracticeRSVPCard(
-                      practice: _selectedPractice!,
-                      clubId: widget.club.id,
-                      // No onInfoTap here since we're already in practice details
-                    ),
-                  ],
-                );
-              },
-            ),
-            SizedBox(height: 24),
+            // RSVP Section (only for upcoming practices)
+            if (isUpcoming)
+              Consumer<RSVPProvider>(
+                builder: (context, rsvpProvider, child) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      PracticeRSVPCard(
+                        practice: _selectedPractice!,
+                        clubId: widget.club.id,
+                        // No onInfoTap here since we're already in practice details
+                      ),
+                    ],
+                  );
+                },
+              ),
+            
+            // Add spacing only if RSVP section was shown
+            if (isUpcoming) SizedBox(height: 24),
             
             // Description
             Container(
@@ -703,6 +746,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildTypicalPracticesTab(BuildContext context) {
+    final typicalPractices = _getTypicalPractices();
+    
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: SingleChildScrollView(
@@ -730,10 +775,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Practice items with dividers
-                  ...widget.club.upcomingPractices.asMap().entries.map((entry) {
+                  ...typicalPractices.asMap().entries.map((entry) {
                     final index = entry.key;
                     final practice = entry.value;
-                    final isLast = index == widget.club.upcomingPractices.length - 1;
+                    final isLast = index == typicalPractices.length - 1;
                     
                     return Column(
                       children: [
@@ -757,6 +802,71 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
+  }
+
+  /// Get typical/template practices for the club (same as used in bulk RSVP)
+  List<Practice> _getTypicalPractices() {
+    final typicalPractices = <Practice>[
+      Practice(
+        id: 'typical-monday',
+        clubId: widget.club.id,
+        title: 'Monday Evening',
+        description: 'Beginner-friendly; arrive 10 min early.',
+        dateTime: DateTime(2025, 9, 22, 20, 15), // Monday 8:15 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        tag: 'Open',
+      ),
+      Practice(
+        id: 'typical-wednesday',
+        clubId: widget.club.id,
+        title: 'Wednesday Evening',
+        description: 'Shallow end reserved. High-level participants only.',
+        dateTime: DateTime(2025, 9, 24, 19, 0), // Wednesday 7:00 PM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        tag: 'High-Level',
+      ),
+      Practice(
+        id: 'typical-thursday',
+        clubId: widget.club.id,
+        title: 'Thursday Evening',
+        description: 'Intermediate players welcome.',
+        dateTime: DateTime(2025, 9, 25, 20, 0), // Thursday 8:00 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        tag: 'Intermediate',
+      ),
+      Practice(
+        id: 'typical-sunday-morning',
+        clubId: widget.club.id,
+        title: 'Sunday Morning',
+        description: 'Weekly practice for all skill levels.',
+        dateTime: DateTime(2025, 9, 21, 10, 0), // Sunday 10:00 AM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        tag: 'Open',
+      ),
+      Practice(
+        id: 'typical-sunday-afternoon',
+        clubId: widget.club.id,
+        title: 'Sunday Afternoon',
+        description: 'Afternoon session.',
+        dateTime: DateTime(2025, 9, 21, 15, 0), // Sunday 3:00 PM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        tag: 'Open',
+      ),
+    ];
+    
+    // Sort by day of week and time
+    typicalPractices.sort((a, b) {
+      final dayComparison = a.dateTime.weekday.compareTo(b.dateTime.weekday);
+      if (dayComparison != 0) return dayComparison;
+      return a.dateTime.hour.compareTo(b.dateTime.hour);
+    });
+    
+    return typicalPractices;
   }
 
   Widget _buildPracticeRow(Practice practice) {
@@ -940,6 +1050,54 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
+  }
+
+  Widget _buildAttendanceIndicator(bool attended) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: attended ? Colors.green : Colors.red,
+      ),
+      child: Icon(
+        attended ? Icons.check : Icons.close,
+        color: Colors.white,
+        size: 14,
+      ),
+    );
+  }
+
+  bool _getUserAttendanceStatus(Practice practice) {
+    // For past practices, use the same logic as the calendar to ensure consistency
+    if (!practice.isUpcoming) {
+      // First check if user is explicitly in participants list
+      if (practice.participants.isNotEmpty) {
+        return practice.participants.contains(widget.currentUserId);
+      }
+      
+      // Fall back to hash-based logic (EXACTLY same as calendar widget)
+      // This ensures consistency between calendar and practice details
+      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+      final hash = practiceDate.hashCode + practice.location.hashCode;
+      return hash % 3 != 0; // Same logic as calendar: attended if hash % 3 != 0
+    }
+    
+    // For upcoming practices, check participants list
+    return practice.participants.contains(widget.currentUserId);
+  }
+
+  int _calculateAttendanceCount(Practice practice) {
+    // For past practices, if no actual participants data, generate consistent count
+    if (!practice.isUpcoming && practice.participants.isEmpty) {
+      // Generate a realistic attendance count (between 8-18 players)
+      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+      final hash = practiceDate.hashCode + practice.location.hashCode;
+      return 8 + (hash.abs() % 11); // Results in 8-18 players
+    }
+    
+    // For practices with actual data, use real count
+    return practice.participants.length;
   }
 
   /// Helper method to get day name from weekday number
