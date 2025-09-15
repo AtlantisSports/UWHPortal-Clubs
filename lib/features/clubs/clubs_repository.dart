@@ -150,89 +150,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
         isActive: true,
         tags: const ['competitive', 'beginner-friendly', 'multi-location'],
         memberCount: 42,
-        upcomingPractices: [
-          Practice(
-            id: 'denver-monday',
-            clubId: 'denver-uwh',
-            title: 'Monday Evening',
-            description: 'Beginner-friendly; arrive 10 min early.',
-            dateTime: _getNextPracticeDate(now, DateTime.monday, 20, 15), // 8:15 PM
-            location: 'VMAC',
-            address: '5310 E 136th Ave, Thornton, CO',
-            tag: 'Open',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending, // Current user starts with no selection
-              'user456': RSVPStatus.maybe,
-              'user789': RSVPStatus.pending,
-              'user101': RSVPStatus.yes,
-              'user202': RSVPStatus.no,
-            },
-          ),
-          Practice(
-            id: 'denver-wednesday',
-            clubId: 'denver-uwh',
-            title: 'Wednesday Evening',
-            description: 'Shallow end reserved. High-level participants only.',
-            dateTime: _getNextPracticeDate(now, DateTime.wednesday, 19, 0), // 7:00 PM
-            location: 'Carmody',
-            address: '2200 S Kipling St, Lakewood, CO',
-            tag: 'High-Level',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending,
-              'user456': RSVPStatus.yes,
-              'user789': RSVPStatus.maybe,
-              'user101': RSVPStatus.no,
-            },
-          ),
-          Practice(
-            id: 'denver-thursday',
-            clubId: 'denver-uwh',
-            title: 'Thursday Evening',
-            description: 'Scrimmage heavy. High-level participants only.',
-            dateTime: _getNextPracticeDate(now, DateTime.thursday, 20, 15), // 8:15 PM
-            location: 'VMAC',
-            address: '5310 E 136th Ave, Thornton, CO',
-            tag: 'High-Level',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending, // Current user starts with no selection
-              'user456': RSVPStatus.yes,
-              'user789': RSVPStatus.yes,
-              'user101': RSVPStatus.pending,
-              'user202': RSVPStatus.yes,
-            },
-          ),
-          Practice(
-            id: 'denver-sunday-morning',
-            clubId: 'denver-uwh',
-            title: 'Sunday Morning',
-            description: 'Drills + conditioning.',
-            dateTime: _getNextPracticeDate(now, DateTime.sunday, 10, 0), // 10:00 AM
-            location: 'VMAC',
-            address: '5310 E 136th Ave, Thornton, CO',
-            tag: 'Intermediate',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending, // Current user starts with no selection
-              'user456': RSVPStatus.pending,
-              'user789': RSVPStatus.yes,
-              'user101': RSVPStatus.maybe,
-            },
-          ),
-          Practice(
-            id: 'denver-sunday-afternoon',
-            clubId: 'denver-uwh',
-            title: 'Sunday Afternoon',
-            description: 'Afternoon session.',
-            dateTime: _getNextPracticeDate(now, DateTime.sunday, 15, 0), // 3:00 PM
-            location: 'Carmody',
-            address: '2200 S Kipling St, Lakewood, CO',
-            tag: 'Open',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending, // Current user starts with no selection
-              'user456': RSVPStatus.yes,
-              'user789': RSVPStatus.maybe,
-            },
-          ),
-        ],
+        upcomingPractices: _generateDenverPractices(),
       ),
       // Sydney Kings UWH - from portal-rsvp-demo repository
       Club(
@@ -274,6 +192,131 @@ class ClubsRepositoryImpl implements ClubsRepository {
   }
 
   /// Helper method to calculate next practice date for a given day of week
+  /// Generate all Denver practice instances for September through November 2025
+  List<Practice> _generateDenverPractices() {
+    final List<Practice> practices = [];
+    
+    // Define recurring practice patterns
+    final patterns = [
+      {
+        'id_prefix': 'denver-monday',
+        'title': 'Monday Evening',
+        'description': 'Beginner-friendly; arrive 10 min early.',
+        'day': DateTime.monday,
+        'hour': 20,
+        'minute': 15,
+        'location': 'VMAC',
+        'address': '5310 E 136th Ave, Thornton, CO',
+        'tag': 'Open',
+      },
+      {
+        'id_prefix': 'denver-wednesday',
+        'title': 'Wednesday Evening',
+        'description': 'Shallow end reserved. High-level participants only.',
+        'day': DateTime.wednesday,
+        'hour': 19,
+        'minute': 0,
+        'location': 'Carmody',
+        'address': '2200 S Kipling St, Lakewood, CO',
+        'tag': 'High-Level',
+      },
+      {
+        'id_prefix': 'denver-thursday',
+        'title': 'Thursday Evening',
+        'description': 'Scrimmage heavy. High-level participants only.',
+        'day': DateTime.thursday,
+        'hour': 20,
+        'minute': 15,
+        'location': 'VMAC',
+        'address': '5310 E 136th Ave, Thornton, CO',
+        'tag': 'High-Level',
+      },
+      {
+        'id_prefix': 'denver-sunday-morning',
+        'title': 'Sunday Morning',
+        'description': 'Drills + conditioning.',
+        'day': DateTime.sunday,
+        'hour': 10,
+        'minute': 0,
+        'location': 'VMAC',
+        'address': '5310 E 136th Ave, Thornton, CO',
+        'tag': 'Intermediate',
+      },
+      {
+        'id_prefix': 'denver-sunday-afternoon',
+        'title': 'Sunday Afternoon',
+        'description': 'Afternoon session.',
+        'day': DateTime.sunday,
+        'hour': 15,
+        'minute': 0,
+        'location': 'Carmody',
+        'address': '2200 S Kipling St, Lakewood, CO',
+        'tag': 'Open',
+      },
+    ];
+    
+    // Generate instances for each pattern
+    for (final pattern in patterns) {
+      final dates = _getRecurringPracticeDates(
+        pattern['day'] as int,
+        pattern['hour'] as int,
+        pattern['minute'] as int,
+      );
+      
+      for (int i = 0; i < dates.length; i++) {
+        final date = dates[i];
+        practices.add(
+          Practice(
+            id: '${pattern['id_prefix']}-${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+            clubId: 'denver-uwh',
+            title: pattern['title'] as String,
+            description: pattern['description'] as String,
+            dateTime: date,
+            location: pattern['location'] as String,
+            address: pattern['address'] as String,
+            tag: pattern['tag'] as String,
+            rsvpResponses: {
+              'user123': RSVPStatus.pending, // Current user starts with no selection
+              'user456': RSVPStatus.maybe,
+              'user789': RSVPStatus.pending,
+              'user101': RSVPStatus.yes,
+              'user202': RSVPStatus.no,
+            },
+          ),
+        );
+      }
+    }
+    
+    // Sort by date
+    practices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    return practices;
+  }
+  
+  /// Generate all practice instances for a recurring practice from September through November 2025
+  List<DateTime> _getRecurringPracticeDates(int targetDayOfWeek, int hour, int minute) {
+    final List<DateTime> dates = [];
+    
+    // Start from September 1, 2025
+    final startDate = DateTime(2025, 9, 1);
+    // End at November 30, 2025
+    final endDate = DateTime(2025, 11, 30);
+    
+    // Find the first occurrence of the target day in September
+    DateTime current = startDate;
+    while (current.weekday != targetDayOfWeek && current.isBefore(endDate)) {
+      current = current.add(const Duration(days: 1));
+    }
+    
+    // Generate weekly occurrences until the end of November
+    while (current.isBefore(endDate)) {
+      dates.add(DateTime(current.year, current.month, current.day, hour, minute));
+      current = current.add(const Duration(days: 7)); // Next week
+    }
+    
+    return dates;
+  }
+  
+  /// Get the next single practice date (for backward compatibility)
   DateTime _getNextPracticeDate(DateTime now, int targetDayOfWeek, int hour, int minute) {
     int daysToAdd = targetDayOfWeek - now.weekday;
     if (daysToAdd <= 0) {

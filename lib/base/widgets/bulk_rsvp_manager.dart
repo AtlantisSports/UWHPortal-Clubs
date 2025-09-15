@@ -2,6 +2,7 @@
 /// Comprehensive bulk RSVP interface with filtering and selection capabilities
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
@@ -37,6 +38,15 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   
+  // UI state
+  bool _isLoading = false;
+  
+  // Toast state
+  bool _showToast = false;
+  String _toastMessage = '';
+  Color _toastColor = Colors.green;
+  IconData? _toastIcon;
+  
   // Available options (populated from data)
   List<String> _availableLocations = [];
   
@@ -44,11 +54,21 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   void initState() {
     super.initState();
     _initializeFilters();
+    _initializeRSVPProvider();
   }
   
   void _initializeFilters() {
     // Initialize available locations from club practices
     _updateAvailableLocations();
+  }
+  
+  void _initializeRSVPProvider() {
+    // Initialize RSVP provider with current club practices
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final rsvpProvider = Provider.of<RSVPProvider>(context, listen: false);
+      final clubPractices = _getClubPractices();
+      rsvpProvider.initializePracticesRSVP(clubPractices);
+    });
   }
   
   void _updateAvailableLocations() {
@@ -62,9 +82,67 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   List<Practice> _getClubPractices() {
-    return widget.club.upcomingPractices
-        .where((practice) => practice.isUpcoming)
-        .toList()
+    // Return representative practices for bulk RSVP (one per pattern)
+    return _getRepresentativePractices();
+  }
+  
+  /// Get representative practices (one per recurring pattern) for bulk RSVP selection
+  List<Practice> _getRepresentativePractices() {
+    final representatives = <Practice>[
+      Practice(
+        id: 'rep-denver-monday',
+        clubId: widget.club.id,
+        title: 'Monday Evening',
+        description: 'Beginner-friendly; arrive 10 min early.',
+        dateTime: DateTime(2025, 9, 22, 20, 15), // Next Monday 8:15 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        tag: 'Open',
+      ),
+      Practice(
+        id: 'rep-denver-wednesday',
+        clubId: widget.club.id,
+        title: 'Wednesday Evening',
+        description: 'Shallow end reserved. High-level participants only.',
+        dateTime: DateTime(2025, 9, 24, 19, 0), // Next Wednesday 7:00 PM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        tag: 'High-Level',
+      ),
+      Practice(
+        id: 'rep-denver-thursday',
+        clubId: widget.club.id,
+        title: 'Thursday Evening',
+        description: 'Scrimmage heavy. High-level participants only.',
+        dateTime: DateTime(2025, 9, 25, 20, 15), // Next Thursday 8:15 PM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        tag: 'High-Level',
+      ),
+      Practice(
+        id: 'rep-denver-sunday-morning',
+        clubId: widget.club.id,
+        title: 'Sunday Morning',
+        description: 'Drills + conditioning.',
+        dateTime: DateTime(2025, 9, 21, 10, 0), // Next Sunday 10:00 AM
+        location: 'VMAC',
+        address: '5310 E 136th Ave, Thornton, CO',
+        tag: 'Intermediate',
+      ),
+      Practice(
+        id: 'rep-denver-sunday-afternoon',
+        clubId: widget.club.id,
+        title: 'Sunday Afternoon',
+        description: 'Afternoon session.',
+        dateTime: DateTime(2025, 9, 21, 15, 0), // Next Sunday 3:00 PM
+        location: 'Carmody',
+        address: '2200 S Kipling St, Lakewood, CO',
+        tag: 'Open',
+      ),
+    ];
+    
+    // Return representatives without filtering by isUpcoming since these are templates
+    return representatives
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
   }
   
@@ -90,24 +168,62 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   Widget build(BuildContext context) {
     final filteredPractices = _getFilteredPractices();
     
-    return Container(
-      width: double.infinity,
-      height: double.infinity,
-      color: Colors.white,
-      child: SingleChildScrollView(
-        child: Column(
-          children: [
-            // Filter Section
-            _buildFilterSection(),
-            
-            // Practice List
-            _buildPracticeList(filteredPractices),
-            
-            // Bottom Action Bar
-            _buildBottomActionBar(filteredPractices),
-          ],
+    return Stack(
+      children: [
+        Container(
+          width: double.infinity,
+          height: double.infinity,
+          color: Colors.white,
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                // Filter Section
+                _buildFilterSection(),
+                
+                // Practice List
+                _buildPracticeList(filteredPractices),
+                
+                // Bottom Action Bar
+                _buildBottomActionBar(filteredPractices),
+              ],
+            ),
+          ),
         ),
-      ),
+        // Custom Toast
+        if (_showToast)
+          Positioned(
+            top: kToolbarHeight + 48,
+            left: 16,
+            right: 16,
+            child: Material(
+              elevation: 6,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _toastColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(_toastIcon, color: Colors.white, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        _toastMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
   
@@ -288,6 +404,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               // Practice list
               ...filteredPractices.map((practice) {
             final isSelected = _selectedPracticeIds.contains(practice.id);
+            final currentRSVPStatus = rsvpProvider.getRSVPStatus(practice.id);
             
             return InkWell(
               onTap: () {
@@ -326,6 +443,25 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                           fontSize: 15,
                           color: Color(0xFF111827),
                         ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    // Current RSVP Status indicator
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: currentRSVPStatus.color.withValues(alpha: 0.1),
+                        border: Border.all(
+                          color: currentRSVPStatus.color,
+                          width: 2,
+                        ),
+                      ),
+                      child: Icon(
+                        _getOverlayIcon(currentRSVPStatus),
+                        size: 12,
+                        color: currentRSVPStatus.color,
                       ),
                     ),
                   ],
@@ -418,6 +554,22 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             ],
           ),
           
+          // Affected practices count (shown as soon as practices are selected)
+          if (_selectedPracticeIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 12.0),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _getAffectedPracticesText(),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ),
+            ),
+          
           const SizedBox(height: 16),
           
           // Cancel/Apply Buttons
@@ -450,20 +602,29 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               const SizedBox(width: 12),
               Expanded(
                 child: ElevatedButton(
-                  onPressed: _canApply() ? _applyBulkRSVP : null,
+                  onPressed: (_canApply() && !_isLoading) ? _applyBulkRSVP : null,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _canApply() ? const Color(0xFF0284C7) : const Color(0xFFE5E7EB),
-                    foregroundColor: _canApply() ? Colors.white : const Color(0xFF9CA3AF),
+                    backgroundColor: (_canApply() && !_isLoading) ? const Color(0xFF0284C7) : const Color(0xFFE5E7EB),
+                    foregroundColor: (_canApply() && !_isLoading) ? Colors.white : const Color(0xFF9CA3AF),
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     elevation: 0,
                   ),
-                  child: const Text(
-                    'Apply',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
+                  child: _isLoading
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                          ),
+                        )
+                      : const Text(
+                          'Apply',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -601,21 +762,28 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         padding: const EdgeInsets.symmetric(vertical: 4),
         child: Row(
           children: [
-            Radio<String>(
-              value: value,
-              groupValue: _selectedTimeframe,
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedTimeframe = newValue!;
-                });
-                
-                if (newValue == 'custom') {
-                  // Show date picker immediately when custom is selected
-                  _showCustomDatePicker();
-                }
-              },
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+            Container(
+              width: 20,
+              height: 20,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: _selectedTimeframe == value 
+                      ? const Color(0xFF0284C7) 
+                      : const Color(0xFFD1D5DB),
+                  width: 2,
+                ),
+                color: _selectedTimeframe == value 
+                    ? const Color(0xFF0284C7) 
+                    : Colors.transparent,
+              ),
+              child: _selectedTimeframe == value
+                  ? const Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: Colors.white,
+                    )
+                  : null,
             ),
             const SizedBox(width: 8),
             Text(
@@ -689,6 +857,110 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     return _selectedPracticeIds.isNotEmpty && _selectedRSVPChoice != null;
   }
   
+  /// Get practice IDs based on selected practices and timeframe filters
+  List<String> _getTargetPracticeIds() {
+    // Start with manually selected representative practices
+    if (_selectedPracticeIds.isEmpty) {
+      return [];
+    }
+    
+    final representativePractices = _getRepresentativePractices();
+    final allCalendarPractices = widget.club.upcomingPractices; // All actual instances
+    final Set<String> targetPracticeIds = {};
+    
+    // For each selected representative practice, find matching calendar instances
+    for (final selectedId in _selectedPracticeIds) {
+      final selectedRepresentative = representativePractices.firstWhere(
+        (p) => p.id == selectedId,
+        orElse: () => throw Exception('Selected representative practice not found: $selectedId'),
+      );
+      
+      // Find all calendar practices with the same time and location pattern
+      final matchingPractices = allCalendarPractices.where((p) {
+        return p.dateTime.hour == selectedRepresentative.dateTime.hour &&
+               p.dateTime.minute == selectedRepresentative.dateTime.minute &&
+               p.location == selectedRepresentative.location &&
+               p.dateTime.weekday == selectedRepresentative.dateTime.weekday;
+      }).toList();
+      
+      // Apply timeframe filtering
+      List<Practice> timeframePractices = [];
+      switch (_selectedTimeframe) {
+        case 'only_announced':
+          // For testing: announced practices are Sept-Nov
+          timeframePractices = matchingPractices.where((p) {
+            final month = p.dateTime.month;
+            return month >= 9 && month <= 11; // September to November
+          }).toList();
+          break;
+          
+        case 'custom':
+          // Custom date range
+          if (_customStartDate != null && _customEndDate != null) {
+            timeframePractices = matchingPractices.where((p) {
+              final practiceDate = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
+              final startDate = DateTime(_customStartDate!.year, _customStartDate!.month, _customStartDate!.day);
+              final endDate = DateTime(_customEndDate!.year, _customEndDate!.month, _customEndDate!.day);
+              return practiceDate.isAtSameMomentAs(startDate) || 
+                     practiceDate.isAtSameMomentAs(endDate) ||
+                     (practiceDate.isAfter(startDate) && practiceDate.isBefore(endDate));
+            }).toList();
+          }
+          break;
+          
+        case 'all_future':
+          // All future practices from today
+          final today = DateTime.now();
+          final todayDate = DateTime(today.year, today.month, today.day);
+          timeframePractices = matchingPractices.where((p) {
+            final practiceDate = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
+            return practiceDate.isAtSameMomentAs(todayDate) || practiceDate.isAfter(todayDate);
+          }).toList();
+          break;
+      }
+      
+      // Apply future-only filter to timeframe results
+      final today = DateTime.now();
+      final futurePractices = timeframePractices.where((p) {
+        return p.dateTime.isAfter(today);
+      }).toList();
+      
+      // Add the IDs to our target set
+      for (final practice in futurePractices) {
+        targetPracticeIds.add(practice.id);
+      }
+    }
+    
+    return targetPracticeIds.toList();
+  }
+  
+  /// Get text describing how many practices will be affected
+  String _getAffectedPracticesText() {
+    if (_selectedPracticeIds.isEmpty) {
+      return 'Select practices to see affected count';
+    }
+    
+    final targetIds = _getTargetPracticeIds();
+    final count = targetIds.length;
+    
+    if (count == 0) {
+      return 'No future practices match the selected timeframe';
+    } else if (count == 1) {
+      return 'Will apply to 1 practice';
+    } else {
+      switch (_selectedTimeframe) {
+        case 'only_announced':
+          return 'Will apply to $count future announced practices';
+        case 'custom':
+          return 'Will apply to $count future practices in date range';
+        case 'all_future':
+          return 'Will apply to all future practices';
+        default:
+          return 'Will apply to $count future practices';
+      }
+    }
+  }
+  
   bool _hasUserInput() {
     return _selectedPracticeIds.isNotEmpty || 
            _selectedRSVPChoice != null || 
@@ -697,23 +969,115 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
            _selectedLocation != null;
   }
   
-  void _applyBulkRSVP() {
-    // Implementation for applying bulk RSVP
-    // This would normally interact with the RSVPProvider
-    print('Applying bulk RSVP: ${_selectedRSVPChoice?.name} for ${_selectedPracticeIds.length} practices');
-    print('Timeframe: $_selectedTimeframe');
-    if (_selectedTimeframe == 'custom') {
-      print('Custom range: $_customStartDate to $_customEndDate');
-    }
+  void _applyBulkRSVP() async {
+    if (!_canApply()) return;
     
-    // Reset after applying
+    // Show loading state
     setState(() {
-      _selectedPracticeIds.clear();
-      _selectedRSVPChoice = null;
-      _selectedTimeframe = 'only_announced';
-      _customStartDate = null;
-      _customEndDate = null;
+      _isLoading = true;
     });
+    
+    try {
+      final rsvpProvider = Provider.of<RSVPProvider>(context, listen: false);
+      
+      // Get practice IDs based on selected timeframe and filters
+      final targetPracticeIds = _getTargetPracticeIds();
+      
+      // Create the bulk RSVP request
+      final request = BulkRSVPRequest(
+        practiceIds: targetPracticeIds,
+        newStatus: _selectedRSVPChoice!,
+        clubId: widget.club.id,
+        userId: rsvpProvider.currentUserId,
+      );
+      
+      // Execute the bulk update
+      final result = await rsvpProvider.bulkUpdateRSVP(request);
+      
+      // Show result to user
+      if (mounted) {
+        _showBulkRSVPResult(result);
+        
+        // Reset the form after successful operation but keep window open
+        if (result.successfulIds.isNotEmpty) {
+          setState(() {
+            _selectedPracticeIds.clear();
+            _selectedRSVPChoice = null;
+            _selectedTimeframe = 'only_announced';
+            _customStartDate = null;
+            _customEndDate = null;
+          });
+          
+          // Window will stay open - user must press Done or Cancel to close
+        }
+      }
+    } catch (error) {
+      if (mounted) {
+        _showErrorDialog('Failed to update RSVPs: ${error.toString()}');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+  
+  void _showBulkRSVPResult(BulkRSVPResult result) {
+    if (result.isFullSuccess) {
+      _showCustomToast(
+        result.summaryText,
+        const Color(0xFF10B981), // Green for success
+        Icons.check,
+      );
+    } else if (result.isPartialSuccess) {
+      _showCustomToast(
+        result.summaryText,
+        const Color(0xFFF59E0B), // Orange for partial success
+        Icons.warning,
+      );
+    } else {
+      _showCustomToast(
+        'Failed to update practices',
+        const Color(0xFFEF4444), // Red for failure
+        Icons.error,
+      );
+    }
+  }
+  
+  void _showCustomToast(String message, Color color, IconData icon) {
+    setState(() {
+      _toastMessage = message;
+      _toastColor = color;
+      _toastIcon = icon;
+      _showToast = true;
+    });
+    
+    // Hide toast after 4 seconds
+    Timer(const Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _showToast = false;
+        });
+      }
+    });
+  }
+  
+  void _showErrorDialog(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Error'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
   
   // Helper methods
@@ -737,7 +1101,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
     final endMinuteStr = endMinute.toString().padLeft(2, '0');
     
-    return '$displayHour:$minuteStr–$endDisplayHour:$endMinuteStr $endPeriod';
+    // Show period for both times if they're different, otherwise just the end
+    if (period == endPeriod) {
+      return '$displayHour:$minuteStr–$endDisplayHour:$endMinuteStr $endPeriod';
+    } else {
+      return '$displayHour:$minuteStr $period–$endDisplayHour:$endMinuteStr $endPeriod';
+    }
   }
   
   void _showDayOfWeekPicker() {
