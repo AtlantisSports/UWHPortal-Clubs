@@ -38,6 +38,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late ScrollController _scrollController;
+  final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
@@ -58,6 +59,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     }
     
     // Add listener to auto-scroll when tab is clicked (after frame is built)
+    // Note: Using onTap in TabBar widget instead of controller listener to avoid conflicts
+    /*
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _tabController.addListener(() {
         if (_tabController.indexIsChanging) {
@@ -65,6 +68,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         }
       });
     });
+    */
   // Removed call to _initializeRSVPStatus (method no longer exists)
   }
 
@@ -352,16 +356,39 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   void _autoScrollToTabsPosition() {
     if (!_scrollController.hasClients) return;
     
-    // Scroll to the maximum extent to bring tab bar to the sticky position
-    // This matches the height calculation we did for the tab content
-    final maxScrollExtent = _scrollController.position.maxScrollExtent;
-    
-    // Animate to the maximum scroll position (full scroll down)
-    _scrollController.animateTo(
-      maxScrollExtent,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+    // Use GlobalKey + RenderBox approach for precise positioning
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      
+      final RenderBox? tabBarRenderBox = _tabBarKey.currentContext?.findRenderObject() as RenderBox?;
+      if (tabBarRenderBox == null) return;
+      
+      // Get the TabBar's position relative to the scroll view
+      final tabBarPosition = tabBarRenderBox.localToGlobal(Offset.zero);
+      
+      // Get the scroll view's position
+      final RenderBox? scrollViewRenderBox = _scrollController.position.context.storageContext.findRenderObject() as RenderBox?;
+      if (scrollViewRenderBox == null) return;
+      
+      final scrollViewPosition = scrollViewRenderBox.localToGlobal(Offset.zero);
+      
+      // Calculate the TabBar's position within the scroll content
+      final tabBarOffsetInScrollView = tabBarPosition.dy - scrollViewPosition.dy;
+      
+      // Add current scroll offset to get absolute position in content
+      final tabBarAbsolutePosition = tabBarOffsetInScrollView + _scrollController.offset;
+      
+      // Target scroll position: bring TabBar to the top of the visible area
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      final targetScrollPosition = tabBarAbsolutePosition.clamp(0.0, maxScrollExtent);
+      
+      // Animate to the calculated position
+      _scrollController.animateTo(
+        targetScrollPosition,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    });
   }
   
   @override
@@ -568,6 +595,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   Column(
                     children: [
                       TabBar(
+                        key: _tabBarKey, // Add the GlobalKey here
                         controller: _tabController,
                         labelColor: AppColors.primary,
                         unselectedLabelColor: AppColors.textSecondary,
