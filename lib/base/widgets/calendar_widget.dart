@@ -173,8 +173,8 @@ class PracticeCalendar extends StatelessWidget {
                         height: 40,
                         decoration: BoxDecoration(
                           border: Border(
-                            top: weekIndex > 0 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
-                            left: dayIndex > 0 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
+                            top: BorderSide(color: Colors.grey[300]!),
+                            left: BorderSide(color: Colors.grey[300]!),
                             right: dayIndex < 6 ? BorderSide(color: Colors.grey[300]!) : BorderSide.none,
                             bottom: weekIndex < ((daysInMonth + startingWeekday + 6) ~/ 7) - 1 
                                 ? BorderSide(color: Colors.grey[300]!) 

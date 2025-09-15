@@ -122,7 +122,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildBulkRSVPContent() {
-    return BulkRSVPManager(club: widget.club);
+    return BulkRSVPManager(
+      club: widget.club,
+      onCancel: () {
+        setState(() {
+          _showingBulkRSVP = false;
+        });
+      },
+    );
   }
 
   void _handlePracticeSelected(Practice practice) {

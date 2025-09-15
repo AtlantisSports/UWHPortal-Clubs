@@ -27,7 +27,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
   DateTime? _endDate;
   Set<int> _selectedDaysOfWeek = <int>{};
   String? _selectedLocation;
-  String? _selectedQuickPreset;
   
   // Selection state
   final Set<String> _selectedPracticeIds = <String>{};
@@ -39,7 +38,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
   
   // Available options (populated from data)
   List<String> _availableLocations = [];
-  List<String> _availableQuickPresets = [];
   
   @override
   void initState() {
@@ -67,9 +65,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
         .toList()
       ..sort();
     
-    // Generate dynamic quick presets based on available data
-    _availableQuickPresets = _generateQuickPresets(practices);
-    
     setState(() {});
   }
   
@@ -78,70 +73,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
         .where((practice) => practice.isUpcoming)
         .toList()
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
-  }
-  
-  List<String> _generateQuickPresets(List<Practice> practices) {
-    final presets = <String>[];
-    final now = DateTime.now();
-    
-    // This week
-    final thisWeekPractices = practices.where((p) {
-      final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-      final endOfWeek = startOfWeek.add(const Duration(days: 6));
-      return p.dateTime.isAfter(startOfWeek) && p.dateTime.isBefore(endOfWeek.add(const Duration(days: 1)));
-    }).toList();
-    if (thisWeekPractices.isNotEmpty) {
-      presets.add('All practices this week');
-    }
-    
-    // Next week
-    final nextWeekStart = now.add(Duration(days: 7 - now.weekday + 1));
-    final nextWeekEnd = nextWeekStart.add(const Duration(days: 6));
-    final nextWeekPractices = practices.where((p) {
-      return p.dateTime.isAfter(nextWeekStart) && p.dateTime.isBefore(nextWeekEnd.add(const Duration(days: 1)));
-    }).toList();
-    if (nextWeekPractices.isNotEmpty) {
-      presets.add('All practices next week');
-    }
-    
-    // Each day of week that has practices
-    for (int day = DateTime.monday; day <= DateTime.sunday; day++) {
-      final dayPractices = practices.where((p) => p.dateTime.weekday == day).toList();
-      if (dayPractices.isNotEmpty) {
-        final dayName = _getDayName(day);
-        presets.add('All ${dayName}s this month');
-      }
-    }
-    
-    // Each location that has practices
-    for (final location in _availableLocations) {
-      final locationPractices = practices.where((p) => p.location == location).toList();
-      if (locationPractices.isNotEmpty) {
-        presets.add('All practices at $location');
-      }
-    }
-    
-    // All remaining practices this season (next 90 days)
-    final seasonEnd = now.add(const Duration(days: 90));
-    final seasonPractices = practices.where((p) => p.dateTime.isBefore(seasonEnd)).toList();
-    if (seasonPractices.isNotEmpty) {
-      presets.add('All remaining practices this season');
-    }
-    
-    return presets;
-  }
-  
-  String _getDayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday: return 'Monday';
-      case DateTime.tuesday: return 'Tuesday';
-      case DateTime.wednesday: return 'Wednesday';
-      case DateTime.thursday: return 'Thursday';
-      case DateTime.friday: return 'Friday';
-      case DateTime.saturday: return 'Saturday';
-      case DateTime.sunday: return 'Sunday';
-      default: return '';
-    }
   }
   
   List<Practice> _getFilteredPractices() {
@@ -167,63 +98,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
       practices = practices.where((p) => p.location == _selectedLocation).toList();
     }
     
-    // Apply quick preset filter
-    if (_selectedQuickPreset != null) {
-      practices = _applyQuickPresetFilter(practices, _selectedQuickPreset!);
-    }
-    
     return practices;
-  }
-  
-  List<Practice> _applyQuickPresetFilter(List<Practice> practices, String preset) {
-    final now = DateTime.now();
-    
-    switch (preset) {
-      case 'All practices this week':
-        final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-        final endOfWeek = startOfWeek.add(const Duration(days: 6));
-        return practices.where((p) {
-          return p.dateTime.isAfter(startOfWeek) && p.dateTime.isBefore(endOfWeek.add(const Duration(days: 1)));
-        }).toList();
-        
-      case 'All practices next week':
-        final nextWeekStart = now.add(Duration(days: 7 - now.weekday + 1));
-        final nextWeekEnd = nextWeekStart.add(const Duration(days: 6));
-        return practices.where((p) {
-          return p.dateTime.isAfter(nextWeekStart) && p.dateTime.isBefore(nextWeekEnd.add(const Duration(days: 1)));
-        }).toList();
-        
-      case 'All remaining practices this season':
-        final seasonEnd = now.add(const Duration(days: 90));
-        return practices.where((p) => p.dateTime.isBefore(seasonEnd)).toList();
-        
-      default:
-        // Handle day-specific and location-specific presets
-        if (preset.startsWith('All ') && preset.contains('s this month')) {
-          final dayName = preset.split(' ')[1].replaceAll('s', '');
-          final weekday = _getWeekdayFromName(dayName);
-          if (weekday != null) {
-            return practices.where((p) => p.dateTime.weekday == weekday).toList();
-          }
-        } else if (preset.startsWith('All practices at ')) {
-          final location = preset.substring('All practices at '.length);
-          return practices.where((p) => p.location == location).toList();
-        }
-        return practices;
-    }
-  }
-  
-  int? _getWeekdayFromName(String dayName) {
-    switch (dayName.toLowerCase()) {
-      case 'monday': return DateTime.monday;
-      case 'tuesday': return DateTime.tuesday;
-      case 'wednesday': return DateTime.wednesday;
-      case 'thursday': return DateTime.thursday;
-      case 'friday': return DateTime.friday;
-      case 'saturday': return DateTime.saturday;
-      case 'sunday': return DateTime.sunday;
-      default: return null;
-    }
   }
   
   @override
@@ -327,48 +202,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
             ],
           ),
           
-          const SizedBox(height: 12),
-          
-          // Quick Presets Row
-          _buildQuickPresetsFilter(),
-          
-          const SizedBox(height: 12),
-          
-          // Apply/Clear Filters Row
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _clearFilters,
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: Color(0xFFE5E7EB)),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text(
-                    'Clear Filters',
-                    style: TextStyle(color: Color(0xFF6B7280)),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // Filters are applied automatically, just clear selection
-                    setState(() {
-                      _selectedPracticeIds.clear();
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF0284C7),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                  ),
-                  child: const Text('Apply Filters'),
-                ),
-              ),
-            ],
-          ),
+          const SizedBox(height: 16),
         ],
       ),
     );
@@ -451,6 +285,19 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
     return '${_selectedDaysOfWeek.length} days selected';
   }
   
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday: return 'Monday';
+      case DateTime.tuesday: return 'Tuesday';
+      case DateTime.wednesday: return 'Wednesday';
+      case DateTime.thursday: return 'Thursday';
+      case DateTime.friday: return 'Friday';
+      case DateTime.saturday: return 'Saturday';
+      case DateTime.sunday: return 'Sunday';
+      default: return 'Unknown';
+    }
+  }
+  
   Widget _buildLocationFilter() {
     return DropdownButtonFormField<String>(
       initialValue: _selectedLocation,
@@ -486,52 +333,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
       onChanged: (value) {
         setState(() {
           _selectedLocation = value;
-          _selectedQuickPreset = null; // Clear quick preset when manually filtering
-        });
-      },
-    );
-  }
-  
-  Widget _buildQuickPresetsFilter() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedQuickPreset,
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.flash_on, size: 16, color: Color(0xFF6B7280)),
-        hintText: 'Quick selection presets',
-        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF0284C7)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        isDense: true,
-      ),
-      items: [
-        const DropdownMenuItem<String>(
-          value: null,
-          child: Text('No preset selected', style: TextStyle(fontSize: 14)),
-        ),
-        ..._availableQuickPresets.map((preset) => DropdownMenuItem<String>(
-          value: preset,
-          child: Text(preset, style: const TextStyle(fontSize: 14)),
-        )),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _selectedQuickPreset = value;
-          if (value != null) {
-            // Clear manual filters when using preset
-            _selectedLocation = null;
-            _selectedDaysOfWeek.clear();
-          }
         });
       },
     );
@@ -1080,7 +881,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
       setState(() {
         _startDate = result.start;
         _endDate = result.end;
-        _selectedQuickPreset = null; // Clear quick preset when manually filtering
       });
     }
   }
@@ -1124,7 +924,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
                   onPressed: () {
                     setState(() {
                       _selectedDaysOfWeek = tempSelection;
-                      _selectedQuickPreset = null; // Clear quick preset when manually filtering
                     });
                     Navigator.pop(context);
                   },
@@ -1136,17 +935,6 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
         );
       },
     );
-  }
-  
-  void _clearFilters() {
-    setState(() {
-      _startDate = DateTime.now();
-      _endDate = DateTime.now().add(const Duration(days: 30));
-      _selectedDaysOfWeek.clear();
-      _selectedLocation = null;
-      _selectedQuickPreset = null;
-      _selectedPracticeIds.clear();
-    });
   }
   
   void _selectRSVPStatus(RSVPStatus status) {
