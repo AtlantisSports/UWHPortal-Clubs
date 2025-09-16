@@ -12,6 +12,7 @@ import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
+import 'practice_detail_screen.dart';
 import 'clubs_provider.dart';
 
 class ClubsListScreen extends StatefulWidget {
@@ -133,11 +134,19 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
   
   void _onPracticeInfoTap(Club club, Practice practice) {
-    setState(() {
-      _selectedClub = club;
-      _selectedPractice = practice; // Store the selected practice
-      _showingClubDetail = true;
-    });
+    // Navigate directly to Practice Detail Screen instead of Club Detail
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PracticeDetailScreen(
+          practice: practice,
+          club: club,
+          currentUserId: _currentUserId,
+          onRSVPChanged: (practiceId, status) {
+            _handleRSVPChange(practiceId, status);
+          },
+        ),
+      ),
+    );
   }
   
   void _navigateBackToList() {
@@ -172,7 +181,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         clubId: club.id,
         title: 'Monday Evening',
         description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 9, 22, 20, 15), // Monday 8:15 PM
+        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Open',
@@ -182,7 +191,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         clubId: club.id,
         title: 'Wednesday Evening',
         description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 9, 24, 19, 0), // Wednesday 7:00 PM
+        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'High-Level',
@@ -192,7 +201,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         clubId: club.id,
         title: 'Thursday Evening',
         description: 'Intermediate players welcome.',
-        dateTime: DateTime(2025, 9, 25, 20, 0), // Thursday 8:00 PM
+        dateTime: DateTime(2025, 1, 2, 20, 0), // Template: Thursday 8:00 PM (using first Thursday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Intermediate',
@@ -202,7 +211,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         clubId: club.id,
         title: 'Sunday Morning',
         description: 'Weekly practice for all skill levels.',
-        dateTime: DateTime(2025, 9, 21, 10, 0), // Sunday 10:00 AM
+        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'Open',
@@ -212,7 +221,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         clubId: club.id,
         title: 'Sunday Afternoon',
         description: 'Afternoon session.',
-        dateTime: DateTime(2025, 9, 21, 15, 0), // Sunday 3:00 PM
+        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'Open',
@@ -250,7 +259,6 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         currentUserId: _currentUserId,
         onRSVPChanged: _handleRSVPChange,
         onBackPressed: _navigateBackToList,
-        initialSelectedPractice: _selectedPractice, // Pass the selected practice
       );
     }
     

@@ -326,7 +326,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
         final currentRSVP = rsvpProvider.getRSVPStatus(widget.practice.id);
         
         return Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), // Reduced top padding by 25% (16 * 0.75 = 12)
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
           decoration: BoxDecoration(
             color: const Color(0xFFF9FAFB), // Light gray background
             borderRadius: BorderRadius.circular(8),
@@ -363,14 +363,17 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   ),
                   // Right: Info icon
                   if (widget.onInfoTap != null)
-                    GestureDetector(
-                      onTap: widget.onInfoTap,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        child: const Icon(
-                          Icons.info_outline,
-                          size: 20,
-                          color: Color(0xFF0284C7),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: widget.onInfoTap,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          child: const Icon(
+                            Icons.info_outline,
+                            size: 20,
+                            color: Color(0xFF0284C7),
+                          ),
                         ),
                       ),
                     )
@@ -416,11 +419,14 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                               color: Color(0xFF6B7280),
                             ),
                             const SizedBox(width: 6),
-                            Text(
-                              _formatTime(widget.practice.dateTime),
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Color(0xFF6B7280),
+                            Flexible(
+                              child: Text(
+                                _formatTime(widget.practice.dateTime),
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  color: Color(0xFF6B7280),
+                                ),
+                                overflow: TextOverflow.ellipsis,
                               ),
                             ),
                           ],
@@ -437,18 +443,23 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                             ),
                             const SizedBox(width: 6),
                             Expanded(
-                              child: GestureDetector(
-                                onTap: widget.onLocationTap,
-                                child: Text(
-                                  widget.practice.location,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: widget.onLocationTap != null 
-                                        ? const Color(0xFF0284C7) 
-                                        : const Color(0xFF6B7280),
-                                    decoration: widget.onLocationTap != null 
-                                        ? TextDecoration.underline 
-                                        : null,
+                              child: MouseRegion(
+                                cursor: widget.onLocationTap != null 
+                                    ? SystemMouseCursors.click 
+                                    : SystemMouseCursors.basic,
+                                child: GestureDetector(
+                                  onTap: widget.onLocationTap,
+                                  child: Text(
+                                    widget.practice.location,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: widget.onLocationTap != null 
+                                          ? const Color(0xFF0284C7) 
+                                          : const Color(0xFF6B7280),
+                                      decoration: widget.onLocationTap != null 
+                                          ? TextDecoration.underline 
+                                          : null,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -486,7 +497,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   
   Widget _buildGuestSection() {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(6), // Reduced from 12 to 6 (50% reduction)
       decoration: BoxDecoration(
         color: Colors.grey[50],
         borderRadius: BorderRadius.circular(6),
@@ -495,7 +506,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Checkbox and label
+          // Checkbox, label, and Add guest pill button
           Row(
             children: [
               Checkbox(
@@ -520,45 +531,42 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   color: Color(0xFF374151),
                 ),
               ),
-            ],
-          ),
-          
-          // Guest summary and manage button
-          if (_bringGuest) ...[
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _guestList.totalGuests > 0
-                      ? Text(
-                          '${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'} added',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF6B7280),
-                          ),
-                        )
-                      : const Text(
-                          'No guests added yet',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFF6B7280),
-                          ),
+              if (_bringGuest) ...[
+                const Spacer(), // Push the button to the right
+                MouseRegion(
+                  cursor: SystemMouseCursors.click,
+                  child: GestureDetector(
+                    onTap: _showGuestManagementModal,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: const Text(
+                        'Add a guest',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.white,
                         ),
-                ),
-                TextButton(
-                  onPressed: _showGuestManagementModal,
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF0284C7),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(
-                    _guestList.totalGuests > 0 ? 'Manage' : 'Add guests',
-                    style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
                   ),
                 ),
               ],
+            ],
+          ),
+          
+          // Guest list display (only show if guests exist)
+          if (_bringGuest && _guestList.totalGuests > 0) ...[
+            const SizedBox(height: 8),
+            Text(
+              '${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'} added',
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF6B7280),
+              ),
             ),
           ],
         ],
@@ -699,12 +707,32 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   }
   
   String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final startHour = dateTime.hour;
+    final startMinute = dateTime.minute;
+    final startPeriod = startHour >= 12 ? 'PM' : 'AM';
+    final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
     
-    return '$displayHour:$minute $period';
+    // Calculate end time using practice duration
+    final endTime = dateTime.add(widget.practice.duration);
+    final endHour = endTime.hour;
+    final endMinute = endTime.minute;
+    final endPeriod = endHour >= 12 ? 'PM' : 'AM';
+    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
+    
+    // Format time without trailing zeros
+    String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
+      final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
+      final periodStr = includePeriod ? ' $period' : '';
+      return '$hour$minuteStr$periodStr';
+    }
+    
+    // Check if we span from morning to afternoon/evening (AM to PM)
+    final spansAmPm = startPeriod != endPeriod;
+    
+    final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
+    final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
+    
+    return '$startTimeStr - $endTimeStr';
   }
 }
 

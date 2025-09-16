@@ -12,6 +12,7 @@ import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../core/utils/responsive_helper.dart';
+import 'practice_detail_screen.dart';
 // ...existing code...
 
 class ClubDetailScreen extends StatefulWidget {
@@ -19,7 +20,6 @@ class ClubDetailScreen extends StatefulWidget {
   final String currentUserId;
   final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
   final VoidCallback? onBackPressed;
-  final Practice? initialSelectedPractice; // Add parameter for initial practice selection
   
   const ClubDetailScreen({
     super.key,
@@ -27,7 +27,6 @@ class ClubDetailScreen extends StatefulWidget {
     required this.currentUserId,
     this.onRSVPChanged,
     this.onBackPressed,
-    this.initialSelectedPractice,
   });
   
   @override
@@ -42,8 +41,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
-  bool _showingPracticeDetail = false;
-  Practice? _selectedPractice;
 // ...existing code...
   
   @override
@@ -51,12 +48,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
     _scrollController = ScrollController();
-    
-    // Initialize with the provided practice if available
-    if (widget.initialSelectedPractice != null) {
-      _selectedPractice = widget.initialSelectedPractice;
-      _showingPracticeDetail = true;
-    }
     
     // Add listener to auto-scroll when tab is clicked (after frame is built)
     // Note: Using onTap in TabBar widget instead of controller listener to avoid conflicts
@@ -137,191 +128,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   void _handlePracticeSelected(Practice practice) {
-    setState(() {
-      _selectedPractice = practice;
-      _showingPracticeDetail = true;
-    });
-  }
-
-  void _handleBackFromPracticeDetail() {
-    setState(() {
-      _showingPracticeDetail = false;
-      _selectedPractice = null;
-    });
-  }
-
-  Widget _buildPracticeDetailContent() {
-    if (_selectedPractice == null) return Container();
-    
-    final isUpcoming = _selectedPractice!.isUpcoming;
-    
-    return SingleChildScrollView(
-      child: Padding(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Practice Header
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _selectedPractice!.title,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(Icons.calendar_today, 
-                           color: AppColors.primary, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        '${_selectedPractice!.dateTime.day}/${_selectedPractice!.dateTime.month}/${_selectedPractice!.dateTime.year}',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.access_time, 
-                           color: AppColors.primary, size: 16),
-                      SizedBox(width: 8),
-                      Text(
-                        _formatPracticeTime(_selectedPractice!.dateTime),
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(Icons.location_on, 
-                           color: AppColors.primary, size: 16),
-                      SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          _selectedPractice!.location,
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  
-                  // Add attendance indicator for past events
-                  if (!isUpcoming) ...[
-                    SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(Icons.group, 
-                             color: AppColors.primary, size: 16),
-                        SizedBox(width: 8),
-                        Text(
-                          'Attendance: ${_calculateAttendanceCount(_selectedPractice!)} players',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: 8),
-                    // Individual attendance indicator
-                    Row(
-                      children: [
-                        _buildAttendanceIndicator(_getUserAttendanceStatus(_selectedPractice!)),
-                        SizedBox(width: 8),
-                        Text(
-                          _getUserAttendanceStatus(_selectedPractice!)
-                              ? 'You attended this practice'
-                              : 'You did not attend this practice',
-                          style: TextStyle(
-                            fontSize: 16,
-                            color: AppColors.textSecondary,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ),
-            ),
-            SizedBox(height: 24),
-            
-            // RSVP Section (only for upcoming practices)
-            if (isUpcoming)
-              Consumer<RSVPProvider>(
-                builder: (context, rsvpProvider, child) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      PracticeRSVPCard(
-                        practice: _selectedPractice!,
-                        clubId: widget.club.id,
-                        // No onInfoTap here since we're already in practice details
-                      ),
-                    ],
-                  );
-                },
-              ),
-            
-            // Add spacing only if RSVP section was shown
-            if (isUpcoming) SizedBox(height: 24),
-            
-            // Description
-            Container(
-              padding: EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Description',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  SizedBox(height: 12),
-                  Text(
-                    _selectedPractice!.description,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.textSecondary,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+    // Navigate to separate Practice Detail Screen
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => PracticeDetailScreen(
+          practice: practice,
+          club: widget.club,
+          currentUserId: widget.currentUserId,
+          onRSVPChanged: (practiceId, status) {
+            // Handle RSVP changes if needed
+          },
         ),
       ),
     );
@@ -448,9 +264,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       appBar: AppBar(
         title: Text(_showingBulkRSVP 
             ? 'BULK RSVP' 
-            : _showingPracticeDetail 
-                ? 'Practice Details'
-                : widget.club.name),
+            : widget.club.name),
         backgroundColor: Colors.grey[100],
         foregroundColor: Colors.black87,
         elevation: 0,
@@ -462,9 +276,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               setState(() {
                 _showingBulkRSVP = false;
               });
-            } else if (_showingPracticeDetail) {
-              // Close the practice detail view
-              _handleBackFromPracticeDetail();
             } else {
               // Go back to clubs list
               if (widget.onBackPressed != null) {
@@ -498,9 +309,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
       body: _showingBulkRSVP 
           ? _buildBulkRSVPContent()
-          : _showingPracticeDetail
-              ? _buildPracticeDetailContent()
-              : SingleChildScrollView(
+          : SingleChildScrollView(
         controller: _scrollController,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,7 +621,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         clubId: widget.club.id,
         title: 'Monday Evening',
         description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 9, 22, 20, 15), // Monday 8:15 PM
+        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Open',
@@ -822,7 +631,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         clubId: widget.club.id,
         title: 'Wednesday Evening',
         description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 9, 24, 19, 0), // Wednesday 7:00 PM
+        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'High-Level',
@@ -832,7 +641,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         clubId: widget.club.id,
         title: 'Thursday Evening',
         description: 'Intermediate players welcome.',
-        dateTime: DateTime(2025, 9, 25, 20, 0), // Thursday 8:00 PM
+        dateTime: DateTime(2025, 1, 2, 20, 0), // Template: Thursday 8:00 PM (using first Thursday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Intermediate',
@@ -842,7 +651,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         clubId: widget.club.id,
         title: 'Sunday Morning',
         description: 'Weekly practice for all skill levels.',
-        dateTime: DateTime(2025, 9, 21, 10, 0), // Sunday 10:00 AM
+        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'Open',
@@ -852,7 +661,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         clubId: widget.club.id,
         title: 'Sunday Afternoon',
         description: 'Afternoon session.',
-        dateTime: DateTime(2025, 9, 21, 15, 0), // Sunday 3:00 PM
+        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'Open',

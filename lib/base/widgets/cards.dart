@@ -205,7 +205,7 @@ class _ClubCardState extends State<ClubCard> {
                 child: Row(
                   children: [
                     const Icon(
-                      Icons.schedule,
+                      Icons.calendar_today,
                       size: 18,
                       color: AppColors.primary,
                     ),

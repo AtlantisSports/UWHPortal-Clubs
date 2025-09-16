@@ -2,10 +2,16 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
+import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/phone_frame.dart';
+import '../../base/widgets/rsvp_components.dart';
+import 'club_detail_screen.dart';
 
 class PracticeDetailScreen extends StatelessWidget {
   final Practice practice;
@@ -21,18 +27,114 @@ class PracticeDetailScreen extends StatelessWidget {
     this.onRSVPChanged,
   });
 
+  Future<void> _handleLocationTap(BuildContext context, String location) async {
+    // Create a Google Maps search URL for the location
+    final encodedLocation = Uri.encodeComponent(location);
+    final url = Uri.parse('https://www.google.com/maps/search/?api=1&query=$encodedLocation');
+    
+    try {
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not open maps')),
+          );
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error opening maps: $e')),
+        );
+      }
+    }
+  }
+
+  bool _isPastEvent(Practice practice) {
+    final now = DateTime.now();
+    final practiceEndTime = practice.dateTime.add(practice.duration);
+    return practiceEndTime.isBefore(now);
+  }
+
+  int _calculateAttendanceCount(Practice practice) {
+    return practice.rsvpResponses.values
+        .where((status) => status == RSVPStatus.yes)
+        .length;
+  }
+
+  bool _getUserAttendanceStatus(Practice practice) {
+    // For past practices, use the same logic as calendar widget to ensure consistency
+    if (_isPastEvent(practice)) {
+      // Use same hash-based mock data as calendar widget
+      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+      final hash = practiceDate.hashCode + practice.location.hashCode;
+      return hash % 3 != 0; // Same logic as calendar: hash % 3 == 0 means notAttended, else attended
+    }
+    
+    // For future practices, this method shouldn't be called, but return false as fallback
+    return false;
+  }
+
+  Widget _buildAttendanceIndicator(bool attended) {
+    return Container(
+      width: 20,
+      height: 20,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: attended ? Colors.green : Colors.red,
+      ),
+      child: Icon(
+        attended ? Icons.check : Icons.close,
+        color: Colors.white,
+        size: 14,
+      ),
+    );
+  }
+
+  String _formatTimeRange(DateTime startTime, Duration duration) {
+    final endTime = startTime.add(duration);
+    return '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+  }
+
+  String _formatTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
+    return '$displayHour$minuteStr $amPm';
+  }
+
   @override
   Widget build(BuildContext context) {
     return PhoneFrameWrapper(
       onBackPressed: () => Navigator.of(context).pop(),
-      child: Scaffold(
-        backgroundColor: AppColors.background,
-        appBar: AppBar(
+      child: PopScope(
+        canPop: true, // Allow system back button to work normally
+        child: DefaultTabController(
+          length: 3, // About, Gallery, and Forum tabs
+          child: Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
           backgroundColor: AppColors.background,
           elevation: 0,
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              // Always navigate to Club Details page from Practice Details
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => PhoneFrameWrapper(
+                    child: ClubDetailScreen(
+                      club: club,
+                      currentUserId: currentUserId,
+                      onRSVPChanged: onRSVPChanged,
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
           title: Text(
             'Practice Details',
@@ -73,210 +175,287 @@ class PracticeDetailScreen extends StatelessWidget {
             ),
           ],
         ),
-        body: SingleChildScrollView(
-          child: Padding(
-            padding: EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Practice Header
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
+        body: Column(
+          children: [
+            // Practice Title above RSVP card
+            Container(
+              width: double.infinity,
+              margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: EdgeInsets.all(10), // Reduced from 20 to 10 (50% reduction)
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    practice.title,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        practice.title,
+                  if (practice.tag != null) ...[
+                    SizedBox(width: 12),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                      ),
+                      child: Text(
+                        practice.tag!,
                         style: TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(Icons.calendar_today, 
-                               color: AppColors.primary, size: 16),
-                          SizedBox(width: 8),
-                          Text(
-                            '${practice.dateTime.day}/${practice.dateTime.month}/${practice.dateTime.year}',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.access_time, 
-                               color: AppColors.primary, size: 16),
-                          SizedBox(width: 8),
-                          Text(
-                            _formatTime(practice.dateTime),
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                      SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, 
-                               color: AppColors.primary, size: 16),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              practice.location,
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 24),
-                
-                // Description
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Description',
-                        style: TextStyle(
-                          fontSize: 18,
+                          fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.primary,
                         ),
                       ),
-                      SizedBox(height: 12),
-                      Text(
-                        practice.description,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                          height: 1.5,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 24),
-                
-                // RSVP Placeholder
-                Container(
-                  padding: EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey[300]!),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'RSVP Status',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        '📝 RSVP functionality coming soon!',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                          fontStyle: FontStyle.italic,
-                        ),
-                      ),
-                      SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: null, // Disabled for now
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.grey[600],
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text('Going'),
-                            ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            // RSVP Card for future events, Attendance indicator for past events
+            _isPastEvent(practice)
+                ? Container(
+                    margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    padding: EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        _buildAttendanceIndicator(_getUserAttendanceStatus(practice)),
+                        SizedBox(width: 12),
+                        Text(
+                          _getUserAttendanceStatus(practice)
+                              ? 'You attended this practice'
+                              : 'You did not attend this practice',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                            color: AppColors.textPrimary,
                           ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: null, // Disabled for now
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.grey[600],
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text('Maybe'),
-                            ),
-                          ),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: null, // Disabled for now
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.grey[300],
-                                foregroundColor: Colors.grey[600],
-                                padding: EdgeInsets.symmetric(vertical: 12),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                              ),
-                              child: Text('Not Going'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
+                  )
+                : Container(
+                    margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
+                    child: Consumer<RSVPProvider>(
+                      builder: (context, rsvpProvider, child) {
+                        return PracticeRSVPCard(
+                          practice: practice,
+                          clubId: club.id,
+                          onRSVPChanged: onRSVPChanged != null 
+                              ? (status) => onRSVPChanged!(practice.id, status)
+                              : null,
+                          onLocationTap: () => _handleLocationTap(context, practice.location),
+                          // No onInfoTap since we're already in practice details
+                        );
+                      },
+                    ),
                   ),
-                ),
+            // TabBar positioned after RSVP card
+            TabBar(
+              labelColor: AppColors.primary,
+              unselectedLabelColor: AppColors.textSecondary,
+              indicatorColor: AppColors.primary,
+              tabs: [
+                Tab(text: 'About'),
+                Tab(text: 'Gallery'),
+                Tab(text: 'Forum'),
               ],
             ),
-          ),
+            // TabBarView for the tabs
+            Expanded(
+              child: TabBarView(
+                children: [
+                  _buildAboutTab(context),
+                  _buildGalleryTab(context),
+                  _buildForumTab(context),
+                ],
+              ),
+            ),
+          ],
+        ),
+        bottomNavigationBar: Consumer<NavigationProvider>(
+          builder: (context, navigationProvider, child) {
+            return BottomNavigationBar(
+              type: BottomNavigationBarType.fixed,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home),
+                  label: 'Home',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.event),
+                  label: 'Events',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.groups),
+                  label: 'Programs',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.group),
+                  label: 'Clubs',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.person),
+                  label: 'Profile',
+                ),
+              ],
+              currentIndex: navigationProvider.selectedIndex,
+              selectedItemColor: AppColors.primary,
+              unselectedItemColor: Colors.grey,
+              onTap: (index) {
+                if (index == 3) { // Clubs tab (0: Home, 1: Events, 2: Programs, 3: Clubs, 4: Profile)
+                  // For Clubs tab, check if we can go back to Club Details
+                  if (Navigator.of(context).canPop()) {
+                    // If there's a previous screen in the stack, go back to it
+                    Navigator.of(context).pop();
+                  } else {
+                    // If no previous screen, go to main app Clubs tab
+                    Navigator.of(context).popUntil((route) => route.isFirst);
+                    navigationProvider.selectTab(index);
+                  }
+                } else {
+                  // For other tabs, navigate back to main app with selected tab
+                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  navigationProvider.selectTab(index);
+                }
+              },
+            );
+          },
+        ),
+        ),
+        ), // Close PopScope
+      ),
+    );
+  }
+
+  Widget _buildAboutTab(BuildContext context) {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Description
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Description',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Text(
+                    practice.description,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: AppColors.textSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 
-  String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final amPm = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $amPm';
+  Widget _buildGalleryTab(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.photo_library,
+              size: 48,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Practice Gallery',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Photos and videos coming soon',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildForumTab(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.forum,
+              size: 48,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Practice Forum',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Discussion board coming soon',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

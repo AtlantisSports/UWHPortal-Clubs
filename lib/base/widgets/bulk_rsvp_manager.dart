@@ -125,7 +125,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         clubId: widget.club.id,
         title: 'Monday Evening',
         description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 9, 22, 20, 15), // Next Monday 8:15 PM
+        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Open',
@@ -135,7 +135,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         clubId: widget.club.id,
         title: 'Wednesday Evening',
         description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 9, 24, 19, 0), // Next Wednesday 7:00 PM
+        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'High-Level',
@@ -145,7 +145,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         clubId: widget.club.id,
         title: 'Thursday Evening',
         description: 'Scrimmage heavy. High-level participants only.',
-        dateTime: DateTime(2025, 9, 25, 20, 15), // Next Thursday 8:15 PM
+        dateTime: DateTime(2025, 1, 2, 20, 15), // Template: Thursday 8:15 PM (using first Thursday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'High-Level',
@@ -155,7 +155,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         clubId: widget.club.id,
         title: 'Sunday Morning',
         description: 'Drills + conditioning.',
-        dateTime: DateTime(2025, 9, 21, 10, 0), // Next Sunday 10:00 AM
+        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
         location: 'VMAC',
         address: '5310 E 136th Ave, Thornton, CO',
         tag: 'Intermediate',
@@ -165,16 +165,23 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         clubId: widget.club.id,
         title: 'Sunday Afternoon',
         description: 'Afternoon session.',
-        dateTime: DateTime(2025, 9, 21, 15, 0), // Next Sunday 3:00 PM
+        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
         location: 'Carmody',
         address: '2200 S Kipling St, Lakewood, CO',
         tag: 'Open',
       ),
     ];
     
-    // Return representatives without filtering by isUpcoming since these are templates
+    // Sort by weekday (Monday=1 through Sunday=7) for consistent ordering
     return representatives
-      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      ..sort((a, b) {
+        final dayA = a.dateTime.weekday;
+        final dayB = b.dateTime.weekday;
+        final dayComparison = dayA.compareTo(dayB);
+        if (dayComparison != 0) return dayComparison;
+        // If same day, sort by time
+        return a.dateTime.hour.compareTo(b.dateTime.hour);
+      });
   }
   
   List<Practice> _getFilteredPractices() {
