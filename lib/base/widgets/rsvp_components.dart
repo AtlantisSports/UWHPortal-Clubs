@@ -583,7 +583,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   }
   
   void _showGuestManagementModal(RSVPProvider rsvpProvider, PracticeGuestList guestList) {
-    PhoneModalUtils.showPhoneModal(
+    PhoneModalUtils.showPhoneFrameModal(
       context: context,
       child: GuestManagementModal(
         initialGuests: guestList,

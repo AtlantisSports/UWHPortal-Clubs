@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
+import 'phone_modal_utils.dart';
 
 class GuestManagementModal extends StatefulWidget {
   final PracticeGuestList initialGuests;
@@ -75,7 +76,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => PhoneFrameModal.close(),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -133,7 +134,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () => PhoneFrameModal.close(),
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -142,7 +143,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                   child: ElevatedButton(
                     onPressed: () {
                       widget.onGuestsChanged(_guestList);
-                      Navigator.of(context).pop();
+                      PhoneFrameModal.close();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
