@@ -632,48 +632,70 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 ),
               ),
             ),
-          // Level filter modal
-          if (_isShowingLevelFilterModal) ...[
-            // Modal backdrop - positioned below AppBar
-            Positioned(
-              top: kToolbarHeight, // Start below AppBar
-              left: 0,
-              right: 0,
-              bottom: 0,
-              child: Container(
-                color: Colors.black54,
-                child: GestureDetector(
-                  onTap: () => setState(() => _isShowingLevelFilterModal = false),
-                  child: Container(),
-                ),
-              ),
-            ),
-            // Modal content - positioned higher up but still bottom-anchored
-            Positioned(
-              left: 0,
-              right: 0,
-              top: kToolbarHeight + 100, // Position 100px below AppBar
-              bottom: 0, // Keep bottom anchored to screen bottom
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                ),
-                child: LevelFilterModal(
-                  availableLevels: _getAvailableLevels(),
-                  onFiltersChanged: () {
-                    setState(() => _isShowingLevelFilterModal = false);
-                  },
-                ),
-              ),
-            ),
-          ],
+          
+          // Modal overlays using the same pattern as profile screen
+          _buildModalOverlays(),
         ],
       ),
     ); // Close ConstrainedBox
+  }
+
+  Widget _buildModalOverlays() {
+    return Stack(
+      children: [
+        // Level Filter Modal
+        if (_isShowingLevelFilterModal) ...[
+          _buildModalBackdrop(() => setState(() => _isShowingLevelFilterModal = false)),
+          _buildLevelFilterModal(),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildModalBackdrop(VoidCallback onTap) {
+    return Positioned(
+      top: kToolbarHeight, // Start below AppBar
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: Container(
+        color: Colors.black54,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildModalContainer({required Widget child}) {
+    return Positioned(
+      left: 0,
+      right: 0,
+      top: kToolbarHeight + 100, // Position below AppBar
+      bottom: 0, // Extend to bottom
+      child: Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
+          ),
+        ),
+        child: child,
+      ),
+    );
+  }
+
+  Widget _buildLevelFilterModal() {
+    return _buildModalContainer(
+      child: LevelFilterModal(
+        availableLevels: _getAvailableLevels(),
+        onFiltersChanged: () {
+          setState(() => _isShowingLevelFilterModal = false);
+        },
+      ),
+    );
   }
 
   Widget _buildRSVPTab(BuildContext context) {
