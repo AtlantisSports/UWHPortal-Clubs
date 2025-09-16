@@ -1,5 +1,6 @@
 
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -7,6 +8,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
@@ -41,6 +43,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
+  
+  // Toast state
+  bool _showToast = false;
+  String _toastMessage = '';
+  Color _toastColor = Colors.green;
+  IconData? _toastIcon;
+  String? _toastText;
 // ...existing code...
   
   @override
@@ -152,6 +161,25 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     return '$displayHour:$minuteStr $amPm';
   }
   
+  void _showCustomToast(String message, Color color, IconData icon) {
+    setState(() {
+      _toastMessage = message;
+      _toastColor = color;
+      _toastIcon = icon;
+      _toastText = null;
+      _showToast = true;
+    });
+    
+    // Hide toast after 4 seconds
+    Timer(Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _showToast = false;
+        });
+      }
+    });
+  }
+  
   @override
   void dispose() {
     _tabController.dispose();
@@ -260,7 +288,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       constraints: const BoxConstraints(
         maxWidth: 393, // Galaxy S23 width - match phone frame
       ),
-      child: Scaffold(
+      child: Stack(
+        children: [
+          Scaffold(
       appBar: AppBar(
         title: Text(_showingBulkRSVP 
             ? 'BULK RSVP' 
@@ -426,9 +456,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                           practice: nextPractice,
                           clubId: widget.club.id,
                           currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),
-                                                        onRSVPChanged: (status) {
-                                                            // Implement RSVP update logic here if needed
-                                                          },
+                          onRSVPChanged: (status) {
+                            // Show toast when RSVP changes
+                            String message = 'RSVP updated to: ${status.displayText}';
+                            Color toastColor = status.color;
+                            if (status == RSVPStatus.maybe) {
+                              _showCustomToast(message, toastColor, Icons.help);
+                            } else {
+                              _showCustomToast(message, toastColor, status.overlayIcon);
+                            }
+                          },
                           onLocationTap: _handleLocationTap,
                           onInfoTap: () => _handlePracticeSelected(nextPractice),
                         ),
@@ -499,7 +536,96 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           ], // Close Column children
         ), // Close Column
       ), // Close SingleChildScrollView
+      // Add bottom navigation when used as standalone page (not embedded in clubs list)
+      bottomNavigationBar: widget.onBackPressed == null ? Consumer<NavigationProvider>(
+        builder: (context, navigationProvider, child) {
+          return BottomNavigationBar(
+            type: BottomNavigationBarType.fixed,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: 'Home',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.event),
+                label: 'Events',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.groups),
+                label: 'Programs',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.group),
+                label: 'Clubs',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
+            currentIndex: navigationProvider.selectedIndex,
+            selectedItemColor: AppColors.primary,
+            unselectedItemColor: Colors.grey,
+            onTap: (index) {
+              // Navigate back to main app with selected tab
+              Navigator.of(context).popUntil((route) => route.isFirst);
+              navigationProvider.selectTab(index);
+            },
+          );
+        },
+      ) : null,
     ), // Close Scaffold
+          // Custom toast positioned over the content
+          if (_showToast)
+            Positioned(
+              top: kToolbarHeight + 48, // Position to cover the tab bar area
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _toastColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      // Display either icon or text (skip if empty)
+                      if (_toastIcon != null)
+                        Icon(
+                          _toastIcon!,
+                          color: Colors.white,
+                          size: 20,
+                        )
+                      else if (_toastText != null && _toastText!.isNotEmpty)
+                        Text(
+                          _toastText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Arial',
+                          ),
+                        ),
+                      // Only add spacing if we have an icon or non-empty text
+                      if ((_toastIcon != null) || (_toastText != null && _toastText!.isNotEmpty))
+                        const SizedBox(width: 8),
+                      Text(
+                        _toastMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     ); // Close ConstrainedBox
   }
 
@@ -867,7 +993,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       height: 20,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: attended ? Colors.green : Colors.red,
+        color: attended ? AppColors.success : AppColors.error,
       ),
       child: Icon(
         attended ? Icons.check : Icons.close,

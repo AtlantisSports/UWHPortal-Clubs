@@ -285,17 +285,17 @@ class PracticeCalendar extends StatelessWidget {
 
     switch (status) {
       case PracticeStatus.attended:
-        color = const Color(0xFF059669); // Green
+        color = AppColors.success; // Green
         icon = Icons.check;
         filled = true; // Solid fill for past practices
         break;
       case PracticeStatus.notAttended:
-        color = const Color(0xFFDC2626); // Red
+        color = AppColors.error; // Red
         icon = Icons.close;
         filled = true; // Solid fill for past practices
         break;
       case PracticeStatus.rsvpYes:
-        color = const Color(0xFF059669); // Green (matching RSVP button)
+        color = AppColors.success; // Green (matching RSVP button)
         icon = Icons.check;
         filled = false; // Outline only for future practices
         break;
@@ -305,7 +305,7 @@ class PracticeCalendar extends StatelessWidget {
         filled = false; // Outline only for future practices
         break;
       case PracticeStatus.rsvpNo:
-        color = const Color(0xFFDC2626); // Red (matching RSVP button)
+        color = AppColors.error; // Red (matching RSVP button)
         icon = Icons.close;
         filled = false; // Outline only for future practices
         break;

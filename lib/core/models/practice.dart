@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'base_model.dart';
+import '../constants/app_constants.dart';
 
 /// Bulk RSVP request model for updating multiple practices
 class BulkRSVPRequest {
@@ -71,11 +72,11 @@ extension RSVPStatusExtension on RSVPStatus {
   Color get color {
     switch (this) {
       case RSVPStatus.yes:
-        return const Color(0xFF10B981); // Green
+        return AppColors.success; // Green
       case RSVPStatus.maybe:
         return const Color(0xFFF59E0B); // Yellow
       case RSVPStatus.no:
-        return const Color(0xFFEF4444); // Red
+        return AppColors.error; // Red
       case RSVPStatus.pending:
         return const Color(0xFF6B7280); // Gray
     }
@@ -106,6 +107,20 @@ extension RSVPStatusExtension on RSVPStatus {
         return 'No, can\'t make it';
       case RSVPStatus.pending:
         return 'Not responded yet';
+    }
+  }
+  
+  /// Get the toast message for this RSVP status change
+  String get toastMessage {
+    switch (this) {
+      case RSVPStatus.yes:
+        return 'RSVP changed to: Yes, I\'ll attend';
+      case RSVPStatus.maybe:
+        return 'RSVP changed to: Maybe, not sure yet';
+      case RSVPStatus.no:
+        return 'RSVP changed to: No, can\'t make it';
+      case RSVPStatus.pending:
+        return 'RSVP status cleared';
     }
   }
 }

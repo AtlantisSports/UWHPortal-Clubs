@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/guest.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/constants/app_constants.dart';
 import 'guest_management_modal.dart';
 import 'phone_modal_utils.dart';
 
@@ -598,13 +599,26 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       onTap: () async {
         // Only change if clicking a different option
         if (currentRSVP != status) {
-          // Use RSVPProvider for centralized state management
-          if (widget.clubId != null) {
-            await rsvpProvider.updateRSVP(widget.clubId!, widget.practice.id, status);
+          try {
+            // Use RSVPProvider for centralized state management
+            if (widget.clubId != null) {
+              await rsvpProvider.updateRSVP(widget.clubId!, widget.practice.id, status);
+            }
+            
+            // Call legacy callback if provided for backward compatibility
+            widget.onRSVPChanged?.call(status);
+          } catch (error) {
+            // Show error toast if RSVP update fails
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Failed to update RSVP. Please try again.'),
+                  backgroundColor: Colors.red,
+                  duration: Duration(seconds: 3),
+                ),
+              );
+            }
           }
-          
-          // Call legacy callback if provided for backward compatibility
-          widget.onRSVPChanged?.call(status);
         }
         // If already selected, do nothing (no toast, no change)
       },
@@ -673,9 +687,9 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   Color _getRSVPHeaderColor(RSVPStatus? currentRSVP) {
     switch (currentRSVP) {
       case RSVPStatus.yes:
-        return const Color(0xFF10B981); // Green
+        return AppColors.success; // Green
       case RSVPStatus.no:
-        return const Color(0xFFEF4444); // Red
+        return AppColors.error; // Red
       case RSVPStatus.maybe:
         return const Color(0xFF6B7280); // Gray (same as default)
       case RSVPStatus.pending:

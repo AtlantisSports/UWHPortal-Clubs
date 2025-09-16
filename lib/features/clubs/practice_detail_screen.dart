@@ -1,6 +1,7 @@
 /// Simple placeholder practice detail screen
 library;
 
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,7 +14,7 @@ import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
 import 'club_detail_screen.dart';
 
-class PracticeDetailScreen extends StatelessWidget {
+class PracticeDetailScreen extends StatefulWidget {
   final Practice practice;
   final Club club;
   final String currentUserId;
@@ -26,6 +27,18 @@ class PracticeDetailScreen extends StatelessWidget {
     required this.currentUserId,
     this.onRSVPChanged,
   });
+
+  @override
+  State<PracticeDetailScreen> createState() => _PracticeDetailScreenState();
+}
+
+class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
+  // Toast state
+  bool _showToast = false;
+  String _toastMessage = '';
+  Color _toastColor = Colors.green;
+  IconData? _toastIcon;
+  String? _toastText;
 
   Future<void> _handleLocationTap(BuildContext context, String location) async {
     // Create a Google Maps search URL for the location
@@ -82,7 +95,7 @@ class PracticeDetailScreen extends StatelessWidget {
       height: 20,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: attended ? Colors.green : Colors.red,
+        color: attended ? AppColors.success : AppColors.error,
       ),
       child: Icon(
         attended ? Icons.check : Icons.close,
@@ -106,14 +119,35 @@ class PracticeDetailScreen extends StatelessWidget {
     return '$displayHour$minuteStr $amPm';
   }
 
+  void _showCustomToast(String message, Color color, IconData icon) {
+    setState(() {
+      _toastMessage = message;
+      _toastColor = color;
+      _toastIcon = icon;
+      _toastText = null;
+      _showToast = true;
+    });
+    
+    // Hide toast after 4 seconds
+    Timer(Duration(seconds: 4), () {
+      if (mounted) {
+        setState(() {
+          _showToast = false;
+        });
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return PhoneFrameWrapper(
       onBackPressed: () => Navigator.of(context).pop(),
-      child: PopScope(
-        canPop: true, // Allow system back button to work normally
-        child: DefaultTabController(
-          length: 3, // About, Gallery, and Forum tabs
+      child: Stack(
+        children: [
+          PopScope(
+            canPop: true, // Allow system back button to work normally
+            child: DefaultTabController(
+              length: 3, // About, Gallery, and Forum tabs
           child: Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -122,14 +156,14 @@ class PracticeDetailScreen extends StatelessWidget {
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () {
-              // Always navigate to Club Details page from Practice Details
+              // Navigate back to Club Details page with proper mobile layout and app navigation
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
                   builder: (context) => PhoneFrameWrapper(
                     child: ClubDetailScreen(
-                      club: club,
-                      currentUserId: currentUserId,
-                      onRSVPChanged: onRSVPChanged,
+                      club: widget.club,
+                      currentUserId: widget.currentUserId,
+                      onRSVPChanged: widget.onRSVPChanged,
                     ),
                   ),
                 ),
@@ -191,14 +225,14 @@ class PracticeDetailScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    practice.title,
+                    widget.practice.title,
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: AppColors.textPrimary,
                     ),
                   ),
-                  if (practice.tag != null) ...[
+                  if (widget.practice.tag != null) ...[
                     SizedBox(width: 12),
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -208,7 +242,7 @@ class PracticeDetailScreen extends StatelessWidget {
                         border: Border.all(color: AppColors.primary.withOpacity(0.3)),
                       ),
                       child: Text(
-                        practice.tag!,
+                        widget.practice.tag!,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -221,7 +255,7 @@ class PracticeDetailScreen extends StatelessWidget {
               ),
             ),
             // RSVP Card for future events, Attendance indicator for past events
-            _isPastEvent(practice)
+            _isPastEvent(widget.practice)
                 ? Container(
                     margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
                     padding: EdgeInsets.all(20),
@@ -232,10 +266,10 @@ class PracticeDetailScreen extends StatelessWidget {
                     ),
                     child: Row(
                       children: [
-                        _buildAttendanceIndicator(_getUserAttendanceStatus(practice)),
+                        _buildAttendanceIndicator(_getUserAttendanceStatus(widget.practice)),
                         SizedBox(width: 12),
                         Text(
-                          _getUserAttendanceStatus(practice)
+                          _getUserAttendanceStatus(widget.practice)
                               ? 'You attended this practice'
                               : 'You did not attend this practice',
                           style: TextStyle(
@@ -252,12 +286,22 @@ class PracticeDetailScreen extends StatelessWidget {
                     child: Consumer<RSVPProvider>(
                       builder: (context, rsvpProvider, child) {
                         return PracticeRSVPCard(
-                          practice: practice,
-                          clubId: club.id,
-                          onRSVPChanged: onRSVPChanged != null 
-                              ? (status) => onRSVPChanged!(practice.id, status)
+                          practice: widget.practice,
+                          clubId: widget.club.id,
+                          onRSVPChanged: widget.onRSVPChanged != null 
+                              ? (status) {
+                                  widget.onRSVPChanged!(widget.practice.id, status);
+                                  // Show toast when RSVP changes
+                                  String message = 'RSVP updated to: ${status.displayText}';
+                                  Color toastColor = status.color;
+                                  if (status == RSVPStatus.maybe) {
+                                    _showCustomToast(message, toastColor, Icons.help);
+                                  } else {
+                                    _showCustomToast(message, toastColor, status.overlayIcon);
+                                  }
+                                }
                               : null,
-                          onLocationTap: () => _handleLocationTap(context, practice.location),
+                          onLocationTap: () => _handleLocationTap(context, widget.practice.location),
                           // No onInfoTap since we're already in practice details
                         );
                       },
@@ -335,8 +379,59 @@ class PracticeDetailScreen extends StatelessWidget {
             );
           },
         ),
-        ),
+            ), // Close Scaffold
+          ), // Close DefaultTabController
         ), // Close PopScope
+          // Custom toast positioned over the content
+          if (_showToast)
+            Positioned(
+              top: kToolbarHeight + 48, // Position to cover the tab bar area
+              left: 16,
+              right: 16,
+              child: Material(
+                elevation: 6,
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: _toastColor,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      // Display either icon or text (skip if empty)
+                      if (_toastIcon != null)
+                        Icon(
+                          _toastIcon!,
+                          color: Colors.white,
+                          size: 20,
+                        )
+                      else if (_toastText != null && _toastText!.isNotEmpty)
+                        Text(
+                          _toastText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            fontFamily: 'Arial',
+                          ),
+                        ),
+                      // Only add spacing if we have an icon or non-empty text
+                      if ((_toastIcon != null) || (_toastText != null && _toastText!.isNotEmpty))
+                        const SizedBox(width: 8),
+                      Text(
+                        _toastMessage,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -369,7 +464,7 @@ class PracticeDetailScreen extends StatelessWidget {
                   ),
                   SizedBox(height: 12),
                   Text(
-                    practice.description,
+                    widget.practice.description,
                     style: TextStyle(
                       fontSize: 16,
                       color: AppColors.textSecondary,

@@ -252,7 +252,7 @@ class _ClubCardState extends State<ClubCard> {
     final dayName = _getDayName(practice.dateTime.weekday);
     final startTime = practice.dateTime;
     final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = '${startTime.hour.toString().padLeft(2, '0')}:${startTime.minute.toString().padLeft(2, '0')}-${endTime.hour.toString().padLeft(2, '0')}:${endTime.minute.toString().padLeft(2, '0')}';
+    final timeStr = '${_formatPracticeTime(startTime)}-${_formatPracticeTime(endTime)}';
     
     final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
     final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
@@ -448,5 +448,15 @@ class _ClubCardState extends State<ClubCard> {
     }
     
     return '$truncated...';
+  }
+
+  /// Format time in 12-hour format with AM/PM (matches club detail screen format)
+  String _formatPracticeTime(DateTime dateTime) {
+    final hour = dateTime.hour;
+    final minute = dateTime.minute;
+    final amPm = hour >= 12 ? 'PM' : 'AM';
+    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+    final minuteStr = minute.toString().padLeft(2, '0');
+    return '$displayHour:$minuteStr $amPm';
   }
 }

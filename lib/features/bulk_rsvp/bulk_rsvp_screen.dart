@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/constants/app_constants.dart';
 import '../../features/clubs/clubs_provider.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/phone_modal_utils.dart';
@@ -318,10 +319,10 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
                 color: result.isFullSuccess
-                  ? const Color(0xFF10B981)
+                  ? AppColors.success
                   : result.isPartialSuccess
                     ? const Color(0xFFF59E0B)
-                    : const Color(0xFFEF4444),
+                    : AppColors.error,
               ),
             ),
             const SizedBox(height: 16),
@@ -359,7 +360,7 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
               style: TextStyle(
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
-                color: Color(0xFFEF4444),
+                color: AppColors.error,
               ),
             ),
             const SizedBox(height: 16),
@@ -374,7 +375,7 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
                 ElevatedButton(
                   onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFEF4444),
+                    backgroundColor: AppColors.error,
                     foregroundColor: Colors.white,
                   ),
                   child: const Text('OK'),

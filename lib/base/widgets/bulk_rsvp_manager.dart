@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/constants/app_constants.dart';
 import 'phone_modal_utils.dart';
 
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
@@ -1235,7 +1236,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     if (result.isFullSuccess) {
       _showCustomToast(
         result.summaryText,
-        const Color(0xFF10B981), // Green for success
+        AppColors.success, // Green for success
         Icons.check,
       );
     } else if (result.isPartialSuccess) {
@@ -1247,7 +1248,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     } else {
       _showCustomToast(
         'Failed to update practices',
-        const Color(0xFFEF4444), // Red for failure
+        AppColors.error, // Red for failure
         Icons.error,
       );
     }

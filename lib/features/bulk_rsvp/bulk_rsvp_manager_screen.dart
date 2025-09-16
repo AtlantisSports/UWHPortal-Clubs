@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/rsvp_provider.dart';
+import '../../core/constants/app_constants.dart';
 
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
 class BulkRSVPManagerScreen extends StatefulWidget {
@@ -1012,10 +1013,10 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
                   : 'Failed',
           style: TextStyle(
             color: result.isFullSuccess
-                ? const Color(0xFF10B981)
+                ? AppColors.success
                 : result.isPartialSuccess
                     ? const Color(0xFFF59E0B)
-                    : const Color(0xFFEF4444),
+                    : AppColors.error,
           ),
         ),
         content: Column(
@@ -1031,7 +1032,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
               ),
               ...result.failedIds.map((id) => Text(
                 '• ${result.errors[id] ?? 'Unknown error'}',
-                style: const TextStyle(fontSize: 12, color: Color(0xFFEF4444)),
+                style: const TextStyle(fontSize: 12, color: AppColors.error),
               )),
             ],
           ],
@@ -1052,7 +1053,7 @@ class _BulkRSVPManagerScreenState extends State<BulkRSVPManagerScreen> {
       builder: (context) => AlertDialog(
         title: const Text(
           'Error',
-          style: TextStyle(color: Color(0xFFEF4444)),
+          style: TextStyle(color: AppColors.error),
         ),
         content: Text(message),
         actions: [
