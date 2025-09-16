@@ -12,6 +12,7 @@ import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
+import '../../base/widgets/level_filter_modal.dart';
 import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../core/utils/responsive_helper.dart';
 import 'practice_detail_screen.dart';
@@ -43,6 +44,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false;
+  bool _isShowingLevelFilterModal = false;
   
   // Toast state
   bool _showToast = false;
@@ -150,6 +152,22 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
+  }
+  
+  Set<String> _getAvailableLevels() {
+    final availableLevels = <String>{};
+    for (final practice in widget.club.upcomingPractices) {
+      if (practice.tag != null && practice.tag!.isNotEmpty) {
+        availableLevels.add(practice.tag!);
+      }
+    }
+    return availableLevels;
+  }
+  
+  void _showLevelFilterModal() {
+    setState(() {
+      _isShowingLevelFilterModal = true;
+    });
   }
   
   void _showCustomToast(String message, Color color, IconData icon) {
@@ -614,6 +632,45 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 ),
               ),
             ),
+          // Level filter modal
+          if (_isShowingLevelFilterModal) ...[
+            // Modal backdrop - positioned below AppBar
+            Positioned(
+              top: kToolbarHeight, // Start below AppBar
+              left: 0,
+              right: 0,
+              bottom: 0,
+              child: Container(
+                color: Colors.black54,
+                child: GestureDetector(
+                  onTap: () => setState(() => _isShowingLevelFilterModal = false),
+                  child: Container(),
+                ),
+              ),
+            ),
+            // Modal content - positioned higher up but still bottom-anchored
+            Positioned(
+              left: 0,
+              right: 0,
+              top: kToolbarHeight + 100, // Position 100px below AppBar
+              bottom: 0, // Keep bottom anchored to screen bottom
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
+                  ),
+                ),
+                child: LevelFilterModal(
+                  availableLevels: _getAvailableLevels(),
+                  onFiltersChanged: () {
+                    setState(() => _isShowingLevelFilterModal = false);
+                  },
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     ); // Close ConstrainedBox
@@ -661,6 +718,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   club: widget.club,
                   onPracticeSelected: _handlePracticeSelected,
                   rsvpProvider: rsvpProvider,
+                  onShowLevelFilter: _showLevelFilterModal,
                 );
               },
             ),

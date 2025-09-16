@@ -7,7 +7,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/rsvp_provider.dart';
-import '../../base/widgets/phone_modal_utils.dart';
+import '../../base/widgets/level_filter_modal.dart';
+import '../../base/widgets/phone_overlay_utils.dart';
 
 enum PracticeStatus {
   attended,
@@ -25,17 +26,26 @@ class PracticeDay {
   PracticeDay({required this.date, required this.practices});
 }
 
-class PracticeCalendar extends StatelessWidget {
+class PracticeCalendar extends StatefulWidget {
   final Club club;
   final Function(Practice)? onPracticeSelected;
   final RSVPProvider? rsvpProvider;
+  final VoidCallback? onShowLevelFilter;
   
   const PracticeCalendar({
     super.key, 
     required this.club,
     this.onPracticeSelected,
     this.rsvpProvider,
+    this.onShowLevelFilter,
   });
+
+  @override
+  State<PracticeCalendar> createState() => _PracticeCalendarState();
+}
+
+class _PracticeCalendarState extends State<PracticeCalendar> {
+  Club get club => widget.club;
 
   @override
   Widget build(BuildContext context) {
@@ -57,11 +67,11 @@ class PracticeCalendar extends StatelessWidget {
                 topRight: Radius.circular(8),
               ),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
-                SizedBox(width: 8),
-                Text(
+                const Icon(Icons.calendar_today, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                const Text(
                   'Announced Practices',
                   style: TextStyle(
                     fontSize: 16,
@@ -69,6 +79,8 @@ class PracticeCalendar extends StatelessWidget {
                     color: AppColors.textPrimary,
                   ),
                 ),
+                const Spacer(),
+                _buildFilterButton(context, widget.rsvpProvider),
               ],
             ),
           ),
@@ -79,11 +91,11 @@ class PracticeCalendar extends StatelessWidget {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildMonth(context, 'September 2025', 2025, 9, rsvpProvider),
+                  _buildMonth(context, 'September 2025', 2025, 9, widget.rsvpProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'October 2025', 2025, 10, rsvpProvider),
+                  _buildMonth(context, 'October 2025', 2025, 10, widget.rsvpProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'November 2025', 2025, 11, rsvpProvider),
+                  _buildMonth(context, 'November 2025', 2025, 11, widget.rsvpProvider),
                 ],
               ),
             ),
@@ -434,7 +446,12 @@ class PracticeCalendar extends StatelessWidget {
           // Future practices - check for real practices first, then fall back to typical schedule
           final realPracticesForDay = club.upcomingPractices.where((practice) {
             final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+            final isCorrectDate = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+            
+            // Apply level filtering if provider is available
+            final passesLevelFilter = rsvpProvider?.shouldShowPractice(practice) ?? true;
+            
+            return isCorrectDate && passesLevelFilter;
           }).toList();
           
           if (realPracticesForDay.isNotEmpty) {
@@ -486,7 +503,7 @@ class PracticeCalendar extends StatelessWidget {
       
       if (practicesForDate.length == 1) {
         // Single practice - call callback directly
-        onPracticeSelected?.call(practicesForDate.first);
+        widget.onPracticeSelected?.call(practicesForDate.first);
       } else if (practicesForDate.length > 1) {
         // Multiple practices - show selection modal
         _showPracticeSelectionModal(context, practicesForDate);
@@ -600,7 +617,7 @@ class PracticeCalendar extends StatelessWidget {
   }
 
   void _showPracticeSelectionModal(BuildContext context, List<Practice> practices) {
-    PhoneModalUtils.showPhoneModal(
+    PhoneOverlayUtils.showPhoneModal(
       context: context,
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -636,7 +653,7 @@ class PracticeCalendar extends StatelessWidget {
                     return InkWell(
                       onTap: () {
                         Navigator.of(context).pop(); // Close modal
-                        onPracticeSelected?.call(practice);
+                        widget.onPracticeSelected?.call(practice);
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -716,6 +733,69 @@ class PracticeCalendar extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Build the filter button for the calendar header
+  Widget _buildFilterButton(BuildContext context, RSVPProvider? rsvpProvider) {
+    if (rsvpProvider == null) {
+      return const SizedBox.shrink();
+    }
+
+    return Consumer<RSVPProvider>(
+      builder: (context, provider, child) {
+        final hasFiltersApplied = provider.hasLevelFiltersApplied;
+        final selectedCount = provider.selectedLevels.length;
+        
+        return Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.primary,
+            shape: BoxShape.circle,
+          ),
+          child: Stack(
+            children: [
+              IconButton(
+                onPressed: widget.onShowLevelFilter,
+                icon: Icon(
+                  Icons.filter_alt,
+                  color: Colors.white,
+                  size: 20,
+                ),
+                padding: EdgeInsets.zero,
+              ),
+              // Show badge when filters are applied
+              if (hasFiltersApplied)
+                Positioned(
+                  right: 0,
+                  top: 0,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 1),
+                    ),
+                    constraints: const BoxConstraints(
+                      minWidth: 16,
+                      minHeight: 16,
+                    ),
+                    child: Text(
+                      selectedCount.toString(),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

@@ -69,6 +69,105 @@ class PhoneModalUtils {
     );
   }
 
+  /// Show a bottom sheet modal positioned within the phone's content area
+  /// 
+  /// This positions the bottom sheet to slide up from the bottom of the phone
+  /// content area. The modal will be behind navigation bars due to lower z-index.
+  static Future<T?> showPhoneBottomSheet<T>({
+    required BuildContext context,
+    required Widget child,
+    bool barrierDismissible = true,
+  }) {
+    return showGeneralDialog<T>(
+      context: context,
+      barrierDismissible: barrierDismissible,
+      barrierLabel: 'Bottom Sheet',
+      barrierColor: Colors.transparent,
+      // Lower z-index so navigation bars appear on top
+      useRootNavigator: false,
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return MediaQuery.removePadding(
+          context: context,
+          removeTop: true,
+          removeBottom: true,
+          removeLeft: true,
+          removeRight: true,
+          child: Builder(
+            builder: (context) {
+              // Phone dimensions and positioning
+              const phoneWidth = 393.0;
+              const phoneHeight = 851.0;
+              const phoneRadius = 20.0; // Phone inner radius
+              const modalTopOffset = 150.0; // Modal starts 150px from screen top
+              
+              final screenWidth = MediaQuery.of(context).size.width;
+              final screenHeight = MediaQuery.of(context).size.height;
+              
+              // Calculate phone positioning (centered on screen)
+              final phoneLeft = (screenWidth - phoneWidth) / 2;
+              final phoneTop = (screenHeight - phoneHeight) / 2;
+              
+              // Modal positioning - starts 150px from screen top
+              final modalTop = modalTopOffset;
+              final modalHeight = screenHeight - modalTopOffset;
+              
+              return Material(
+                type: MaterialType.transparency,
+                child: Stack(
+                  children: [
+                    // Gray background constrained to phone frame with rounded corners
+                    Positioned(
+                      left: phoneLeft,
+                      top: phoneTop,
+                      width: phoneWidth,
+                      height: phoneHeight,
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(phoneRadius),
+                        child: Container(
+                          color: Colors.black54,
+                          child: barrierDismissible
+                              ? GestureDetector(
+                                  onTap: () => Navigator.of(context).pop(),
+                                  child: Container(),
+                                )
+                              : Container(),
+                        ),
+                      ),
+                    ),
+                    // Modal positioned 150px from screen top, constrained to phone width
+                    AnimatedBuilder(
+                      animation: animation,
+                      builder: (context, _) {
+                        final slideValue = Curves.easeOutCubic.transform(animation.value);
+                        return Positioned(
+                          left: phoneLeft,
+                          top: modalTop + (modalHeight * (1 - slideValue)),
+                          width: phoneWidth,
+                          height: modalHeight,
+                          child: ClipRRect(
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(20),
+                              topRight: Radius.circular(20),
+                            ),
+                            child: Material(
+                              color: Colors.transparent,
+                              child: child,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+      transitionDuration: const Duration(milliseconds: 300),
+    );
+  }
+
   /// Show a confirmation dialog with proper phone positioning
   static Future<bool> showPhoneConfirmationDialog({
     required BuildContext context,

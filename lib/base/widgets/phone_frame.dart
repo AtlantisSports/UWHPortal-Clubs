@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../core/utils/navigation_service.dart';
 
 /// Creates a realistic phone frame around the app content
-class PhoneFrame extends StatelessWidget {
+class PhoneFrame extends StatefulWidget {
   final Widget child;
   final VoidCallback? onBackPressed;
   
@@ -11,6 +11,65 @@ class PhoneFrame extends StatelessWidget {
     required this.child,
     this.onBackPressed,
   });
+
+  @override
+  State<PhoneFrame> createState() => PhoneFrameState();
+}
+
+class PhoneFrameState extends State<PhoneFrame> {
+  static PhoneFrameState? _instance;
+  
+  Widget? _overlayWidget;
+
+  @override
+  void initState() {
+    super.initState();
+    _instance = this;
+  }
+
+  @override
+  void dispose() {
+    if (_instance == this) {
+      _instance = null;
+    }
+    super.dispose();
+  }
+  
+  /// Show an overlay widget within the phone frame
+  static void showOverlay(Widget overlay) {
+    print('DEBUG: PhoneFrameState.showOverlay called');
+    final state = _instance;
+    print('DEBUG: Phone frame instance: $state');
+    if (state != null) {
+      state._showOverlay(overlay);
+    } else {
+      print('DEBUG: Phone frame instance is null!');
+    }
+  }
+  
+  /// Hide the current overlay
+  static void hideOverlay() {
+    print('DEBUG: PhoneFrameState.hideOverlay called');
+    final state = _instance;
+    if (state != null) {
+      state._hideOverlay();
+    }
+  }
+  
+  void _showOverlay(Widget overlay) {
+    print('DEBUG: _showOverlay called with overlay: $overlay');
+    setState(() {
+      _overlayWidget = overlay;
+    });
+    print('DEBUG: Overlay set, triggering rebuild');
+  }
+  
+  void _hideOverlay() {
+    print('DEBUG: _hideOverlay called');
+    setState(() {
+      _overlayWidget = null;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,19 +89,29 @@ class PhoneFrame extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(20), // Match Galaxy S23 inner radius
-        child: Column(
+        child: Stack(
           children: [
-            // Status Bar
-            _buildStatusBar(),
-            // App Content
-            Expanded(
-              child: SizedBox(
-                width: double.infinity,
-                child: child,
-              ),
+            // Main phone content
+            Column(
+              children: [
+                // Status Bar
+                _buildStatusBar(),
+                // App Content
+                Expanded(
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: widget.child,
+                  ),
+                ),
+                // Navigation Bar (Home indicator for iPhone-style)
+                _buildNavigationBar(),
+              ],
             ),
-            // Navigation Bar (Home indicator for iPhone-style)
-            _buildNavigationBar(),
+            // Overlay for modals (appears above everything)
+            if (_overlayWidget != null)
+              Positioned.fill(
+                child: _overlayWidget!,
+              ),
           ],
         ),
       ),
@@ -171,8 +240,8 @@ class PhoneFrame extends StatelessWidget {
             icon: Icons.arrow_back,
             onTap: () {
               // Use custom callback if provided
-              if (onBackPressed != null) {
-                onBackPressed!();
+              if (widget.onBackPressed != null) {
+                widget.onBackPressed!();
                 return;
               }
               

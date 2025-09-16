@@ -29,6 +29,9 @@ class RSVPProvider with ChangeNotifier {
   // Map to track loading states for each practice
   final Map<String, bool> _loadingStates = {};
   
+  // Level filter state (session-based persistence)
+  Set<String> _selectedLevels = <String>{};
+  
   // Bulk operation tracking
   bool _isBulkOperationInProgress = false;
   String? _bulkOperationStatus;
@@ -41,6 +44,8 @@ class RSVPProvider with ChangeNotifier {
   String get currentUserId => _currentUserId;
   bool get isBulkOperationInProgress => _isBulkOperationInProgress;
   String? get bulkOperationStatus => _bulkOperationStatus;
+  Set<String> get selectedLevels => Set.from(_selectedLevels);
+  bool get hasLevelFiltersApplied => _selectedLevels.isNotEmpty;
 
   /// Get RSVP status for a specific practice
   RSVPStatus getRSVPStatus(String practiceId) {
@@ -257,6 +262,69 @@ class RSVPProvider with ChangeNotifier {
     if (error != null) {
       notifyListeners();
     }
+  }
+  
+  /// Level Filter Management
+  
+  /// Get all available practice levels from a list of practices
+  Set<String> getAvailableLevels(List<Practice> practices) {
+    final levels = <String>{};
+    for (final practice in practices) {
+      if (practice.tag != null && practice.tag!.isNotEmpty) {
+        levels.add(practice.tag!);
+      }
+    }
+    return levels;
+  }
+  
+  /// Update selected levels for filtering
+  void updateSelectedLevels(Set<String> levels) {
+    _selectedLevels = Set.from(levels);
+    notifyListeners();
+  }
+  
+  /// Add a level to the filter
+  void addLevelToFilter(String level) {
+    _selectedLevels.add(level);
+    notifyListeners();
+  }
+  
+  /// Remove a level from the filter
+  void removeLevelFromFilter(String level) {
+    _selectedLevels.remove(level);
+    notifyListeners();
+  }
+  
+  /// Toggle a level in the filter
+  void toggleLevelFilter(String level) {
+    if (_selectedLevels.contains(level)) {
+      _selectedLevels.remove(level);
+    } else {
+      _selectedLevels.add(level);
+    }
+    notifyListeners();
+  }
+  
+  /// Clear all level filters (show all practices)
+  void clearLevelFilters() {
+    _selectedLevels.clear();
+    notifyListeners();
+  }
+  
+  /// Check if a practice should be shown based on current level filters
+  bool shouldShowPractice(Practice practice) {
+    // If no filters are applied, show all practices
+    if (_selectedLevels.isEmpty) {
+      return true;
+    }
+    
+    // If practice has no tag, only show if no filters are applied
+    if (practice.tag == null || practice.tag!.isEmpty) {
+      return false;
+    }
+    
+    // Show practice if its level is in the selected levels
+    return _selectedLevels.contains(practice.tag);
   }
   
   /// Debug method to see all tracked RSVP statuses
