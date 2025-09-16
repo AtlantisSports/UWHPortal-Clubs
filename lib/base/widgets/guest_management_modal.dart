@@ -103,7 +103,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                           Icon(Icons.group, color: AppColors.primary, size: 16),
                           const SizedBox(width: 8),
                           Text(
-                            '${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'} added',
+                            'Bringing ${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'}',
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
@@ -116,9 +116,11 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                     const SizedBox(height: 16),
                   ],
                   
-                  // Guest type sections
-                  for (final type in GuestType.values)
+                  // Guest type sections - show dependents at bottom
+                  for (final type in GuestType.values.where((t) => t != GuestType.dependent))
                     _buildGuestTypeSection(type),
+                  // Dependents section at the bottom
+                  _buildGuestTypeSection(GuestType.dependent),
                 ],
               ),
             ),
@@ -442,6 +444,13 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           id: guestId,
           name: name,
           memberId: guestId, // Placeholder - would be actual member ID
+        );
+        break;
+      case GuestType.dependent:
+        guest = DependentGuest(
+          id: guestId,
+          name: name,
+          waiverSigned: _waiverStates[type] ?? false,
         );
         break;
     }

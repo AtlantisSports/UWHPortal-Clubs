@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
@@ -196,6 +197,34 @@ class PracticeCalendar extends StatelessWidget {
                               ),
                             ),
                           ),
+                          // Guest count indicator (lower-left corner)
+                          Consumer<RSVPProvider>(
+                            builder: (context, rsvpProvider, child) {
+                              final guestCount = _getGuestCountForDate(date, rsvpProvider);
+                              if (guestCount > 0) {
+                                return Positioned(
+                                  bottom: 2,
+                                  left: 2,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text(
+                                      '$guestCount+',
+                                      style: const TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }
+                              return const SizedBox.shrink();
+                            },
+                          ),
                           // Practice indicators
                           if (practicesForDay.isNotEmpty)
                             Positioned(
@@ -339,6 +368,25 @@ class PracticeCalendar extends StatelessWidget {
     return date.year == today.year && 
            date.month == today.month && 
            date.day == today.day;
+  }
+
+  int _getGuestCountForDate(DateTime date, RSVPProvider? rsvpProvider) {
+    if (rsvpProvider == null) return 0;
+    
+    int maxGuestCount = 0;
+    
+    // Get all practices for this date
+    final practicesForDate = _getPracticesForDate(date);
+    
+    // Find the highest guest count among all practices on this date
+    for (final practice in practicesForDate) {
+      final guestList = rsvpProvider.getPracticeGuests(practice.id);
+      if (guestList.totalGuests > maxGuestCount) {
+        maxGuestCount = guestList.totalGuests;
+      }
+    }
+    
+    return maxGuestCount;
   }
 
   Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month, RSVPProvider? rsvpProvider) {

@@ -70,12 +70,6 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
     return practiceEndTime.isBefore(now);
   }
 
-  int _calculateAttendanceCount(Practice practice) {
-    return practice.rsvpResponses.values
-        .where((status) => status == RSVPStatus.yes)
-        .length;
-  }
-
   bool _getUserAttendanceStatus(Practice practice) {
     // For past practices, use the same logic as calendar widget to ensure consistency
     if (_isPastEvent(practice)) {
@@ -103,20 +97,6 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
         size: 14,
       ),
     );
-  }
-
-  String _formatTimeRange(DateTime startTime, Duration duration) {
-    final endTime = startTime.add(duration);
-    return '${_formatTime(startTime)} - ${_formatTime(endTime)}';
-  }
-
-  String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final amPm = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
-    return '$displayHour$minuteStr $amPm';
   }
 
   void _showCustomToast(String message, Color color, IconData icon) {
@@ -237,9 +217,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                     Container(
                       padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
                       ),
                       child: Text(
                         widget.practice.tag!,

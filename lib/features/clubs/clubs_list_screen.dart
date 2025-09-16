@@ -27,7 +27,6 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   
   // Internal navigation state
   Club? _selectedClub;
-  Practice? _selectedPractice; // Add selected practice state
   bool _showingClubDetail = false;
   
   // Toast state
@@ -152,7 +151,6 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   void _navigateBackToList() {
     setState(() {
       _selectedClub = null;
-      _selectedPractice = null; // Reset selected practice
       _showingClubDetail = false;
     });
   }

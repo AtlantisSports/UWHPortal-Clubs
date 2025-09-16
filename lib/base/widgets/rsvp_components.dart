@@ -316,15 +316,15 @@ class PracticeRSVPCard extends StatefulWidget {
 }
 
 class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
-  bool _bringGuest = false;
-  PracticeGuestList _guestList = const PracticeGuestList();
-  
   @override
   Widget build(BuildContext context) {
     return Consumer<RSVPProvider>(
       builder: (context, rsvpProvider, child) {
         // Get current RSVP status from provider, fallback to widget parameter
         final currentRSVP = rsvpProvider.getRSVPStatus(widget.practice.id);
+        // Get guest data from provider
+        final guestList = rsvpProvider.getPracticeGuests(widget.practice.id);
+        final bringGuest = rsvpProvider.getBringGuestState(widget.practice.id);
         
         return Container(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
@@ -487,7 +487,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
               // Bring a guest section (only show if user selected "Yes")
               if (currentRSVP == RSVPStatus.yes) ...[
                 const SizedBox(height: 12),
-                _buildGuestSection(),
+                _buildGuestSection(rsvpProvider, bringGuest, guestList),
               ],
             ],
           ),
@@ -496,7 +496,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     );
   }
   
-  Widget _buildGuestSection() {
+  Widget _buildGuestSection(RSVPProvider rsvpProvider, bool bringGuest, PracticeGuestList guestList) {
     return Container(
       padding: const EdgeInsets.all(6), // Reduced from 12 to 6 (50% reduction)
       decoration: BoxDecoration(
@@ -507,18 +507,25 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Checkbox, label, and Add guest pill button
+          // Checkbox, label, and Edit guests pill button
           Row(
             children: [
               Checkbox(
-                value: _bringGuest,
+                value: bringGuest,
                 onChanged: (value) {
-                  setState(() {
-                    _bringGuest = value ?? false;
-                    if (!_bringGuest) {
-                      _guestList = const PracticeGuestList();
-                    }
-                  });
+                  final newBringGuest = value ?? false;
+                  rsvpProvider.updateBringGuestState(widget.practice.id, newBringGuest);
+                  
+                  if (!newBringGuest) {
+                    // Clear guests if not bringing any
+                    rsvpProvider.updatePracticeGuests(widget.practice.id, []);
+                  } else {
+                    // Automatically open guest modal when checkbox is checked
+                    // Use a small delay to ensure the UI state is updated first
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _showGuestManagementModal(rsvpProvider, guestList);
+                    });
+                  }
                 },
                 activeColor: const Color(0xFF0284C7),
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -532,12 +539,12 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   color: Color(0xFF374151),
                 ),
               ),
-              if (_bringGuest) ...[
+              if (bringGuest) ...[
                 const Spacer(), // Push the button to the right
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: _showGuestManagementModal,
+                    onTap: () => _showGuestManagementModal(rsvpProvider, guestList),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -545,7 +552,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: const Text(
-                        'Add a guest',
+                        'Edit guests',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w500,
@@ -560,10 +567,10 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
           ),
           
           // Guest list display (only show if guests exist)
-          if (_bringGuest && _guestList.totalGuests > 0) ...[
+          if (bringGuest && guestList.totalGuests > 0) ...[
             const SizedBox(height: 8),
             Text(
-              '${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'} added',
+              'Bringing ${guestList.totalGuests} guest${guestList.totalGuests == 1 ? '' : 's'}',
               style: const TextStyle(
                 fontSize: 13,
                 color: Color(0xFF6B7280),
@@ -575,15 +582,14 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     );
   }
   
-  void _showGuestManagementModal() {
+  void _showGuestManagementModal(RSVPProvider rsvpProvider, PracticeGuestList guestList) {
     PhoneModalUtils.showPhoneModal(
       context: context,
       child: GuestManagementModal(
-        initialGuests: _guestList,
+        initialGuests: guestList,
         onGuestsChanged: (newGuestList) {
-          setState(() {
-            _guestList = newGuestList;
-          });
+          // Update provider with new guest data
+          rsvpProvider.updatePracticeGuests(widget.practice.id, newGuestList.guests);
         },
         practiceId: widget.practice.id,
       ),
@@ -609,7 +615,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
             widget.onRSVPChanged?.call(status);
           } catch (error) {
             // Show error toast if RSVP update fails
-            if (context.mounted) {
+            if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Failed to update RSVP. Please try again.'),

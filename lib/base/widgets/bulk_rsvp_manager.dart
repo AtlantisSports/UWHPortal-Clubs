@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
+import '../../core/models/guest.dart';
 import '../../core/providers/rsvp_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'phone_modal_utils.dart';
@@ -700,6 +701,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                             _selectedDependents.clear();
                           }
                         });
+                        
+                        // Automatically open dependent management modal when checkbox is checked
+                        if (_includeDependents) {
+                          // Use a small delay to ensure the UI state is updated first
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            _showDependentManagementModal();
+                          });
+                        }
                       },
                       activeColor: const Color(0xFF1B365D),
                       materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -715,6 +724,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                             _selectedDependents.clear();
                           }
                         });
+                        
+                        // Automatically open dependent management modal when checkbox is checked
+                        if (_includeDependents) {
+                          // Use a small delay to ensure the UI state is updated first
+                          Future.delayed(const Duration(milliseconds: 100), () {
+                            _showDependentManagementModal();
+                          });
+                        }
                       },
                       child: Text(
                         _includeDependents && _selectedDependents.isNotEmpty
@@ -728,18 +745,24 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                     ),
                   ),
                   if (_includeDependents)
-                    TextButton(
-                      onPressed: () => _showDependentManagementModal(),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      child: const Text(
-                        'Manage',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF1B365D),
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      child: GestureDetector(
+                        onTap: () => _showDependentManagementModal(),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF1B365D),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: const Text(
+                            'Manage Dependents',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: Colors.white,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -1197,7 +1220,32 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         newStatus: _selectedRSVPChoice!,
         clubId: widget.club.id,
         userId: rsvpProvider.currentUserId,
+        includeDependents: _includeDependents,
+        selectedDependents: _selectedDependents,
       );
+      
+      // If we're including dependents and RSVPing YES, store guest data
+      if (_includeDependents && _selectedRSVPChoice == RSVPStatus.yes && _selectedDependents.isNotEmpty) {
+        // Convert dependent names to guest objects for storage
+        final guestList = _selectedDependents.map((dependentName) {
+          return DependentGuest(
+            id: '${DateTime.now().millisecondsSinceEpoch}_${dependentName.hashCode}',
+            name: dependentName,
+          );
+        }).toList();
+        
+        // Store guest data for all target practices
+        for (final practiceId in targetPracticeIds) {
+          rsvpProvider.updatePracticeGuests(practiceId, guestList);
+          rsvpProvider.updateBringGuestState(practiceId, true);
+        }
+      } else if (!_includeDependents || _selectedRSVPChoice == RSVPStatus.no) {
+        // Clear guest data for all target practices if not including dependents or RSVPing NO
+        for (final practiceId in targetPracticeIds) {
+          rsvpProvider.updatePracticeGuests(practiceId, []);
+          rsvpProvider.updateBringGuestState(practiceId, false);
+        }
+      }
       
       // Execute the bulk update
       final result = await rsvpProvider.bulkUpdateRSVP(request);
@@ -1214,6 +1262,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             _selectedTimeframe = 'only_announced';
             _customStartDate = null;
             _customEndDate = null;
+            _selectedDependents.clear(); // Clear dependent selection
+            _includeDependents = false; // Reset include dependents checkbox
           });
           
           // Window will stay open - user must press Done or Cancel to close
@@ -1233,15 +1283,25 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _showBulkRSVPResult(BulkRSVPResult result) {
+    String message = result.summaryText;
+    
+    // If we included dependents and the operation was successful, add dependent count to message
+    if (_includeDependents && result.successfulIds.isNotEmpty && _selectedDependents.isNotEmpty) {
+      // Count the unique dependents that were added (not multiplied by practice count)
+      final dependentCount = _selectedDependents.length;
+      final dependentText = dependentCount == 1 ? '1 dependent' : '$dependentCount dependents';
+      message = '${result.summaryText} + $dependentText';
+    }
+    
     if (result.isFullSuccess) {
       _showCustomToast(
-        result.summaryText,
+        message,
         AppColors.success, // Green for success
         Icons.check,
       );
     } else if (result.isPartialSuccess) {
       _showCustomToast(
-        result.summaryText,
+        message,
         const Color(0xFFF59E0B), // Orange for partial success
         Icons.warning,
       );

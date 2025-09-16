@@ -151,15 +151,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       ),
     );
   }
-
-  String _formatPracticeTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final amPm = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $amPm';
-  }
   
   void _showCustomToast(String message, Color color, IconData icon) {
     setState(() {
@@ -455,7 +446,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         PracticeRSVPCard(
                           practice: nextPractice,
                           clubId: widget.club.id,
-                          currentRSVP: rsvpProvider.getRSVPStatus(nextPractice.id),
                           onRSVPChanged: (status) {
                             // Show toast when RSVP changes
                             String message = 'RSVP updated to: ${status.displayText}';
@@ -985,54 +975,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
-  }
-
-  Widget _buildAttendanceIndicator(bool attended) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: attended ? AppColors.success : AppColors.error,
-      ),
-      child: Icon(
-        attended ? Icons.check : Icons.close,
-        color: Colors.white,
-        size: 14,
-      ),
-    );
-  }
-
-  bool _getUserAttendanceStatus(Practice practice) {
-    // For past practices, use the same logic as the calendar to ensure consistency
-    if (!practice.isUpcoming) {
-      // First check if user is explicitly in participants list
-      if (practice.participants.isNotEmpty) {
-        return practice.participants.contains(widget.currentUserId);
-      }
-      
-      // Fall back to hash-based logic (EXACTLY same as calendar widget)
-      // This ensures consistency between calendar and practice details
-      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-      final hash = practiceDate.hashCode + practice.location.hashCode;
-      return hash % 3 != 0; // Same logic as calendar: attended if hash % 3 != 0
-    }
-    
-    // For upcoming practices, check participants list
-    return practice.participants.contains(widget.currentUserId);
-  }
-
-  int _calculateAttendanceCount(Practice practice) {
-    // For past practices, if no actual participants data, generate consistent count
-    if (!practice.isUpcoming && practice.participants.isEmpty) {
-      // Generate a realistic attendance count (between 8-18 players)
-      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-      final hash = practiceDate.hashCode + practice.location.hashCode;
-      return 8 + (hash.abs() % 11); // Results in 8-18 players
-    }
-    
-    // For practices with actual data, use real count
-    return practice.participants.length;
   }
 
   /// Helper method to get day name from weekday number

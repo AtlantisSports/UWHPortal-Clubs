@@ -2,6 +2,7 @@
 
 import 'package:flutter/foundation.dart';
 import '../models/practice.dart';
+import '../models/guest.dart';
 import '../utils/error_handler.dart';
 import '../../features/clubs/clubs_repository.dart';
 import '../di/service_locator.dart';
@@ -16,6 +17,14 @@ class RSVPProvider with ChangeNotifier {
   // Map to track RSVP status for each practice
   // Key: practiceId, Value: RSVPStatus
   final Map<String, RSVPStatus> _rsvpStatusMap = {};
+  
+  // Map to track guest lists for each practice
+  // Key: practiceId, Value: PracticeGuestList
+  final Map<String, PracticeGuestList> _practiceGuestsMap = {};
+  
+  // Map to track "bring guest" checkbox state for each practice
+  // Key: practiceId, Value: bool
+  final Map<String, bool> _bringGuestMap = {};
   
   // Map to track loading states for each practice
   final Map<String, bool> _loadingStates = {};
@@ -36,6 +45,16 @@ class RSVPProvider with ChangeNotifier {
   /// Get RSVP status for a specific practice
   RSVPStatus getRSVPStatus(String practiceId) {
     return _rsvpStatusMap[practiceId] ?? RSVPStatus.pending;
+  }
+  
+  /// Get guest list for a specific practice
+  PracticeGuestList getPracticeGuests(String practiceId) {
+    return _practiceGuestsMap[practiceId] ?? const PracticeGuestList();
+  }
+  
+  /// Get "bring guest" checkbox state for a specific practice
+  bool getBringGuestState(String practiceId) {
+    return _bringGuestMap[practiceId] ?? false;
   }
   
   /// Check if a specific practice is loading
@@ -93,6 +112,24 @@ class RSVPProvider with ChangeNotifier {
     }
   }
   
+  /// Update guest list for a practice
+  void updatePracticeGuests(String practiceId, List<Guest> guests) {
+    _practiceGuestsMap[practiceId] = PracticeGuestList(guests: guests);
+    notifyListeners();
+  }
+  
+  /// Update "bring guest" checkbox state for a practice
+  void updateBringGuestState(String practiceId, bool bringGuest) {
+    _bringGuestMap[practiceId] = bringGuest;
+    
+    // Clear guest list if not bringing guests
+    if (!bringGuest) {
+      _practiceGuestsMap[practiceId] = const PracticeGuestList();
+    }
+    
+    notifyListeners();
+  }
+  
   /// Bulk update RSVP status for multiple practices
   Future<BulkRSVPResult> bulkUpdateRSVP(BulkRSVPRequest request) async {
     if (_isBulkOperationInProgress) {
@@ -124,6 +161,9 @@ class RSVPProvider with ChangeNotifier {
           // Update local state
           _rsvpStatusMap[practiceId] = request.newStatus;
           successfulIds.add(practiceId);
+          
+          // Notify listeners immediately for real-time UI updates
+          notifyListeners();
           
         } catch (error) {
           final errorMessage = AppErrorHandler.getErrorMessage(error);

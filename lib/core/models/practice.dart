@@ -10,12 +10,16 @@ class BulkRSVPRequest {
   final RSVPStatus newStatus;
   final String clubId;
   final String userId;
+  final bool includeDependents;
+  final List<String> selectedDependents;
   
   const BulkRSVPRequest({
     required this.practiceIds,
     required this.newStatus,
     required this.clubId,
     required this.userId,
+    this.includeDependents = false,
+    this.selectedDependents = const [],
   });
   
   Map<String, dynamic> toJson() {
@@ -24,6 +28,8 @@ class BulkRSVPRequest {
       'newStatus': newStatus.name,
       'clubId': clubId,
       'userId': userId,
+      'includeDependents': includeDependents,
+      'selectedDependents': selectedDependents,
     };
   }
 }

@@ -5,6 +5,7 @@ enum GuestType {
   newPlayer,
   visitor,
   clubMember,
+  dependent,
 }
 
 extension GuestTypeExtension on GuestType {
@@ -16,6 +17,8 @@ extension GuestTypeExtension on GuestType {
         return 'Visitor';
       case GuestType.clubMember:
         return 'Club Member';
+      case GuestType.dependent:
+        return 'Dependents';
     }
   }
   
@@ -27,6 +30,8 @@ extension GuestTypeExtension on GuestType {
         return 'Guest visiting from another club/location';
       case GuestType.clubMember:
         return 'Current member of this club';
+      case GuestType.dependent:
+        return 'Family members or dependents';
     }
   }
 }
@@ -78,6 +83,15 @@ class ClubMemberGuest extends Guest {
     required this.memberId,
     this.hasPermission = true,
   }) : super(type: GuestType.clubMember, waiverSigned: true);
+}
+
+/// Dependent guest (family member)
+class DependentGuest extends Guest {
+  const DependentGuest({
+    required super.id,
+    required super.name,
+    super.waiverSigned = false,
+  }) : super(type: GuestType.dependent);
 }
 
 /// Guest management state for a practice
