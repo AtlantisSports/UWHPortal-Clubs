@@ -312,10 +312,21 @@ class PhoneFrameWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5), // Light gray background
-      body: Center(
-        child: PhoneFrame(
-          onBackPressed: onBackPressed,
-          child: child,
+      body: OverflowBox(
+        maxWidth: double.infinity,
+        maxHeight: double.infinity,
+        child: Center(
+          child: Transform.scale(
+            scale: 1.0, // Fixed scale - never changes
+            child: SizedBox(
+              width: 393, // Fixed Galaxy S23 width - never changes
+              height: 851, // Fixed Galaxy S23 height - never changes
+              child: PhoneFrame(
+                onBackPressed: onBackPressed,
+                child: child,
+              ),
+            ),
+          ),
         ),
       ),
     );

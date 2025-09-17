@@ -101,25 +101,30 @@ class _ClubCardState extends State<ClubCard> {
         children: [
           Row(
             children: [
-              // Club logo or placeholder
+              // Banner image with 1.91:1 ratio (30% of previous size: ~36px height)
               Container(
-                width: 48,
-                height: 48,
+                width: 69, // 36px height * 1.91 ratio = ~69px width
+                height: 36, // 30% of 120px = 36px
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(AppRadius.small),
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primaryDark,
+                    ],
+                  ),
                 ),
+                clipBehavior: Clip.hardEdge,
                 child: widget.logoUrl != null
-                    ? ClipRRect(
-                        borderRadius: BorderRadius.circular(AppRadius.small),
-                        child: Image.network(
-                          widget.logoUrl!,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const Icon(Icons.group, color: AppColors.primary),
-                        ),
+                    ? Image.network(
+                        widget.logoUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) =>
+                            const Icon(Icons.group, color: Colors.white54, size: 20),
                       )
-                    : const Icon(Icons.group, color: AppColors.primary),
+                    : const Icon(Icons.group, color: Colors.white54, size: 20),
               ),
               const SizedBox(width: AppSpacing.medium),
               Expanded(
@@ -131,25 +136,6 @@ class _ClubCardState extends State<ClubCard> {
                       style: AppTextStyles.headline3,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.location_on,
-                          size: 16,
-                          color: AppColors.textSecondary,
-                        ),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            widget.location,
-                            style: AppTextStyles.bodySmall,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
