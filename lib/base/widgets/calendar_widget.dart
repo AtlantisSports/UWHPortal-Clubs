@@ -8,7 +8,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/rsvp_provider.dart';
 import '../../base/widgets/level_filter_modal.dart';
-import '../../base/widgets/phone_overlay_utils.dart';
+import '../../base/widgets/phone_modal_utils.dart';
 
 enum PracticeStatus {
   attended,
@@ -617,7 +617,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   void _showPracticeSelectionModal(BuildContext context, List<Practice> practices) {
-    PhoneOverlayUtils.showPhoneModal(
+    PhoneModalUtils.showPhoneFrameModal(
       context: context,
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -639,7 +639,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 IconButton(
                   icon: const Icon(Icons.close),
                   iconSize: 20, // Smaller close button
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => PhoneFrameModal.close(),
                 ),
               ],
             ),
@@ -652,7 +652,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   children: practices.map((practice) {
                     return InkWell(
                       onTap: () {
-                        Navigator.of(context).pop(); // Close modal
+                        PhoneFrameModal.close(); // Close modal
                         widget.onPracticeSelected?.call(practice);
                       },
                       child: Container(

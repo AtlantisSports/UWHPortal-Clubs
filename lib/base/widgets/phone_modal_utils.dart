@@ -271,7 +271,7 @@ class PhoneModalUtils {
     required List<String> selectedDependents,
     required Function(List<String>) onDependentsChanged,
   }) async {
-    await showPhoneModal(
+    await showPhoneFrameModal(
       context: context,
       child: DependentManagementModal(
         availableDependents: availableDependents,

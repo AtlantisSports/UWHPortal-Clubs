@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
+import 'phone_modal_utils.dart';
 import '../../core/providers/rsvp_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'phone_modal_utils.dart';
@@ -30,8 +31,8 @@ class BulkRSVPManager extends StatefulWidget {
 class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   // Filter state
   Set<int> _selectedDaysOfWeek = <int>{};
-  String? _selectedLocation;
-  String? _selectedLevel;
+  Set<String> _selectedLocations = <String>{}; // Changed to Set for multi-select
+  Set<String> _selectedLevels = <String>{}; // Changed to Set for multi-select
   
   // Selection state
   final Set<String> _selectedPracticeIds = <String>{};
@@ -112,6 +113,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     setState(() {
       _availableLevels = levels;
     });
+  }
+
+  List<int> _getAvailableDaysOfWeek() {
+    final clubPractices = _getClubPractices();
+    final availableDays = clubPractices.map((p) => p.dateTime.weekday).toSet().toList();
+    availableDays.sort();
+    return availableDays;
   }
   
   List<Practice> _getClubPractices() {
@@ -197,13 +205,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     }
     
     // Apply location filter
-    if (_selectedLocation != null && _selectedLocation!.isNotEmpty) {
-      practices = practices.where((p) => p.location == _selectedLocation).toList();
+    if (_selectedLocations.isNotEmpty) {
+      practices = practices.where((p) => _selectedLocations.contains(p.location)).toList();
     }
     
     // Apply level filter
-    if (_selectedLevel != null && _selectedLevel!.isNotEmpty) {
-      practices = practices.where((p) => p.tag == _selectedLevel).toList();
+    if (_selectedLevels.isNotEmpty) {
+      practices = practices.where((p) => p.tag != null && _selectedLevels.contains(p.tag!)).toList();
     }
     
     return practices;
@@ -389,82 +397,76 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   Widget _buildLocationFilter() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedLocation,
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.location_on, size: 16, color: Color(0xFF6B7280)),
-        hintText: 'Any location',
-        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
-        border: OutlineInputBorder(
+    final displayText = _selectedLocations.isEmpty 
+        ? 'Any location' 
+        : _selectedLocations.length == 1 
+            ? _selectedLocations.first 
+            : '${_selectedLocations.length} locations';
+    
+    return InkWell(
+      onTap: () => _showLocationSelectionModal(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE5E7EB)),
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        child: Row(
+          children: [
+            const Icon(Icons.location_on, size: 16, color: Color(0xFF6B7280)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                displayText,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _selectedLocations.isEmpty 
+                      ? const Color(0xFF9CA3AF) 
+                      : const Color(0xFF374151),
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+          ],
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF0284C7)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        isDense: true,
       ),
-      items: [
-        const DropdownMenuItem<String>(
-          value: null,
-          child: Text('Any location', style: TextStyle(fontSize: 14)),
-        ),
-        ..._availableLocations.map((location) => DropdownMenuItem<String>(
-          value: location,
-          child: Text(location, style: const TextStyle(fontSize: 14)),
-        )),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _selectedLocation = value;
-        });
-      },
     );
   }
   
   Widget _buildLevelFilter() {
-    return DropdownButtonFormField<String>(
-      initialValue: _selectedLevel,
-      decoration: InputDecoration(
-        prefixIcon: const Icon(Icons.star, size: 16, color: Color(0xFF6B7280)),
-        hintText: 'Any level',
-        hintStyle: const TextStyle(fontSize: 14, color: Color(0xFF9CA3AF)),
-        border: OutlineInputBorder(
+    final displayText = _selectedLevels.isEmpty 
+        ? 'Any level' 
+        : _selectedLevels.length == 1 
+            ? _selectedLevels.first 
+            : '${_selectedLevels.length} levels';
+    
+    return InkWell(
+      onTap: () => _showLevelSelectionModal(),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          border: Border.all(color: const Color(0xFFE5E7EB)),
           borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        child: Row(
+          children: [
+            const Icon(Icons.star, size: 16, color: Color(0xFF6B7280)),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                displayText,
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _selectedLevels.isEmpty 
+                      ? const Color(0xFF9CA3AF) 
+                      : const Color(0xFF374151),
+                ),
+              ),
+            ),
+            const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
+          ],
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-          borderSide: const BorderSide(color: Color(0xFF0284C7)),
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        isDense: true,
       ),
-      items: [
-        const DropdownMenuItem<String>(
-          value: null,
-          child: Text('Any level', style: TextStyle(fontSize: 14)),
-        ),
-        ..._availableLevels.map((level) => DropdownMenuItem<String>(
-          value: level,
-          child: Text(level, style: const TextStyle(fontSize: 14)),
-        )),
-      ],
-      onChanged: (value) {
-        setState(() {
-          _selectedLevel = value;
-        });
-      },
     );
   }
   
@@ -1196,8 +1198,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
            _selectedRSVPChoice != null || 
            _selectedTimeframe != 'only_announced' ||
            _selectedDaysOfWeek.isNotEmpty ||
-           _selectedLocation != null ||
-           _selectedLevel != null;
+           _selectedLocations.isNotEmpty ||
+           _selectedLevels.isNotEmpty;
   }
   
   void _applyBulkRSVP() async {
@@ -1400,54 +1402,19 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _showDayOfWeekPicker() {
-    showDialog(
+    final availableDays = _getAvailableDaysOfWeek();
+    
+    PhoneModalUtils.showPhoneFrameModal(
       context: context,
-      builder: (context) {
-        final tempSelection = Set<int>.from(_selectedDaysOfWeek);
-        
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('Select Days of Week'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  for (int day = DateTime.monday; day <= DateTime.sunday; day++)
-                    CheckboxListTile(
-                      title: Text(_getDayName(day)),
-                      value: tempSelection.contains(day),
-                      onChanged: (value) {
-                        setDialogState(() {
-                          if (value == true) {
-                            tempSelection.add(day);
-                          } else {
-                            tempSelection.remove(day);
-                          }
-                        });
-                      },
-                      activeColor: const Color(0xFF0284C7),
-                    ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () {
-                    setState(() {
-                      _selectedDaysOfWeek = tempSelection;
-                    });
-                    Navigator.pop(context);
-                  },
-                  child: const Text('Apply'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      child: _DaySelectionModal(
+        availableDays: availableDays,
+        selectedDays: Set<int>.from(_selectedDaysOfWeek),
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _selectedDaysOfWeek = newSelection;
+          });
+        },
+      ),
     );
   }
 
@@ -1515,6 +1482,36 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     }
     
     return '$truncated...';
+  }
+
+  void _showLocationSelectionModal() {
+    PhoneModalUtils.showPhoneFrameModal(
+      context: context,
+      child: _LocationSelectionModal(
+        availableLocations: _availableLocations,
+        selectedLocations: Set<String>.from(_selectedLocations),
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _selectedLocations = newSelection;
+          });
+        },
+      ),
+    );
+  }
+
+  void _showLevelSelectionModal() {
+    PhoneModalUtils.showPhoneFrameModal(
+      context: context,
+      child: _LevelSelectionModal(
+        availableLevels: _availableLevels,
+        selectedLevels: Set<String>.from(_selectedLevels),
+        onSelectionChanged: (newSelection) {
+          setState(() {
+            _selectedLevels = newSelection;
+          });
+        },
+      ),
+    );
   }
 }
 
@@ -1803,6 +1800,514 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _DaySelectionModal extends StatefulWidget {
+  final List<int> availableDays;
+  final Set<int> selectedDays;
+  final Function(Set<int>) onSelectionChanged;
+
+  const _DaySelectionModal({
+    required this.availableDays,
+    required this.selectedDays,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_DaySelectionModal> createState() => _DaySelectionModalState();
+}
+
+class _DaySelectionModalState extends State<_DaySelectionModal> {
+  late Set<int> _tempSelection;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempSelection = Set<int>.from(widget.selectedDays);
+  }
+
+  String _getDayName(int weekday) {
+    switch (weekday) {
+      case DateTime.monday: return 'Monday';
+      case DateTime.tuesday: return 'Tuesday';
+      case DateTime.wednesday: return 'Wednesday';
+      case DateTime.thursday: return 'Thursday';
+      case DateTime.friday: return 'Friday';
+      case DateTime.saturday: return 'Saturday';
+      case DateTime.sunday: return 'Sunday';
+      default: return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Select Days of Week',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => PhoneFrameModal.close(),
+                icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.clear();
+                  });
+                },
+                child: const Text(
+                  'Clear All',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.addAll(widget.availableDays);
+                  });
+                },
+                child: const Text(
+                  'Select All',
+                  style: TextStyle(color: Color(0xFF0284C7)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.availableDays.length,
+              itemBuilder: (context, index) {
+                final day = widget.availableDays[index];
+                final isSelected = _tempSelection.contains(day);
+                
+                return CheckboxListTile(
+                  title: Text(
+                    _getDayName(day),
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  value: isSelected,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        _tempSelection.add(day);
+                      } else {
+                        _tempSelection.remove(day);
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFF0284C7),
+                  contentPadding: EdgeInsets.zero,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => PhoneFrameModal.close(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    widget.onSelectionChanged(_tempSelection);
+                    PhoneFrameModal.close();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Apply',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationSelectionModal extends StatefulWidget {
+  final List<String> availableLocations;
+  final Set<String> selectedLocations;
+  final Function(Set<String>) onSelectionChanged;
+
+  const _LocationSelectionModal({
+    required this.availableLocations,
+    required this.selectedLocations,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_LocationSelectionModal> createState() => _LocationSelectionModalState();
+}
+
+class _LocationSelectionModalState extends State<_LocationSelectionModal> {
+  late Set<String> _tempSelection;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempSelection = Set<String>.from(widget.selectedLocations);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Select Locations',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => PhoneFrameModal.close(),
+                icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.clear();
+                  });
+                },
+                child: const Text(
+                  'Clear All',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.addAll(widget.availableLocations);
+                  });
+                },
+                child: const Text(
+                  'Select All',
+                  style: TextStyle(color: Color(0xFF0284C7)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.availableLocations.length,
+              itemBuilder: (context, index) {
+                final location = widget.availableLocations[index];
+                final isSelected = _tempSelection.contains(location);
+                
+                return CheckboxListTile(
+                  title: Text(
+                    location,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  value: isSelected,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        _tempSelection.add(location);
+                      } else {
+                        _tempSelection.remove(location);
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFF0284C7),
+                  contentPadding: EdgeInsets.zero,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => PhoneFrameModal.close(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    widget.onSelectionChanged(_tempSelection);
+                    PhoneFrameModal.close();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Apply',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LevelSelectionModal extends StatefulWidget {
+  final List<String> availableLevels;
+  final Set<String> selectedLevels;
+  final Function(Set<String>) onSelectionChanged;
+
+  const _LevelSelectionModal({
+    required this.availableLevels,
+    required this.selectedLevels,
+    required this.onSelectionChanged,
+  });
+
+  @override
+  State<_LevelSelectionModal> createState() => _LevelSelectionModalState();
+}
+
+class _LevelSelectionModalState extends State<_LevelSelectionModal> {
+  late Set<String> _tempSelection;
+
+  @override
+  void initState() {
+    super.initState();
+    _tempSelection = Set<String>.from(widget.selectedLevels);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Select Levels',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF1F2937),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: () => PhoneFrameModal.close(),
+                icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.clear();
+                  });
+                },
+                child: const Text(
+                  'Clear All',
+                  style: TextStyle(color: Color(0xFF6B7280)),
+                ),
+              ),
+              const Spacer(),
+              TextButton(
+                onPressed: () {
+                  setState(() {
+                    _tempSelection.addAll(widget.availableLevels);
+                  });
+                },
+                child: const Text(
+                  'Select All',
+                  style: TextStyle(color: Color(0xFF0284C7)),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              itemCount: widget.availableLevels.length,
+              itemBuilder: (context, index) {
+                final level = widget.availableLevels[index];
+                final isSelected = _tempSelection.contains(level);
+                
+                return CheckboxListTile(
+                  title: Text(
+                    level,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+                  value: isSelected,
+                  onChanged: (bool? value) {
+                    setState(() {
+                      if (value == true) {
+                        _tempSelection.add(level);
+                      } else {
+                        _tempSelection.remove(level);
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFF0284C7),
+                  contentPadding: EdgeInsets.zero,
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () => PhoneFrameModal.close(),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    ),
+                  ),
+                  child: const Text(
+                    'Cancel',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    widget.onSelectionChanged(_tempSelection);
+                    PhoneFrameModal.close();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0284C7),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: const Text(
+                    'Apply',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
