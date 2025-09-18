@@ -126,7 +126,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
           PopScope(
             canPop: true, // Allow system back button to work normally
             child: DefaultTabController(
-              length: 3, // About, Gallery, and Forum tabs
+              length: 4, // About, Teams, Gallery, and Forum tabs
           child: Scaffold(
           backgroundColor: AppColors.background,
           appBar: AppBar(
@@ -261,6 +261,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
               indicatorColor: AppColors.primary,
               tabs: [
                 Tab(text: 'About'),
+                Tab(text: 'Teams'),
                 Tab(text: 'Gallery'),
                 Tab(text: 'Forum'),
               ],
@@ -270,6 +271,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
               child: TabBarView(
                 children: [
                   _buildAboutTab(context),
+                  _buildTeamsTab(context),
                   _buildGalleryTab(context),
                   _buildForumTab(context),
                 ],
@@ -421,6 +423,43 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTeamsTab(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.groups,
+              size: 48,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Practice Teams',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Team assignments and rosters coming soon',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
             ),
           ],
         ),

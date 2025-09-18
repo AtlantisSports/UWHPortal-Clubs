@@ -45,6 +45,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
   bool _isShowingLevelFilterModal = false;
+  bool _isTypicalPracticesExpanded = false; // Track expansion state for typical practices dropdown
   
   // Toast state
   bool _showToast = false;
@@ -57,7 +58,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _scrollController = ScrollController();
     
     // Add listener to auto-scroll when tab is clicked (after frame is built)
@@ -522,7 +523,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         },
                         tabs: const [
                           Tab(text: 'RSVP'),
-                          Tab(text: 'Typical Practices'),
+                          Tab(text: 'Groups'),
+                          Tab(text: 'About'),
                           Tab(text: 'Gallery'),
                           Tab(text: 'Forum'),
                         ],
@@ -533,7 +535,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                           controller: _tabController,
                           children: [
                             _buildRSVPTab(context),
-                            _buildTypicalPracticesTab(context),
+                            _buildGroupsTab(context),
+                            _buildAboutTab(context),
                             _buildGalleryTab(context),
                             _buildForumTab(context),
                           ],
@@ -761,65 +764,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  Widget _buildTypicalPracticesTab(BuildContext context) {
-    final typicalPractices = _getTypicalPractices();
-    
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Typical Practice Schedule',
-              style: AppTextStyles.headline3.copyWith(
-                fontSize: 20,
-              ),
-            ),
-            SizedBox(height: ResponsiveHelper.getSpacing(context)),
-            
-            // Single container for all practices
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16.0),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Practice items with dividers
-                  ...typicalPractices.asMap().entries.map((entry) {
-                    final index = entry.key;
-                    final practice = entry.value;
-                    final isLast = index == typicalPractices.length - 1;
-                    
-                    return Column(
-                      children: [
-                        _buildPracticeRow(practice),
-                        if (!isLast) ...[
-                          const SizedBox(height: 12),
-                          Divider(
-                            color: Colors.grey.shade200,
-                            thickness: 1,
-                            height: 1,
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      ],
-                    );
-                  }),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// Get typical/template practices for the club (same as used in bulk RSVP)
   List<Practice> _getTypicalPractices() {
     final typicalPractices = <Practice>[
@@ -889,112 +833,255 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     final dayName = _getDayName(practice.dateTime.weekday);
     final startTime = practice.dateTime;
     final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = '${_formatTime(startTime)} - ${_formatTime(endTime)}';
+    final timeStr = '${_formatTime(startTime)}-${_formatTime(endTime)}';
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Main row with day, time, and location
-        Row(
-          children: [
-            // Day text (no background)
-            Text(
-              dayName,
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.black,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surface.withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              // Day text (no background)
+              Text(
+                dayName,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Time
-            Text(
-              timeStr,
-              style: AppTextStyles.bodyMedium.copyWith(
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
+              const SizedBox(width: 8),
+              // Time range
+              Text(
+                timeStr,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.textPrimary,
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            // Separator
+              const SizedBox(width: 8),
+              // Separator
+              Text(
+                '•',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Location (clickable)
+              Expanded(
+                child: GestureDetector(
+                  onTap: () => _launchLocationUrl(practice.mapsUrl),
+                  child: Text(
+                    practice.location,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF0284C7), // Blue color to indicate it's clickable
+                      decoration: TextDecoration.underline,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+              // Practice tag
+              if (practice.tag != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(
+                      color: Colors.blue.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Text(
+                    practice.tag!,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.blue,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          // Practice description
+          if (practice.description.isNotEmpty) ...[
+            const SizedBox(height: 6),
             Text(
-              '•',
+              practice.description,
               style: TextStyle(
                 fontSize: 12,
-                color: AppColors.textSecondary.withValues(alpha: 0.6),
+                color: AppColors.textSecondary.withValues(alpha: 0.8),
+                fontStyle: FontStyle.italic,
               ),
             ),
-            const SizedBox(width: 8),
-            // Location (clickable)
-            Expanded(
-              child: GestureDetector(
-                onTap: () => _launchLocationUrl(practice.mapsUrl),
-                child: Text(
-                  practice.location,
-                  style: AppTextStyles.bodyMedium.copyWith(
-                    fontSize: 14,
-                    color: const Color(0xFF0284C7), // Blue color to indicate it's clickable
-                    decoration: TextDecoration.underline,
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGroupsTab(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.groups,
+              size: 48,
+              color: AppColors.textDisabled,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context)),
+            Text(
+              'Club Groups',
+              style: AppTextStyles.headline3.copyWith(
+                fontSize: 20,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 4.0)),
+            Text(
+              'Training groups and teams coming soon',
+              style: AppTextStyles.bodyMedium.copyWith(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAboutTab(BuildContext context) {
+    final typicalPractices = _getTypicalPractices();
+    
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Typical Practices Dropdown
+            Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  // Dropdown Header
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isTypicalPracticesExpanded = !_isTypicalPracticesExpanded;
+                      });
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          const Expanded(
+                            child: Text(
+                              'Typical weekly practices',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _isTypicalPracticesExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: AppColors.primary,
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
+                  
+                  // Expanded Schedule Details
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    height: _isTypicalPracticesExpanded ? null : 0,
+                    child: _isTypicalPracticesExpanded
+                        ? Column(
+                            children: [
+                              const SizedBox(height: 8),
+                              ...typicalPractices.map((practice) => _buildPracticeRow(practice)),
+                              const SizedBox(height: 16),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // About content placeholder
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.info_outline,
+                    size: 48,
+                    color: AppColors.textDisabled,
+                  ),
+                  SizedBox(height: ResponsiveHelper.getSpacing(context)),
+                  Text(
+                    'About ${widget.club.name}',
+                    style: AppTextStyles.headline3.copyWith(
+                      fontSize: 20,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 4.0)),
+                  Text(
+                    'Club information and history coming soon',
+                    style: AppTextStyles.bodyMedium.copyWith(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             ),
           ],
         ),
-        // Second row with description and tag
-        if (practice.tag != null || practice.description.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 8.0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Description text (left side)
-                if (practice.description.isNotEmpty) ...[
-                  Expanded(
-                    child: Text(
-                      practice.description,
-                      style: AppTextStyles.bodyMedium.copyWith(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.left,
-                    ),
-                  ),
-                ] else ...[
-                  // Empty space when no description
-                  const Expanded(child: SizedBox()),
-                ],
-                // Practice tag (right side)
-                if (practice.tag != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                        color: Colors.blue.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Text(
-                      practice.tag!,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.blue,
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 

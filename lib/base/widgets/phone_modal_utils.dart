@@ -368,7 +368,7 @@ class _PhoneFrameModalOverlayState<T> extends State<_PhoneFrameModalOverlay<T>>
                     elevation: 8,
                     child: Container(
                       constraints: const BoxConstraints(
-                        maxHeight: 400, // Reduced to fit in available space
+                        maxHeight: 500, // Increased to accommodate 2.5 practices without cutoff
                       ),
                       child: widget.child,
                     ),
