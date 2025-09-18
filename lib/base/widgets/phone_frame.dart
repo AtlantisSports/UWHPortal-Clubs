@@ -18,6 +18,7 @@ class PhoneFrame extends StatefulWidget {
 
 class PhoneFrameState extends State<PhoneFrame> {
   static PhoneFrameState? _instance;
+  static final List<PhoneFrameState> _allInstances = [];
   
   Widget? _overlayWidget;
 
@@ -25,43 +26,115 @@ class PhoneFrameState extends State<PhoneFrame> {
   void initState() {
     super.initState();
     _instance = this;
+    _allInstances.add(this);
+    // Clear any lingering overlay state when the widget is created
+    _overlayWidget = null;
+    debugPrint('PhoneFrame initState called, instance set to: $this (total instances: ${_allInstances.length})');
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Ensure instance is always current when dependencies change
+    _instance = this;
+    debugPrint('PhoneFrame didChangeDependencies - instance reset to: $this');
+    
+    // Also clear overlay when dependencies change (e.g., returning from navigation)
+    if (_overlayWidget != null) {
+      debugPrint('PhoneFrame didChangeDependencies - clearing overlay');
+      _overlayWidget = null;
+      if (mounted) {
+        setState(() {});
+      }
+    }
+  }
+
+  @override
+  void activate() {
+    super.activate();
+    // Restore instance when widget becomes active again (e.g., returning from navigation)
+    _instance = this;
+    debugPrint('PhoneFrame activate called, instance restored to: $this');
   }
 
   @override
   void dispose() {
+    _allInstances.remove(this);
     if (_instance == this) {
-      _instance = null;
+      // Find another active instance if available
+      _instance = _allInstances.isNotEmpty ? _allInstances.last : null;
     }
+    debugPrint('PhoneFrame dispose called, remaining instances: ${_allInstances.length}');
     super.dispose();
   }
   
   /// Show an overlay widget within the phone frame
   static void showOverlay(Widget overlay) {
     debugPrint('PhoneFrameState.showOverlay called');
-    final state = _instance;
-    debugPrint('Phone frame instance: $state');
-    if (state != null) {
+    var state = _instance;
+    debugPrint('Primary phone frame instance: $state');
+    
+    if (state != null && state.mounted) {
       state._showOverlay(overlay);
     } else {
-      debugPrint('Phone frame instance is null!');
+      debugPrint('Primary instance is null or not mounted, trying fallback');
+      // Try to find any mounted instance as fallback
+      for (var instance in _allInstances) {
+        if (instance.mounted) {
+          debugPrint('Using fallback instance: $instance');
+          _instance = instance; // Update primary instance
+          instance._showOverlay(overlay);
+          return;
+        }
+      }
+      debugPrint('No valid PhoneFrame instances found!');
     }
   }
   
   /// Hide the current overlay
   static void hideOverlay() {
     debugPrint('PhoneFrameState.hideOverlay called');
+    var state = _instance;
+    if (state != null && state.mounted) {
+      state._hideOverlay();
+    } else {
+      debugPrint('Primary instance not available for hiding overlay, trying fallback');
+      // Try to find any mounted instance with an overlay
+      for (var instance in _allInstances) {
+        if (instance.mounted && instance._overlayWidget != null) {
+          debugPrint('Using fallback instance for hiding: $instance');
+          _instance = instance; // Update primary instance
+          instance._hideOverlay();
+          return;
+        }
+      }
+      debugPrint('No instance with overlay found to hide');
+    }
+  }
+  
+  /// Force clear any overlay state (useful after navigation)
+  static void clearOverlayState() {
+    debugPrint('PhoneFrameState.clearOverlayState called');
     final state = _instance;
     if (state != null) {
-      state._hideOverlay();
+      state._clearOverlayState();
     }
   }
   
   void _showOverlay(Widget overlay) {
     debugPrint('_showOverlay called with overlay: $overlay');
+    debugPrint('Current overlay state: $_overlayWidget');
+    
+    // If we already have an overlay, force clear it first
+    if (_overlayWidget != null) {
+      debugPrint('Warning: Overlay already exists, clearing it first');
+      _overlayWidget = null;
+    }
+    
     setState(() {
       _overlayWidget = overlay;
     });
-        debugPrint('Overlay hidden, triggering rebuild');
+    debugPrint('Overlay shown, triggering rebuild');
   }
   
   void _hideOverlay() {
@@ -69,6 +142,14 @@ class PhoneFrameState extends State<PhoneFrame> {
     setState(() {
       _overlayWidget = null;
     });
+  }
+  
+  void _clearOverlayState() {
+    debugPrint('_clearOverlayState called');
+    _overlayWidget = null;
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   @override

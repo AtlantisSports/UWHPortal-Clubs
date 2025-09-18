@@ -136,18 +136,8 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () {
-              // Navigate back to Club Details page with proper mobile layout and app navigation
-              Navigator.of(context).pushReplacement(
-                MaterialPageRoute(
-                  builder: (context) => PhoneFrameWrapper(
-                    child: ClubDetailScreen(
-                      club: widget.club,
-                      currentUserId: widget.currentUserId,
-                      onParticipationChanged: widget.onParticipationChanged,
-                    ),
-                  ),
-                ),
-              );
+              // Simply pop back to the previous screen (club details)
+              Navigator.of(context).pop();
             },
           ),
           title: Text(

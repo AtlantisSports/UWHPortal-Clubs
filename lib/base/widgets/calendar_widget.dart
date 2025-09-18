@@ -8,6 +8,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/phone_modal_utils.dart';
+import '../../base/widgets/phone_frame.dart';
 
 enum PracticeStatus {
   attended,
@@ -658,7 +659,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     return InkWell(
                       onTap: () {
                         PhoneFrameModal.close(); // Close modal
-                        widget.onPracticeSelected?.call(practice);
+                        // Delay the callback to ensure modal is fully closed
+                        Future.microtask(() {
+                          widget.onPracticeSelected?.call(practice);
+                        });
                       },
                       child: Container(
                         padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
@@ -727,7 +731,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => PhoneFrameModal.close(),
                   child: Text(
                     'Cancel',
                     style: TextStyle(color: Colors.grey[600]),
