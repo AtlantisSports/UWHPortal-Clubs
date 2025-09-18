@@ -13,6 +13,7 @@ import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/level_filter_modal.dart';
+import '../bulk_rsvp/bulk_rsvp_screen.dart';
 import '../../core/utils/responsive_helper.dart';
 import 'practice_detail_screen.dart';
 // ...existing code...
@@ -704,26 +705,17 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bulk RSVP Button - Temporarily Disabled
+          // Bulk RSVP Button - Now Enabled
           SizedBox(
             width: double.infinity,
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              decoration: BoxDecoration(
-                color: Colors.grey.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Center(
-                child: Text(
-                  'Bulk RSVP (Under Development)',
-                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
-                ),
-              ),
-            ),
-            /*
             child: ElevatedButton(
               onPressed: () {
-                _showBulkRSVPModal(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => BulkRSVPScreen(clubId: widget.club.id),
+                  ),
+                );
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF0284C7),
@@ -741,7 +733,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ), */
+            ),
           ),
           
           const SizedBox(height: 16),
