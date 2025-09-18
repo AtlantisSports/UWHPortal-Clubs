@@ -4,7 +4,11 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/dependent_constants.dart';
+import 'multi_select_dropdown.dart';
+import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
+import 'phone_frame.dart';
 
 class GuestManagementModal extends StatefulWidget {
   final PracticeGuestList initialGuests;
@@ -27,6 +31,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   final Map<GuestType, bool> _expandedSections = {};
   final Map<GuestType, TextEditingController> _nameControllers = {};
   final Map<GuestType, bool> _waiverStates = {};
+  List<String> _selectedDependents = []; // For multiple dependent selections
   
   @override
   void initState() {
@@ -134,7 +139,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: () => PhoneFrameModal.close(),
+                    onPressed: () => PhoneFrameState.hideOverlay(),
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -143,7 +148,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                   child: ElevatedButton(
                     onPressed: () {
                       widget.onGuestsChanged(_guestList);
-                      PhoneFrameModal.close();
+                      // Try using PhoneFrameState.hideOverlay() directly
+                      PhoneFrameState.hideOverlay();
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -163,6 +169,11 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   Widget _buildGuestTypeSection(GuestType type) {
     final guests = _guestList.getGuestsByType(type);
     final isExpanded = _expandedSections[type] ?? false;
+    
+    // Debug logging
+    if (type == GuestType.dependent) {
+      print('Building ${type.displayName} section with ${guests.length} guests: ${guests.map((g) => g.name).toList()}');
+    }
     
     return Column(
       children: [
@@ -322,8 +333,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
             child: Container(
               padding: const EdgeInsets.all(4),
               child: const Icon(
-                Icons.close,
-                size: 16,
+                Icons.remove_circle,
+                size: 18,
                 color: Colors.red,
               ),
             ),
@@ -340,16 +351,26 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Name field
-        TextField(
-          controller: nameController,
-          decoration: InputDecoration(
-            labelText: type == GuestType.clubMember ? 'Select member' : 'Guest name',
-            border: OutlineInputBorder(),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        // Name field - use dependent selector for dependents, text field for others
+        if (type == GuestType.dependent)
+          DropdownUtils.createDependentSelector(
+            selectedDependents: _selectedDependents,
+            onDependentsChanged: (selected) {
+              setState(() {
+                _selectedDependents = selected;
+              });
+            },
+          )
+        else
+          TextField(
+            controller: nameController,
+            decoration: InputDecoration(
+              labelText: type == GuestType.clubMember ? 'Select member' : 'Guest name',
+              border: OutlineInputBorder(),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            ),
+            textCapitalization: TextCapitalization.words,
           ),
-          textCapitalization: TextCapitalization.words,
-        ),
         
         const SizedBox(height: 12),
         
@@ -387,9 +408,14 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
             const SizedBox(width: 8),
             Expanded(
               child: ElevatedButton(
-                onPressed: nameController.text.trim().isEmpty 
+                onPressed: (type == GuestType.dependent ? 
+                    _selectedDependents.isEmpty : 
+                    nameController.text.trim().isEmpty) 
                     ? null 
-                    : () => _addGuest(type),
+                    : () {
+                        print('Add button pressed for ${type.displayName} with ${_selectedDependents.length} dependents');
+                        _addGuest(type);
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
@@ -418,50 +444,74 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   
   void _addGuest(GuestType type) {
     final nameController = _nameControllers[type]!;
-    final name = nameController.text.trim();
     
-    if (name.isEmpty) return;
-    
-    final guestId = '${widget.practiceId}_${type.name}_${DateTime.now().millisecondsSinceEpoch}';
-    
-    Guest guest;
-    switch (type) {
-      case GuestType.newPlayer:
-        guest = NewPlayerGuest(
+    if (type == GuestType.dependent) {
+      // Handle multiple dependent selections
+      if (_selectedDependents.isEmpty) return;
+      
+      final waiverSigned = _waiverStates[type] ?? false;
+      
+      // Add each selected dependent as a separate guest
+      for (final dependentName in _selectedDependents) {
+        final guestId = '${widget.practiceId}_${type.name}_${dependentName}_${DateTime.now().millisecondsSinceEpoch}';
+        final guest = DependentGuest(
           id: guestId,
-          name: name,
-          waiverSigned: _waiverStates[type] ?? false,
+          name: dependentName,
+          waiverSigned: waiverSigned,
         );
-        break;
-      case GuestType.visitor:
-        guest = VisitorGuest(
-          id: guestId,
-          name: name,
-          waiverSigned: _waiverStates[type] ?? false,
-        );
-        break;
-      case GuestType.clubMember:
-        guest = ClubMemberGuest(
-          id: guestId,
-          name: name,
-          memberId: guestId, // Placeholder - would be actual member ID
-        );
-        break;
-      case GuestType.dependent:
-        guest = DependentGuest(
-          id: guestId,
-          name: name,
-          waiverSigned: _waiverStates[type] ?? false,
-        );
-        break;
+        _guestList = _guestList.addGuest(guest);
+        print('Added dependent guest: ${guest.name}, ID: ${guest.id}, Type: ${guest.type}');
+      }
+      
+      setState(() {
+        _waiverStates[type] = false;
+        _expandedSections[type] = false;
+        _selectedDependents.clear();
+        print('Current guest list has ${_guestList.totalGuests} guests');
+        print('Dependents in list: ${_guestList.getGuestsByType(GuestType.dependent).map((g) => g.name).toList()}');
+      });
+    } else {
+      // Handle single guest addition for other types
+      final name = nameController.text.trim();
+      if (name.isEmpty) return;
+      
+      final guestId = '${widget.practiceId}_${type.name}_${DateTime.now().millisecondsSinceEpoch}';
+      
+      Guest guest;
+      switch (type) {
+        case GuestType.newPlayer:
+          guest = NewPlayerGuest(
+            id: guestId,
+            name: name,
+            waiverSigned: _waiverStates[type] ?? false,
+          );
+          break;
+        case GuestType.visitor:
+          guest = VisitorGuest(
+            id: guestId,
+            name: name,
+            waiverSigned: _waiverStates[type] ?? false,
+          );
+          break;
+        case GuestType.clubMember:
+          guest = ClubMemberGuest(
+            id: guestId,
+            name: name,
+            memberId: guestId, // Placeholder - would be actual member ID
+          );
+          break;
+        case GuestType.dependent:
+          // This case is handled above
+          return;
+      }
+      
+      setState(() {
+        _guestList = _guestList.addGuest(guest);
+        nameController.clear();
+        _waiverStates[type] = false;
+        _expandedSections[type] = false;
+      });
     }
-    
-    setState(() {
-      _guestList = _guestList.addGuest(guest);
-      nameController.clear();
-      _waiverStates[type] = false;
-      _expandedSections[type] = false;
-    });
   }
   
   void _removeGuest(String guestId) {
@@ -475,6 +525,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       _nameControllers[type]!.clear();
       _waiverStates[type] = false;
       _expandedSections[type] = false;
+      if (type == GuestType.dependent) {
+        _selectedDependents.clear();
+      }
     });
   }
 }

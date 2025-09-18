@@ -8,12 +8,14 @@ class DependentManagementModal extends StatefulWidget {
   final List<String> availableDependents;
   final List<String> selectedDependents;
   final Function(List<String>) onDependentsChanged;
+  final VoidCallback? onClose;
   
   const DependentManagementModal({
     super.key,
     required this.availableDependents,
     required this.selectedDependents,
     required this.onDependentsChanged,
+    this.onClose,
   });
 
   @override
@@ -51,7 +53,13 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
                 ),
               ),
               IconButton(
-                onPressed: () => PhoneFrameModal.close(),
+                onPressed: () {
+                  if (widget.onClose != null) {
+                    widget.onClose!();
+                  } else {
+                    PhoneFrameModal.close();
+                  }
+                },
                 icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -109,7 +117,13 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => PhoneFrameModal.close(),
+                  onPressed: () {
+                    if (widget.onClose != null) {
+                      widget.onClose!();
+                    } else {
+                      PhoneFrameModal.close();
+                    }
+                  },
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -131,7 +145,12 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
                 child: ElevatedButton(
                   onPressed: () {
                     widget.onDependentsChanged(_selectedDependents);
-                    PhoneFrameModal.close();
+                    // Use Navigator.pop for dialog compatibility
+                    if (widget.onClose != null) {
+                      widget.onClose!();
+                    } else {
+                      PhoneFrameModal.close();
+                    }
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0284C7),

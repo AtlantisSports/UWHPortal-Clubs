@@ -8,6 +8,9 @@ import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
+import '../../core/constants/dependent_constants.dart';
+import 'multi_select_dropdown.dart';
+import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
 import 'phone_modal.dart';
 import '../../core/providers/participation_provider.dart';
@@ -42,18 +45,16 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   DateTime? _customStartDate;
   DateTime? _customEndDate;
   
+  // Dependent selection state
+  List<String> _selectedDependents = [];
+  
   // UI state
   bool _isLoading = false;
   final Map<String, bool> _expandedDescriptions = <String, bool>{};
   
   // Dependent state - Simpson family mock data
   bool _includeDependents = false;
-  final List<String> _selectedDependents = <String>[];
-  final List<String> _availableDependents = [
-    'Bart Simpson',
-    'Lisa Simpson', 
-    'Maggie Simpson',
-  ];
+  final List<String> _availableDependents = DependentConstants.availableDependents;
   
   // Toast state
   bool _showToast = false;
@@ -188,13 +189,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   List<Practice> _getFilteredPractices() {
     var practices = _getClubPractices();
     
-    // Apply location filter
-    if (_selectedLocations.isNotEmpty) {
+    // Apply location filter (skip if "All locations" is selected)
+    if (_selectedLocations.isNotEmpty && !_selectedLocations.contains('All locations')) {
       practices = practices.where((p) => _selectedLocations.contains(p.location)).toList();
     }
     
-    // Apply level filter
-    if (_selectedLevels.isNotEmpty) {
+    // Apply level filter (skip if "All levels" is selected)
+    if (_selectedLevels.isNotEmpty && !_selectedLevels.contains('All levels')) {
       practices = practices.where((p) => p.tag != null && _selectedLevels.contains(p.tag!)).toList();
     }
     
@@ -219,6 +220,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                 
                 // Practice List
                 _buildPracticeList(filteredPractices),
+                
+                // Dependent Selection Section
+                _buildDependentSelectionSection(),
                 
                 // Bottom Action Bar
                 _buildBottomActionBar(filteredPractices),
@@ -318,76 +322,26 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   Widget _buildLocationFilter() {
-    final displayText = _selectedLocations.isEmpty 
-        ? 'Any location' 
-        : _selectedLocations.length == 1 
-            ? _selectedLocations.first 
-            : '${_selectedLocations.length} locations';
-    
-    return InkWell(
-      onTap: () => _showLocationSelectionModal(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on, size: 16, color: Color(0xFF6B7280)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                displayText,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _selectedLocations.isEmpty 
-                      ? const Color(0xFF9CA3AF) 
-                      : const Color(0xFF374151),
-                ),
-              ),
-            ),
-            const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
-          ],
-        ),
-      ),
+    return DropdownUtils.createLocationFilter(
+      selectedLocations: _selectedLocations.toList(),
+      onLocationChanged: (selected) {
+        setState(() {
+          _selectedLocations = selected.toSet();
+        });
+      },
+      customLocations: _availableLocations,
     );
   }
   
   Widget _buildLevelFilter() {
-    final displayText = _selectedLevels.isEmpty 
-        ? 'Any level' 
-        : _selectedLevels.length == 1 
-            ? _selectedLevels.first 
-            : '${_selectedLevels.length} levels';
-    
-    return InkWell(
-      onTap: () => _showLevelSelectionModal(),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-          borderRadius: BorderRadius.circular(8),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.star, size: 16, color: Color(0xFF6B7280)),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Text(
-                displayText,
-                style: TextStyle(
-                  fontSize: 14,
-                  color: _selectedLevels.isEmpty 
-                      ? const Color(0xFF9CA3AF) 
-                      : const Color(0xFF374151),
-                ),
-              ),
-            ),
-            const Icon(Icons.arrow_drop_down, color: Color(0xFF6B7280)),
-          ],
-        ),
-      ),
+    return DropdownUtils.createLevelFilter(
+      selectedLevels: _selectedLevels.toList(),
+      onLevelChanged: (selected) {
+        setState(() {
+          _selectedLevels = selected.toSet();
+        });
+      },
+      customLevels: _availableLevels,
     );
   }
   
@@ -527,6 +481,71 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     );
   }
   
+  Widget _buildDependentSelectionSection() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(
+                Icons.family_restroom,
+                size: 20,
+                color: Color(0xFF0284C7),
+              ),
+              SizedBox(width: 8),
+              Text(
+                'Dependent Selection',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1F2937),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'Select dependents to include in bulk RSVP actions',
+            style: TextStyle(
+              fontSize: 14,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          const SizedBox(height: 16),
+          DropdownUtils.createNoneFilterDropdown(
+            label: 'Dependents',
+            items: DependentConstants.availableDependents,
+            selectedItems: _selectedDependents,
+            onSelectionChanged: (selected) {
+              setState(() {
+                _selectedDependents = selected;
+                // Automatically set _includeDependents based on selection
+                _includeDependents = selected.isNotEmpty && !selected.contains('None selected');
+              });
+            },
+            noneOptionText: 'None selected',
+            placeholder: 'Select dependents for bulk actions',
+          ),
+        ],
+      ),
+    );
+  }
+  
   Widget _buildBottomActionBar(List<Practice> filteredPractices) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -606,92 +625,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ],
           ),
-          
-          // Include dependents checkbox (shown when RSVP choice is made)
-          if (_selectedRSVPChoice != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 12.0),
-              child: Row(
-                children: [
-                  Transform.scale(
-                    scale: 0.9,
-                    child: Checkbox(
-                      value: _includeDependents,
-                      onChanged: (value) {
-                        setState(() {
-                          _includeDependents = value ?? false;
-                          if (!_includeDependents) {
-                            _selectedDependents.clear();
-                          }
-                        });
-                        
-                        // Automatically open dependent management modal when checkbox is checked
-                        if (_includeDependents) {
-                          // Use a small delay to ensure the UI state is updated first
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            _showDependentManagementModal();
-                          });
-                        }
-                      },
-                      activeColor: const Color(0xFF1B365D),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _includeDependents = !_includeDependents;
-                          if (!_includeDependents) {
-                            _selectedDependents.clear();
-                          }
-                        });
-                        
-                        // Automatically open dependent management modal when checkbox is checked
-                        if (_includeDependents) {
-                          // Use a small delay to ensure the UI state is updated first
-                          Future.delayed(const Duration(milliseconds: 100), () {
-                            _showDependentManagementModal();
-                          });
-                        }
-                      },
-                      child: Text(
-                        _includeDependents && _selectedDependents.isNotEmpty
-                            ? 'Include dependents (${_selectedDependents.length} selected)'
-                            : 'Include dependents',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF374151),
-                        ),
-                      ),
-                    ),
-                  ),
-                  if (_includeDependents)
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: () => _showDependentManagementModal(),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF1B365D),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Text(
-                            'Manage Dependents',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
           
           // Affected practices count (shown as soon as practices are selected)
           if (_selectedPracticeIds.isNotEmpty)
@@ -1195,8 +1128,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _selectedTimeframe = 'only_announced';
           _customStartDate = null;
           _customEndDate = null;
-          _selectedDependents.clear(); // Clear dependent selection
+          _selectedDependents = ['None selected']; // Reset to "None selected" state
           _includeDependents = false; // Reset include dependents checkbox
+          _selectedLocations.clear(); // Clear location filter
+          _selectedLevels.clear(); // Clear level filter
         });
       }
     } catch (error) {
@@ -1361,36 +1296,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     }
     
     return '$truncated...';
-  }
-
-  void _showLocationSelectionModal() {
-    PhoneModalUtils.showPhoneFrameModal(
-      context: context,
-      child: _LocationSelectionModal(
-        availableLocations: _availableLocations,
-        selectedLocations: Set<String>.from(_selectedLocations),
-        onSelectionChanged: (newSelection) {
-          setState(() {
-            _selectedLocations = newSelection;
-          });
-        },
-      ),
-    );
-  }
-
-  void _showLevelSelectionModal() {
-    PhoneModalUtils.showPhoneFrameModal(
-      context: context,
-      child: _LevelSelectionModal(
-        availableLevels: _availableLevels,
-        selectedLevels: Set<String>.from(_selectedLevels),
-        onSelectionChanged: (newSelection) {
-          setState(() {
-            _selectedLevels = newSelection;
-          });
-        },
-      ),
-    );
   }
 }
 
