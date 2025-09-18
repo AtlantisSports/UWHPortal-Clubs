@@ -27,10 +27,10 @@ class PhoneModalUtils {
     
     // Create modal content with backdrop and positioning
     final modalOverlay = _PhoneFrameModalOverlay<T>(
-      child: child,
       barrierDismissible: barrierDismissible,
       barrierColor: barrierColor ?? Colors.black54,
       onResult: closeModal,
+      child: child,
     );
     
     // Show using phone frame's overlay system
@@ -345,7 +345,7 @@ class _PhoneFrameModalOverlayState<T> extends State<_PhoneFrameModalOverlay<T>>
               right: 0,
               bottom: 48 + 56, // Above phone nav + app bottom nav (leave app nav visible)
               child: Container(
-                color: widget.barrierColor.withValues(alpha: widget.barrierColor.opacity * _animation.value),
+                color: widget.barrierColor.withValues(alpha: widget.barrierColor.a * _animation.value),
                 child: widget.barrierDismissible
                     ? GestureDetector(
                         onTap: () => _closeModal(),

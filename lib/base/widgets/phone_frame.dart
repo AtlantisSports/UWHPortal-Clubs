@@ -37,19 +37,19 @@ class PhoneFrameState extends State<PhoneFrame> {
   
   /// Show an overlay widget within the phone frame
   static void showOverlay(Widget overlay) {
-    print('DEBUG: PhoneFrameState.showOverlay called');
+    debugPrint('PhoneFrameState.showOverlay called');
     final state = _instance;
-    print('DEBUG: Phone frame instance: $state');
+    debugPrint('Phone frame instance: $state');
     if (state != null) {
       state._showOverlay(overlay);
     } else {
-      print('DEBUG: Phone frame instance is null!');
+      debugPrint('Phone frame instance is null!');
     }
   }
   
   /// Hide the current overlay
   static void hideOverlay() {
-    print('DEBUG: PhoneFrameState.hideOverlay called');
+    debugPrint('PhoneFrameState.hideOverlay called');
     final state = _instance;
     if (state != null) {
       state._hideOverlay();
@@ -57,15 +57,15 @@ class PhoneFrameState extends State<PhoneFrame> {
   }
   
   void _showOverlay(Widget overlay) {
-    print('DEBUG: _showOverlay called with overlay: $overlay');
+    debugPrint('_showOverlay called with overlay: $overlay');
     setState(() {
       _overlayWidget = overlay;
     });
-    print('DEBUG: Overlay set, triggering rebuild');
+        debugPrint('Overlay hidden, triggering rebuild');
   }
   
   void _hideOverlay() {
-    print('DEBUG: _hideOverlay called');
+    debugPrint('_hideOverlay called');
     setState(() {
       _overlayWidget = null;
     });

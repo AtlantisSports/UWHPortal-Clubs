@@ -10,7 +10,7 @@ import 'rsvp_components.dart';
 class PracticeCard extends StatelessWidget {
   final Practice practice;
   final String currentUserId;
-  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onParticipationChanged;
   final VoidCallback? onTap;
   final bool showRSVPSummary;
   
@@ -18,7 +18,7 @@ class PracticeCard extends StatelessWidget {
     super.key,
     required this.practice,
     required this.currentUserId,
-    this.onRSVPChanged,
+    this.onParticipationChanged,
     this.onTap,
     this.showRSVPSummary = true,
   });
@@ -167,7 +167,7 @@ class PracticeCard extends StatelessWidget {
                     RSVPIconButton(
                       status: userRSVPStatus,
                       onStatusChanged: (newStatus) {
-                        onRSVPChanged?.call(practice.id, newStatus);
+                        onParticipationChanged?.call(practice.id, newStatus);
                       },
                       size: 60, // Slightly smaller than portal-rsvp-demo for card layout
                     ),
@@ -202,14 +202,14 @@ class PracticeCard extends StatelessWidget {
 class PracticeListItem extends StatelessWidget {
   final Practice practice;
   final String currentUserId;
-  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onParticipationChanged;
   final VoidCallback? onTap;
   
   const PracticeListItem({
     super.key,
     required this.practice,
     required this.currentUserId,
-    this.onRSVPChanged,
+    this.onParticipationChanged,
     this.onTap,
   });
   
@@ -251,7 +251,7 @@ class PracticeListItem extends StatelessWidget {
         ? RSVPIconButton(
             status: userRSVPStatus,
             onStatusChanged: (newStatus) {
-              onRSVPChanged?.call(practice.id, newStatus);
+              onParticipationChanged?.call(practice.id, newStatus);
             },
             size: 40, // Small size for list item
           )

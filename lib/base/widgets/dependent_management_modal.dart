@@ -2,7 +2,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import '../../core/constants/app_constants.dart';
 import 'phone_modal_utils.dart';
 
 class DependentManagementModal extends StatefulWidget {

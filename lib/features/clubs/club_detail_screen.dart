@@ -20,14 +20,14 @@ import 'practice_detail_screen.dart';
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
   final String currentUserId;
-  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onParticipationChanged;
   final VoidCallback? onBackPressed;
   
   const ClubDetailScreen({
     super.key,
     required this.club,
     required this.currentUserId,
-    this.onRSVPChanged,
+    this.onParticipationChanged,
     this.onBackPressed,
   });
   
@@ -146,7 +146,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           practice: practice,
           club: widget.club,
           currentUserId: widget.currentUserId,
-          onRSVPChanged: (practiceId, status) {
+          onParticipationChanged: (practiceId, status) {
             // Handle RSVP changes if needed
           },
         ),
@@ -464,15 +464,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                         PracticeRSVPCard(
                           practice: nextPractice,
                           clubId: widget.club.id,
-                          onRSVPChanged: (status) {
-                            final participationStatus = status as ParticipationStatus;
+                          onParticipationChanged: (status) {
                             // Show toast when RSVP changes
-                            String message = 'RSVP updated to: ${participationStatus.displayText}';
-                            Color toastColor = participationStatus.color;
-                            if (participationStatus == ParticipationStatus.maybe) {
+                            String message = 'RSVP updated to: ${status.displayText}';
+                            Color toastColor = status.color;
+                            if (status == ParticipationStatus.maybe) {
                               _showCustomToast(message, toastColor, Icons.help);
                             } else {
-                              _showCustomToast(message, toastColor, participationStatus.overlayIcon);
+                              _showCustomToast(message, toastColor, status.overlayIcon);
                             }
                           },
                           onLocationTap: _handleLocationTap,
@@ -711,7 +710,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             child: Container(
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: BoxDecoration(
-                color: Colors.grey.withOpacity(0.3),
+                color: Colors.grey.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Center(

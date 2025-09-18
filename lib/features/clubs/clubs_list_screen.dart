@@ -140,7 +140,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           practice: practice,
           club: club,
           currentUserId: _currentUserId,
-          onRSVPChanged: (practiceId, status) {
+          onParticipationChanged: (practiceId, status) {
             _handleRSVPChange(practiceId, status);
           },
         ),
@@ -255,7 +255,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       return ClubDetailScreen(
         club: _selectedClub!,
         currentUserId: _currentUserId,
-        onRSVPChanged: _handleRSVPChange,
+        onParticipationChanged: _handleRSVPChange,
         onBackPressed: _navigateBackToList,
       );
     }
@@ -377,7 +377,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                           itemBuilder: (context, index) {
                             final club = clubsProvider.clubs[index];
                             final nextPractice = _getNextPractice(club);
-                            final currentRSVP = nextPractice != null 
+                            final currentParticipationStatus = nextPractice != null 
                                 ? nextPractice.getParticipationStatus(_currentUserId)
                                 : ParticipationStatus.blank;
                             
@@ -386,10 +386,10 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               location: club.location,
                               logoUrl: club.logoUrl,
                               nextPractice: nextPractice,
-                              currentRSVP: currentRSVP,
+                              currentParticipationStatus: currentParticipationStatus,
                               allPractices: _getTypicalPractices(club), // Use typical practices instead of upcoming
                               clubId: club.id, // Pass clubId for RSVP synchronization
-                              onRSVPChanged: (status) {
+                              onParticipationChanged: (status) {
                                 if (nextPractice != null) {
                                   _handleRSVPChange(nextPractice.id, status);
                                 }

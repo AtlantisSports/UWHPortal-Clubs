@@ -7,7 +7,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../base/widgets/level_filter_modal.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 
 enum PracticeStatus {

@@ -61,9 +61,9 @@ class ClubCard extends StatefulWidget {
   final String location;
   final String? logoUrl;
   final Practice? nextPractice;
-  final ParticipationStatus? currentRSVP;
+  final ParticipationStatus? currentParticipationStatus;
   final List<Practice> allPractices; // Add this to show typical weekly schedule
-  final Function(ParticipationStatus)? onRSVPChanged;
+  final Function(ParticipationStatus)? onParticipationChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
   final VoidCallback? onPracticeInfoTap; // Add callback for practice info
@@ -75,9 +75,9 @@ class ClubCard extends StatefulWidget {
     required this.location,
     this.logoUrl,
     this.nextPractice,
-    this.currentRSVP,
+    this.currentParticipationStatus,
     this.allPractices = const [],
-    this.onRSVPChanged,
+    this.onParticipationChanged,
     this.onTap,
     this.onLocationTap,
     this.onPracticeInfoTap,
@@ -160,8 +160,8 @@ class _ClubCardState extends State<ClubCard> {
             PracticeRSVPCard(
               practice: widget.nextPractice!,
               clubId: widget.clubId,
-              currentRSVP: widget.currentRSVP,
-              onRSVPChanged: widget.onRSVPChanged ?? (_) {},
+              currentParticipationStatus: widget.currentParticipationStatus,
+              onParticipationChanged: widget.onParticipationChanged ?? (_) {},
               onLocationTap: widget.onLocationTap,
               onInfoTap: widget.onPracticeInfoTap,
             ),

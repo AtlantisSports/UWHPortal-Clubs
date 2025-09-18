@@ -305,8 +305,8 @@ class RSVPSummary extends StatelessWidget {
 class PracticeRSVPCard extends StatefulWidget {
   final Practice practice;
   final String? clubId; // Add clubId for RSVP updates
-  final ParticipationStatus? currentRSVP; // Keep for backward compatibility
-  final Function(ParticipationStatus)? onRSVPChanged; // Keep for backward compatibility
+  final ParticipationStatus? currentParticipationStatus; // Optional override of participation status
+  final Function(ParticipationStatus)? onParticipationChanged; // Callback when participation changes
   final VoidCallback? onLocationTap;
   final VoidCallback? onInfoTap; // Add callback for info icon
   
@@ -314,8 +314,8 @@ class PracticeRSVPCard extends StatefulWidget {
     super.key,
     required this.practice,
     this.clubId,
-    this.currentRSVP,
-    this.onRSVPChanged,
+    this.currentParticipationStatus,
+    this.onParticipationChanged,
     this.onLocationTap,
     this.onInfoTap,
   });
@@ -330,7 +330,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     return Consumer<ParticipationProvider>(
       builder: (context, participationProvider, child) {
         // Get current participation status from provider, fallback to widget parameter
-        final currentRSVP = participationProvider.getParticipationStatus(widget.practice.id);
+        final currentParticipationStatus = participationProvider.getParticipationStatus(widget.practice.id);
         // Get guest data from provider
         final guestList = participationProvider.getPracticeGuests(widget.practice.id);
         final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
@@ -362,11 +362,11 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   Expanded(
                     child: Center(
                       child: Text(
-                        _getRSVPHeaderText(currentRSVP),
+                        _getParticipationHeaderText(currentParticipationStatus),
                         style: TextStyle(
                           fontSize: 17, // Increased from 12 to 17 (12 + 5)
-                          fontWeight: (currentRSVP == ParticipationStatus.yes || currentRSVP == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
-                          color: _getRSVPHeaderColor(currentRSVP),
+                          fontWeight: (currentParticipationStatus == ParticipationStatus.yes || currentParticipationStatus == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                          color: _getParticipationHeaderColor(currentParticipationStatus),
                         ),
                       ),
                     ),
@@ -483,18 +483,18 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   // RSVP buttons
                   Row(
                     children: [
-                      _buildRSVPButton(ParticipationStatus.yes, currentRSVP, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.yes, currentParticipationStatus, participationProvider),
                       const SizedBox(width: 8),
-                      _buildRSVPButton(ParticipationStatus.maybe, currentRSVP, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.maybe, currentParticipationStatus, participationProvider),
                       const SizedBox(width: 8),
-                      _buildRSVPButton(ParticipationStatus.no, currentRSVP, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.no, currentParticipationStatus, participationProvider),
                     ],
                   ),
                 ],
               ),
               
               // Bring a guest section (only show if user selected "Yes")
-              if (currentRSVP == ParticipationStatus.yes) ...[
+              if (currentParticipationStatus == ParticipationStatus.yes) ...[
                 const SizedBox(height: 12),
                 _buildGuestSection(participationProvider, bringGuest, guestList),
               ],
@@ -605,15 +605,15 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     );
   }
   
-  Widget _buildRSVPButton(ParticipationStatus status, ParticipationStatus currentRSVP, ParticipationProvider participationProvider) {
-    final isSelected = currentRSVP == status;
+  Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
+    final isSelected = currentParticipationStatus == status;
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
     
     return GestureDetector(
       onTap: () async {
         // Only change if clicking a different option
-        if (currentRSVP != status) {
+        if (currentParticipationStatus != status) {
           try {
             // Use ParticipationProvider for centralized state management
             if (widget.clubId != null) {
@@ -621,7 +621,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
             }
             
             // Call legacy callback if provided for backward compatibility
-            widget.onRSVPChanged?.call(status);
+            widget.onParticipationChanged?.call(status);
           } catch (error) {
             // Show error toast if RSVP update fails
             if (mounted) {
@@ -688,8 +688,8 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     }
   }
 
-  String _getRSVPHeaderText(ParticipationStatus? currentRSVP) {
-    switch (currentRSVP) {
+  String _getParticipationHeaderText(ParticipationStatus? currentParticipationStatus) {
+    switch (currentParticipationStatus) {
       case ParticipationStatus.yes:
         return 'You are going';
       case ParticipationStatus.no:
@@ -707,8 +707,8 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     }
   }
 
-  Color _getRSVPHeaderColor(ParticipationStatus? currentRSVP) {
-    switch (currentRSVP) {
+  Color _getParticipationHeaderColor(ParticipationStatus? currentParticipationStatus) {
+    switch (currentParticipationStatus) {
       case ParticipationStatus.yes:
         return AppColors.success; // Green
       case ParticipationStatus.no:
