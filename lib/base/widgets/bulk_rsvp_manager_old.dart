@@ -9,7 +9,7 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import 'phone_modal_utils.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'phone_modal_utils.dart';
 
@@ -37,8 +37,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   // Selection state
   final Set<String> _selectedPracticeIds = <String>{};
   
-  // New RSVP interface state
-  RSVPStatus? _selectedRSVPChoice; // YES or NO selection
+  // New participation interface state
+  ParticipationStatus? _selectedRSVPChoice; // YES or NO selection
   String _selectedTimeframe = 'only_announced'; // 'only_announced', 'custom', 'all_future'
   DateTime? _customStartDate;
   DateTime? _customEndDate;

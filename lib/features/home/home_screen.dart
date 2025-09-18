@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
-import '../bulk_rsvp/bulk_rsvp_screen.dart';
 
-/// Home screen placeholder matching UWH Portal design with bulk RSVP access
+/// Home screen placeholder matching UWH Portal design
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
@@ -89,15 +88,28 @@ class HomeScreen extends StatelessWidget {
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const BulkRSVPScreen(),
-                        ),
-                      );
-                    },
+                  // Temporarily disabled - Bulk RSVP feature under migration
+                  // ElevatedButton(
+                  //   onPressed: () {
+                  //     Navigator.push(
+                  //       context,
+                  //       MaterialPageRoute(
+                  //         builder: (context) => const BulkRSVPScreen(),
+                  //       ),
+                  //     );
+                  //   },
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.3),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      'Bulk RSVP (Under Development)',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                  /*
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF0284C7),
                       foregroundColor: Colors.white,
@@ -110,7 +122,7 @@ class HomeScreen extends StatelessWidget {
                       'Try Bulk RSVP',
                       style: TextStyle(fontWeight: FontWeight.w500),
                     ),
-                  ),
+                  ), */
                 ],
               ),
             ),

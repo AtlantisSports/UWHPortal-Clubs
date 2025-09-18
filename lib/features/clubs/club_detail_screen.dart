@@ -7,13 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/level_filter_modal.dart';
-import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../core/utils/responsive_helper.dart';
 import 'practice_detail_screen.dart';
 // ...existing code...
@@ -21,7 +20,7 @@ import 'practice_detail_screen.dart';
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
   final String currentUserId;
-  final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
   final VoidCallback? onBackPressed;
   
   const ClubDetailScreen({
@@ -43,7 +42,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
   final bool _isMember = false;
   bool _isLoading = false;
-  bool _showingBulkRSVP = false;
+  bool _showingBulkRSVP = false; // Temporarily disabled
   bool _isShowingLevelFilterModal = false;
   
   // Toast state
@@ -121,22 +120,23 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     return upcomingPractices.first;
   }
 
-  void _showBulkRSVPModal(BuildContext context) {
-    setState(() {
-      _showingBulkRSVP = true;
-    });
-  }
+  // Temporarily disabled bulk RSVP functionality
+  // void _showBulkRSVPModal(BuildContext context) {
+  //   setState(() {
+  //     _showingBulkRSVP = true;
+  //   });
+  // }
 
-  Widget _buildBulkRSVPContent() {
-    return BulkRSVPManager(
-      club: widget.club,
-      onCancel: () {
-        setState(() {
-          _showingBulkRSVP = false;
-        });
-      },
-    );
-  }
+  // Widget _buildBulkRSVPContent() {
+  //   return BulkRSVPManager(
+  //     club: widget.club,
+  //     onCancel: () {
+  //       setState(() {
+  //         _showingBulkRSVP = false;
+  //       });
+  //     },
+  //   );
+  // }
 
   void _handlePracticeSelected(Practice practice) {
     // Navigate to separate Practice Detail Screen
@@ -347,7 +347,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ],
       ),
       body: _showingBulkRSVP 
-          ? _buildBulkRSVPContent()
+          ? Container() // Temporarily disabled during migration
           : SingleChildScrollView(
         controller: _scrollController,
         child: Column(
@@ -442,12 +442,12 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
                   
                   // Next Practice Section
-                  Consumer<RSVPProvider>(builder: (context, rsvpProvider, child) {
+                  Consumer<ParticipationProvider>(builder: (context, participationProvider, child) {
                     final nextPractice = _getNextPractice();
                     if (nextPractice == null) return const SizedBox.shrink();
                     
-                    // Initialize RSVP status if needed
-                    rsvpProvider.initializePracticeRSVP(nextPractice);
+                    // Initialize participation status if needed
+                    participationProvider.initializePracticeParticipation(nextPractice);
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -465,13 +465,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                           practice: nextPractice,
                           clubId: widget.club.id,
                           onRSVPChanged: (status) {
+                            final participationStatus = status as ParticipationStatus;
                             // Show toast when RSVP changes
-                            String message = 'RSVP updated to: ${status.displayText}';
-                            Color toastColor = status.color;
-                            if (status == RSVPStatus.maybe) {
+                            String message = 'RSVP updated to: ${participationStatus.displayText}';
+                            Color toastColor = participationStatus.color;
+                            if (participationStatus == ParticipationStatus.maybe) {
                               _showCustomToast(message, toastColor, Icons.help);
                             } else {
-                              _showCustomToast(message, toastColor, status.overlayIcon);
+                              _showCustomToast(message, toastColor, participationStatus.overlayIcon);
                             }
                           },
                           onLocationTap: _handleLocationTap,
@@ -704,9 +705,23 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Bulk RSVP Button
+          // Bulk RSVP Button - Temporarily Disabled
           SizedBox(
             width: double.infinity,
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Center(
+                child: Text(
+                  'Bulk RSVP (Under Development)',
+                  style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+                ),
+              ),
+            ),
+            /*
             child: ElevatedButton(
               onPressed: () {
                 _showBulkRSVPModal(context);
@@ -727,19 +742,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   fontWeight: FontWeight.w600,
                 ),
               ),
-            ),
+            ), */
           ),
           
           const SizedBox(height: 16),
           
           // Practice Calendar
           Expanded(
-            child: Consumer<RSVPProvider>(
-              builder: (context, rsvpProvider, child) {
+            child: Consumer<ParticipationProvider>(
+              builder: (context, participationProvider, child) {
                 return PracticeCalendar(
                   club: widget.club,
                   onPracticeSelected: _handlePracticeSelected,
-                  rsvpProvider: rsvpProvider,
+                  participationProvider: participationProvider,
                   onShowLevelFilter: _showLevelFilterModal,
                 );
               },

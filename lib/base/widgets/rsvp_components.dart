@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/guest.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'guest_management_modal.dart';
 import 'phone_modal_utils.dart';
@@ -12,8 +12,8 @@ import 'phone_modal_utils.dart';
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
 class RSVPIconButton extends StatefulWidget {
-  final RSVPStatus status;
-  final Function(RSVPStatus) onStatusChanged;
+  final ParticipationStatus status;
+  final Function(ParticipationStatus) onStatusChanged;
   final double size;
   final bool enabled;
   
@@ -64,20 +64,25 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
       _animationController.reverse();
     });
     
-    // Cycle through RSVP statuses: pending → yes → maybe → no → pending
-    RSVPStatus nextStatus;
+    // Cycle through participation statuses: blank → yes → maybe → no → blank
+    ParticipationStatus nextStatus;
     switch (widget.status) {
-      case RSVPStatus.pending:
-        nextStatus = RSVPStatus.yes;
+      case ParticipationStatus.blank:
+        nextStatus = ParticipationStatus.yes;
         break;
-      case RSVPStatus.yes:
-        nextStatus = RSVPStatus.maybe;
+      case ParticipationStatus.yes:
+        nextStatus = ParticipationStatus.maybe;
         break;
-      case RSVPStatus.maybe:
-        nextStatus = RSVPStatus.no;
+      case ParticipationStatus.maybe:
+        nextStatus = ParticipationStatus.no;
         break;
-      case RSVPStatus.no:
-        nextStatus = RSVPStatus.pending;
+      case ParticipationStatus.no:
+        nextStatus = ParticipationStatus.blank;
+        break;
+      case ParticipationStatus.attended:
+      case ParticipationStatus.missed:
+        // Admin-only states - don't allow cycling from user interface
+        nextStatus = widget.status;
         break;
     }
     
@@ -85,11 +90,11 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
   }
   
   Widget _buildStatusContent() {
-    if (widget.status == RSVPStatus.pending) {
+    if (widget.status == ParticipationStatus.blank) {
       return const SizedBox.shrink();
     }
     
-    if (widget.status == RSVPStatus.maybe) {
+    if (widget.status == ParticipationStatus.maybe) {
       // Try plain question mark icon first (option 3)
       return Icon(
         Icons.question_mark,
@@ -136,14 +141,14 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: widget.status == RSVPStatus.maybe 
+                        color: widget.status == ParticipationStatus.maybe 
                           ? widget.status.color  // Same as other options
                           : (widget.enabled 
                             ? widget.status.color 
                             : Colors.grey),
-                        width: widget.status == RSVPStatus.pending ? 2 : 4, // Thicker when selected
+                        width: widget.status == ParticipationStatus.blank ? 2 : 4, // Thicker when selected
                       ),
-                      color: widget.status == RSVPStatus.pending 
+                      color: widget.status == ParticipationStatus.blank 
                         ? Colors.transparent 
                         : widget.status.color.withValues(alpha: 0.1), // Light background when selected
                     ),
@@ -163,7 +168,7 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
 
 /// Compact RSVP display showing status with smaller icon
 class RSVPStatusDisplay extends StatelessWidget {
-  final RSVPStatus status;
+  final ParticipationStatus status;
   final double size;
   
   const RSVPStatusDisplay({
@@ -186,17 +191,17 @@ class RSVPStatusDisplay extends StatelessWidget {
               color: status.color,
               width: 2,
             ),
-            color: status == RSVPStatus.pending 
+            color: status == ParticipationStatus.blank 
               ? Colors.transparent 
               : status.color.withValues(alpha: 0.1),
           ),
-          child: status == RSVPStatus.pending
+          child: status == ParticipationStatus.blank
               ? null
               : Icon(
-                  status == RSVPStatus.maybe
+                  status == ParticipationStatus.maybe
                       ? Icons.question_mark  // Plain question mark for maybe option
                       : status.overlayIcon,
-                  size: status == RSVPStatus.maybe 
+                  size: status == ParticipationStatus.maybe 
                       ? size * 0.7  // Smaller question mark
                       : (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
                   color: status.color,
@@ -218,7 +223,7 @@ class RSVPStatusDisplay extends StatelessWidget {
 
 /// RSVP summary showing counts for each status
 class RSVPSummary extends StatelessWidget {
-  final Map<RSVPStatus, int> counts;
+  final Map<ParticipationStatus, int> counts;
   final int totalInvited;
   
   const RSVPSummary({
@@ -239,21 +244,21 @@ class RSVPSummary extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildStatusCount(RSVPStatus.yes, counts[RSVPStatus.yes] ?? 0),
-          _buildStatusCount(RSVPStatus.maybe, counts[RSVPStatus.maybe] ?? 0),
-          _buildStatusCount(RSVPStatus.no, counts[RSVPStatus.no] ?? 0),
-          _buildStatusCount(RSVPStatus.pending, counts[RSVPStatus.pending] ?? 0),
+          _buildStatusCount(ParticipationStatus.yes, counts[ParticipationStatus.yes] ?? 0),
+          _buildStatusCount(ParticipationStatus.maybe, counts[ParticipationStatus.maybe] ?? 0),
+          _buildStatusCount(ParticipationStatus.no, counts[ParticipationStatus.no] ?? 0),
+          _buildStatusCount(ParticipationStatus.blank, counts[ParticipationStatus.blank] ?? 0),
         ],
       ),
     );
   }
   
-  Widget _buildStatusCount(RSVPStatus status, int count) {
+  Widget _buildStatusCount(ParticipationStatus status, int count) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(
-          status == RSVPStatus.pending ? Icons.star_border : Icons.star,
+          status == ParticipationStatus.blank ? Icons.star_border : Icons.star,
           color: status.color,
           size: 20,
         ),
@@ -277,16 +282,20 @@ class RSVPSummary extends StatelessWidget {
     );
   }
   
-  String _getStatusLabel(RSVPStatus status) {
+  String _getStatusLabel(ParticipationStatus status) {
     switch (status) {
-      case RSVPStatus.yes:
+      case ParticipationStatus.yes:
         return 'Yes';
-      case RSVPStatus.maybe:
+      case ParticipationStatus.maybe:
         return 'Maybe';
-      case RSVPStatus.no:
+      case ParticipationStatus.no:
         return 'No';
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return 'Pending';
+      case ParticipationStatus.attended:
+        return 'Attended';
+      case ParticipationStatus.missed:
+        return 'Missed';
     }
   }
 }
@@ -296,8 +305,8 @@ class RSVPSummary extends StatelessWidget {
 class PracticeRSVPCard extends StatefulWidget {
   final Practice practice;
   final String? clubId; // Add clubId for RSVP updates
-  final RSVPStatus? currentRSVP; // Keep for backward compatibility
-  final Function(RSVPStatus)? onRSVPChanged; // Keep for backward compatibility
+  final ParticipationStatus? currentRSVP; // Keep for backward compatibility
+  final Function(ParticipationStatus)? onRSVPChanged; // Keep for backward compatibility
   final VoidCallback? onLocationTap;
   final VoidCallback? onInfoTap; // Add callback for info icon
   
@@ -318,13 +327,13 @@ class PracticeRSVPCard extends StatefulWidget {
 class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   @override
   Widget build(BuildContext context) {
-    return Consumer<RSVPProvider>(
-      builder: (context, rsvpProvider, child) {
-        // Get current RSVP status from provider, fallback to widget parameter
-        final currentRSVP = rsvpProvider.getRSVPStatus(widget.practice.id);
+    return Consumer<ParticipationProvider>(
+      builder: (context, participationProvider, child) {
+        // Get current participation status from provider, fallback to widget parameter
+        final currentRSVP = participationProvider.getParticipationStatus(widget.practice.id);
         // Get guest data from provider
-        final guestList = rsvpProvider.getPracticeGuests(widget.practice.id);
-        final bringGuest = rsvpProvider.getBringGuestState(widget.practice.id);
+        final guestList = participationProvider.getPracticeGuests(widget.practice.id);
+        final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
         
         return Container(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
@@ -356,7 +365,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                         _getRSVPHeaderText(currentRSVP),
                         style: TextStyle(
                           fontSize: 17, // Increased from 12 to 17 (12 + 5)
-                          fontWeight: (currentRSVP == RSVPStatus.yes || currentRSVP == RSVPStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                          fontWeight: (currentRSVP == ParticipationStatus.yes || currentRSVP == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
                           color: _getRSVPHeaderColor(currentRSVP),
                         ),
                       ),
@@ -474,20 +483,20 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                   // RSVP buttons
                   Row(
                     children: [
-                      _buildRSVPButton(RSVPStatus.yes, currentRSVP, rsvpProvider),
+                      _buildRSVPButton(ParticipationStatus.yes, currentRSVP, participationProvider),
                       const SizedBox(width: 8),
-                      _buildRSVPButton(RSVPStatus.maybe, currentRSVP, rsvpProvider),
+                      _buildRSVPButton(ParticipationStatus.maybe, currentRSVP, participationProvider),
                       const SizedBox(width: 8),
-                      _buildRSVPButton(RSVPStatus.no, currentRSVP, rsvpProvider),
+                      _buildRSVPButton(ParticipationStatus.no, currentRSVP, participationProvider),
                     ],
                   ),
                 ],
               ),
               
               // Bring a guest section (only show if user selected "Yes")
-              if (currentRSVP == RSVPStatus.yes) ...[
+              if (currentRSVP == ParticipationStatus.yes) ...[
                 const SizedBox(height: 12),
-                _buildGuestSection(rsvpProvider, bringGuest, guestList),
+                _buildGuestSection(participationProvider, bringGuest, guestList),
               ],
             ],
           ),
@@ -496,7 +505,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     );
   }
   
-  Widget _buildGuestSection(RSVPProvider rsvpProvider, bool bringGuest, PracticeGuestList guestList) {
+  Widget _buildGuestSection(ParticipationProvider participationProvider, bool bringGuest, PracticeGuestList guestList) {
     return Container(
       padding: const EdgeInsets.all(6), // Reduced from 12 to 6 (50% reduction)
       decoration: BoxDecoration(
@@ -514,16 +523,16 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                 value: bringGuest,
                 onChanged: (value) {
                   final newBringGuest = value ?? false;
-                  rsvpProvider.updateBringGuestState(widget.practice.id, newBringGuest);
+                  participationProvider.updateBringGuestState(widget.practice.id, newBringGuest);
                   
                   if (!newBringGuest) {
                     // Clear guests if not bringing any
-                    rsvpProvider.updatePracticeGuests(widget.practice.id, []);
+                    participationProvider.updatePracticeGuests(widget.practice.id, []);
                   } else {
                     // Automatically open guest modal when checkbox is checked
                     // Use a small delay to ensure the UI state is updated first
                     Future.delayed(const Duration(milliseconds: 100), () {
-                      _showGuestManagementModal(rsvpProvider, guestList);
+                      _showGuestManagementModal(participationProvider, guestList);
                     });
                   }
                 },
@@ -544,7 +553,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: () => _showGuestManagementModal(rsvpProvider, guestList),
+                    onTap: () => _showGuestManagementModal(participationProvider, guestList),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -582,21 +591,21 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
     );
   }
   
-  void _showGuestManagementModal(RSVPProvider rsvpProvider, PracticeGuestList guestList) {
+  void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
     PhoneModalUtils.showPhoneFrameModal(
       context: context,
       child: GuestManagementModal(
         initialGuests: guestList,
         onGuestsChanged: (newGuestList) {
           // Update provider with new guest data
-          rsvpProvider.updatePracticeGuests(widget.practice.id, newGuestList.guests);
+          participationProvider.updatePracticeGuests(widget.practice.id, newGuestList.guests);
         },
         practiceId: widget.practice.id,
       ),
     );
   }
   
-  Widget _buildRSVPButton(RSVPStatus status, RSVPStatus currentRSVP, RSVPProvider rsvpProvider) {
+  Widget _buildRSVPButton(ParticipationStatus status, ParticipationStatus currentRSVP, ParticipationProvider participationProvider) {
     final isSelected = currentRSVP == status;
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
@@ -606,9 +615,9 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
         // Only change if clicking a different option
         if (currentRSVP != status) {
           try {
-            // Use RSVPProvider for centralized state management
+            // Use ParticipationProvider for centralized state management
             if (widget.clubId != null) {
-              await rsvpProvider.updateRSVP(widget.clubId!, widget.practice.id, status);
+              await participationProvider.updateParticipationStatus(widget.clubId!, widget.practice.id, status);
             }
             
             // Call legacy callback if provided for backward compatibility
@@ -653,7 +662,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
             ),
             child: Icon(
               _getOverlayIcon(status),
-              size: status == RSVPStatus.maybe 
+              size: status == ParticipationStatus.maybe 
                   ? 20.8 // Increased by 10% (18.954 * 1.1 = 20.8)
                   : 25.7, // Increased by 10% (23.4 * 1.1 = 25.7)
               color: color,
@@ -662,59 +671,75 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
         ),
       ),
     );
-  }  Color _getFadedBackground(RSVPStatus status) {
+  }  Color _getFadedBackground(ParticipationStatus status) {
     switch (status) {
-      case RSVPStatus.yes:
+      case ParticipationStatus.yes:
         return const Color(0xFFECFDF5);
-      case RSVPStatus.maybe:
+      case ParticipationStatus.maybe:
         return const Color(0xFFFFFBEB);
-      case RSVPStatus.no:
+      case ParticipationStatus.no:
         return const Color(0xFFFEF2F2);
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return const Color(0xFFF3F4F6);
+      case ParticipationStatus.attended:
+        return const Color(0xFFECFDF5);
+      case ParticipationStatus.missed:
+        return const Color(0xFFFEF2F2);
     }
   }
 
-  String _getRSVPHeaderText(RSVPStatus? currentRSVP) {
+  String _getRSVPHeaderText(ParticipationStatus? currentRSVP) {
     switch (currentRSVP) {
-      case RSVPStatus.yes:
+      case ParticipationStatus.yes:
         return 'You are going';
-      case RSVPStatus.no:
+      case ParticipationStatus.no:
         return 'Not going';
-      case RSVPStatus.maybe:
+      case ParticipationStatus.maybe:
         return 'Will you attend?';
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return 'Will you attend?';
+      case ParticipationStatus.attended:
+        return 'You attended';
+      case ParticipationStatus.missed:
+        return 'You missed this';
       case null:
         return 'Will you attend?';
     }
   }
 
-  Color _getRSVPHeaderColor(RSVPStatus? currentRSVP) {
+  Color _getRSVPHeaderColor(ParticipationStatus? currentRSVP) {
     switch (currentRSVP) {
-      case RSVPStatus.yes:
+      case ParticipationStatus.yes:
         return AppColors.success; // Green
-      case RSVPStatus.no:
+      case ParticipationStatus.no:
         return AppColors.error; // Red
-      case RSVPStatus.maybe:
+      case ParticipationStatus.maybe:
         return const Color(0xFF6B7280); // Gray (same as default)
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
+      case ParticipationStatus.attended:
+        return AppColors.success; // Green
+      case ParticipationStatus.missed:
+        return AppColors.error; // Red
       case null:
         return const Color(0xFF6B7280); // Gray
     }
   }
   
-  IconData _getOverlayIcon(RSVPStatus status) {
+  IconData _getOverlayIcon(ParticipationStatus status) {
     switch (status) {
-      case RSVPStatus.yes:
+      case ParticipationStatus.yes:
         return Icons.check;
-      case RSVPStatus.maybe:
+      case ParticipationStatus.maybe:
         return Icons.question_mark; // Plain question mark
-      case RSVPStatus.no:
+      case ParticipationStatus.no:
         return Icons.close;
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return Icons.star_border;
+      case ParticipationStatus.attended:
+        return Icons.check_circle;
+      case ParticipationStatus.missed:
+        return Icons.cancel;
     }
   }
   
@@ -777,8 +802,8 @@ class SelectablePracticeCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final userRSVPStatus = practice.getRSVPStatus(currentUserId);
-    final rsvpCounts = practice.getRSVPCounts();
+    final userRSVPStatus = practice.getParticipationStatus(currentUserId);
+    final rsvpCounts = practice.getParticipationCounts();
     final isUpcoming = practice.isUpcoming;
     
     return Card(
@@ -928,7 +953,7 @@ class SelectablePracticeCard extends StatelessWidget {
 /// Floating bulk action panel for RSVP operations
 class BulkRSVPActionPanel extends StatelessWidget {
   final int selectedCount;
-  final Function(RSVPStatus) onBulkRSVP;
+  final Function(ParticipationStatus) onBulkRSVP;
   final VoidCallback onClearSelection;
   final bool isLoading;
   
@@ -995,7 +1020,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
             children: [
               Expanded(
                 child: _buildActionButton(
-                  RSVPStatus.yes,
+                  ParticipationStatus.yes,
                   'Yes',
                   Icons.check,
                   isLoading,
@@ -1004,7 +1029,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildActionButton(
-                  RSVPStatus.maybe,
+                  ParticipationStatus.maybe,
                   'Maybe',
                   Icons.question_mark,
                   isLoading,
@@ -1013,7 +1038,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
               const SizedBox(width: 8),
               Expanded(
                 child: _buildActionButton(
-                  RSVPStatus.no,
+                  ParticipationStatus.no,
                   'No',
                   Icons.close,
                   isLoading,
@@ -1026,7 +1051,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
     );
   }
   
-  Widget _buildActionButton(RSVPStatus status, String label, IconData icon, bool isLoading) {
+  Widget _buildActionButton(ParticipationStatus status, String label, IconData icon, bool isLoading) {
     return ElevatedButton(
       onPressed: isLoading ? null : () => onBulkRSVP(status),
       style: ElevatedButton.styleFrom(
@@ -1070,7 +1095,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
 /// Bulk RSVP confirmation modal
 class BulkRSVPConfirmationModal extends StatelessWidget {
   final List<Practice> practices;
-  final RSVPStatus newStatus;
+  final ParticipationStatus newStatus;
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
   final bool isLoading;

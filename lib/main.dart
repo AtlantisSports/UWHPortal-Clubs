@@ -9,7 +9,7 @@ import 'package:provider/provider.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/providers/navigation_provider.dart';
-import 'core/providers/rsvp_provider.dart';
+import 'core/providers/participation_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'features/clubs/clubs_list_screen.dart';
 import 'features/clubs/clubs_provider.dart';
@@ -39,11 +39,11 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
-        ChangeNotifierProvider(create: (_) => RSVPProvider()),
-        ChangeNotifierProxyProvider<RSVPProvider, ClubsProvider>(
-          create: (context) => ClubsProvider(rsvpProvider: context.read<RSVPProvider>()),
-          update: (context, rsvpProvider, clubsProvider) => 
-              clubsProvider ?? ClubsProvider(rsvpProvider: rsvpProvider),
+        ChangeNotifierProvider(create: (_) => ParticipationProvider()),
+        ChangeNotifierProxyProvider<ParticipationProvider, ClubsProvider>(
+          create: (context) => ClubsProvider(participationProvider: context.read<ParticipationProvider>()),
+          update: (context, participationProvider, clubsProvider) => 
+              clubsProvider ?? ClubsProvider(participationProvider: participationProvider),
         ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),
         // Add more providers as features grow

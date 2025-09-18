@@ -10,7 +10,7 @@ import 'rsvp_components.dart';
 class PracticeCard extends StatelessWidget {
   final Practice practice;
   final String currentUserId;
-  final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
   final VoidCallback? onTap;
   final bool showRSVPSummary;
   
@@ -25,8 +25,8 @@ class PracticeCard extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final userRSVPStatus = practice.getRSVPStatus(currentUserId);
-    final rsvpCounts = practice.getRSVPCounts();
+    final userRSVPStatus = practice.getParticipationStatus(currentUserId);
+    final rsvpCounts = practice.getParticipationCounts();
     final isUpcoming = practice.isUpcoming;
     
     return Card(
@@ -202,7 +202,7 @@ class PracticeCard extends StatelessWidget {
 class PracticeListItem extends StatelessWidget {
   final Practice practice;
   final String currentUserId;
-  final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
   final VoidCallback? onTap;
   
   const PracticeListItem({
@@ -215,7 +215,7 @@ class PracticeListItem extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
-    final userRSVPStatus = practice.getRSVPStatus(currentUserId);
+    final userRSVPStatus = practice.getParticipationStatus(currentUserId);
     final isUpcoming = practice.isUpcoming;
     
     return ListTile(

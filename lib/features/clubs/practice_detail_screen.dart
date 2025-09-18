@@ -8,7 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -18,7 +18,7 @@ class PracticeDetailScreen extends StatefulWidget {
   final Practice practice;
   final Club club;
   final String currentUserId;
-  final Function(String practiceId, RSVPStatus status)? onRSVPChanged;
+  final Function(String practiceId, ParticipationStatus status)? onRSVPChanged;
 
   const PracticeDetailScreen({
     super.key,
@@ -263,21 +263,22 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                   )
                 : Container(
                     margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    child: Consumer<RSVPProvider>(
-                      builder: (context, rsvpProvider, child) {
+                    child: Consumer<ParticipationProvider>(
+                      builder: (context, participationProvider, child) {
                         return PracticeRSVPCard(
                           practice: widget.practice,
                           clubId: widget.club.id,
                           onRSVPChanged: widget.onRSVPChanged != null 
                               ? (status) {
-                                  widget.onRSVPChanged!(widget.practice.id, status);
+                                  final participationStatus = status as ParticipationStatus;
+                                  widget.onRSVPChanged!(widget.practice.id, participationStatus);
                                   // Show toast when RSVP changes
-                                  String message = 'RSVP updated to: ${status.displayText}';
-                                  Color toastColor = status.color;
-                                  if (status == RSVPStatus.maybe) {
+                                  String message = 'RSVP updated to: ${participationStatus.displayText}';
+                                  Color toastColor = participationStatus.color;
+                                  if (participationStatus == ParticipationStatus.maybe) {
                                     _showCustomToast(message, toastColor, Icons.help);
                                   } else {
-                                    _showCustomToast(message, toastColor, status.overlayIcon);
+                                    _showCustomToast(message, toastColor, participationStatus.overlayIcon);
                                   }
                                 }
                               : null,

@@ -1,16 +1,16 @@
 import 'package:flutter/foundation.dart';
 import '../../core/models/club.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/utils/error_handler.dart';
 import 'clubs_repository.dart';
 import '../../core/di/service_locator.dart';
 
 class ClubsProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
-  final RSVPProvider rsvpProvider;
+  final ParticipationProvider participationProvider;
   
   ClubsProvider({
-    required this.rsvpProvider,
+    required this.participationProvider,
     ClubsRepository? clubsRepository,
   }) : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
 
@@ -34,10 +34,10 @@ class ClubsProvider with ChangeNotifier {
     try {
       _clubs = await _clubsRepository.getClubs();
       
-      // Initialize RSVP status for all upcoming practices
+      // Initialize participation status for all upcoming practices
       for (final club in _clubs) {
         for (final practice in club.upcomingPractices) {
-          rsvpProvider.initializePracticeRSVP(practice);
+          participationProvider.initializePracticeParticipation(practice);
         }
       }
       

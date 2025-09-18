@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 
 /// Bottom sheet modal for filtering practices by level
@@ -25,13 +25,13 @@ class _LevelFilterModalState extends State<LevelFilterModal> {
   @override
   void initState() {
     super.initState();
-    final rsvpProvider = Provider.of<RSVPProvider>(context, listen: false);
-    _tempSelectedLevels = Set.from(rsvpProvider.selectedLevels);
+    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+    _tempSelectedLevels = Set.from(participationProvider.selectedLevels);
   }
 
   void _applyFilters() {
-    final rsvpProvider = Provider.of<RSVPProvider>(context, listen: false);
-    rsvpProvider.updateSelectedLevels(_tempSelectedLevels);
+    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+    participationProvider.updateSelectedLevels(_tempSelectedLevels);
     widget.onFiltersChanged?.call();
     // Don't call Navigator.pop() since this is a Stack overlay, not a route
   }

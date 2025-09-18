@@ -4,16 +4,16 @@ import 'package:flutter/material.dart';
 import 'base_model.dart';
 import '../constants/app_constants.dart';
 
-/// Bulk RSVP request model for updating multiple practices
-class BulkRSVPRequest {
+/// Bulk participation status request model for updating multiple practices
+class BulkParticipationRequest {
   final List<String> practiceIds;
-  final RSVPStatus newStatus;
+  final ParticipationStatus newStatus;
   final String clubId;
   final String userId;
   final bool includeDependents;
   final List<String> selectedDependents;
   
-  const BulkRSVPRequest({
+  const BulkParticipationRequest({
     required this.practiceIds,
     required this.newStatus,
     required this.clubId,
@@ -34,14 +34,14 @@ class BulkRSVPRequest {
   }
 }
 
-/// Result of bulk RSVP operation
-class BulkRSVPResult {
+/// Result of bulk participation status operation
+class BulkParticipationResult {
   final List<String> successfulIds;
   final List<String> failedIds;
   final Map<String, String> errors; // practiceId -> error message
-  final RSVPStatus appliedStatus;
+  final ParticipationStatus appliedStatus;
   
-  const BulkRSVPResult({
+  const BulkParticipationResult({
     required this.successfulIds,
     required this.failedIds,
     required this.errors,
@@ -65,70 +65,116 @@ class BulkRSVPResult {
 }
 
 /// RSVP status enum with circle-based UI design
-enum RSVPStatus {
-  yes,     // Green circle with checkmark
-  maybe,   // Yellow circle with plain question mark  
-  no,      // Red circle with X
-  pending  // Default state - empty circle outline
+/// Unified practice participation status enum
+/// Handles both RSVP (future) and attendance (past) states
+enum ParticipationStatus {
+  blank,     // No RSVP response given (default state)
+  yes,       // Will attend - Green circle with checkmark
+  maybe,     // Unsure - Yellow circle with question mark  
+  no,        // Cannot attend - Red circle with X
+  attended,  // Confirmed attendance (past practices, admin-only)
+  missed     // Did not attend (past practices, admin-only)
 }
 
-/// Extension to get display properties for RSVP status
-extension RSVPStatusExtension on RSVPStatus {
-  /// Get the color for this RSVP status
+/// Extension to get display properties for participation status
+extension ParticipationStatusExtension on ParticipationStatus {
+  /// Get the color for this participation status
   Color get color {
     switch (this) {
-      case RSVPStatus.yes:
-        return AppColors.success; // Green
-      case RSVPStatus.maybe:
-        return const Color(0xFFF59E0B); // Yellow
-      case RSVPStatus.no:
-        return AppColors.error; // Red
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
+      case ParticipationStatus.yes:
+        return AppColors.success; // Green
+      case ParticipationStatus.maybe:
+        return const Color(0xFFF59E0B); // Yellow
+      case ParticipationStatus.no:
+        return AppColors.error; // Red
+      case ParticipationStatus.attended:
+        return AppColors.success; // Green (same as yes for consistency)
+      case ParticipationStatus.missed:
+        return AppColors.error; // Red (same as no for consistency)
     }
   }
   
-  /// Get the overlay icon for this RSVP status
+  /// Get the overlay icon for this participation status
   IconData get overlayIcon {
     switch (this) {
-      case RSVPStatus.yes:
-        return Icons.check;
-      case RSVPStatus.maybe:
-        return Icons.question_mark; // Plain question mark
-      case RSVPStatus.no:
-        return Icons.close; // X mark for "no"
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return Icons.radio_button_unchecked;
+      case ParticipationStatus.yes:
+        return Icons.check;
+      case ParticipationStatus.maybe:
+        return Icons.question_mark; // Plain question mark
+      case ParticipationStatus.no:
+        return Icons.close; // X mark for "no"
+      case ParticipationStatus.attended:
+        return Icons.check_circle; // Filled check for confirmed attendance
+      case ParticipationStatus.missed:
+        return Icons.cancel; // Filled X for confirmed absence
     }
   }
   
-  /// Get the display text for this RSVP status
+  /// Get the display text for this participation status
   String get displayText {
     switch (this) {
-      case RSVPStatus.yes:
-        return 'Yes, I\'ll attend';
-      case RSVPStatus.maybe:
-        return 'Maybe, not sure yet';
-      case RSVPStatus.no:
-        return 'No, can\'t make it';
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return 'Not responded yet';
+      case ParticipationStatus.yes:
+        return 'Yes, I\'ll attend';
+      case ParticipationStatus.maybe:
+        return 'Maybe, not sure yet';
+      case ParticipationStatus.no:
+        return 'No, can\'t make it';
+      case ParticipationStatus.attended:
+        return 'Attended';
+      case ParticipationStatus.missed:
+        return 'Did not attend';
     }
   }
   
-  /// Get the toast message for this RSVP status change
+  /// Get the toast message for this participation status change
   String get toastMessage {
     switch (this) {
-      case RSVPStatus.yes:
-        return 'RSVP changed to: Yes, I\'ll attend';
-      case RSVPStatus.maybe:
-        return 'RSVP changed to: Maybe, not sure yet';
-      case RSVPStatus.no:
-        return 'RSVP changed to: No, can\'t make it';
-      case RSVPStatus.pending:
+      case ParticipationStatus.blank:
         return 'RSVP status cleared';
+      case ParticipationStatus.yes:
+        return 'RSVP changed to: Yes, I\'ll attend';
+      case ParticipationStatus.maybe:
+        return 'RSVP changed to: Maybe, not sure yet';
+      case ParticipationStatus.no:
+        return 'RSVP changed to: No, can\'t make it';
+      case ParticipationStatus.attended:
+        return 'Marked as attended';
+      case ParticipationStatus.missed:
+        return 'Marked as missed';
     }
   }
+  
+  /// Check if this is an RSVP state (for future practices)
+  bool get isRSVPState => [
+    ParticipationStatus.blank,
+    ParticipationStatus.yes,
+    ParticipationStatus.maybe,
+    ParticipationStatus.no,
+  ].contains(this);
+  
+  /// Check if this is an attendance state (for past practices)
+  bool get isAttendanceState => [
+    ParticipationStatus.attended,
+    ParticipationStatus.missed,
+  ].contains(this);
+  
+  /// Check if this status indicates attendance/willingness to attend
+  bool get indicatesAttendance => [
+    ParticipationStatus.yes,
+    ParticipationStatus.attended,
+  ].contains(this);
+  
+  /// Check if this status indicates non-attendance
+  bool get indicatesNonAttendance => [
+    ParticipationStatus.no,
+    ParticipationStatus.missed,
+  ].contains(this);
 }
 
 /// Practice session model
@@ -142,7 +188,7 @@ class Practice extends BaseModel {
   final Duration duration;
   final int maxParticipants;
   final List<String> participants;
-  final Map<String, RSVPStatus> rsvpResponses;
+  final Map<String, ParticipationStatus> participationResponses;
   final bool isRecurring;
   final String? recurringPattern;
   final String? tag; // Practice level/type tag (e.g., "Open", "High-Level", "Intermediate")
@@ -158,7 +204,7 @@ class Practice extends BaseModel {
     this.duration = const Duration(hours: 2),
     this.maxParticipants = 20,
     this.participants = const [],
-    this.rsvpResponses = const {},
+    this.participationResponses = const {},
     this.isRecurring = false,
     this.recurringPattern,
     this.tag,
@@ -166,21 +212,23 @@ class Practice extends BaseModel {
     super.updatedAt,
   });
   
-  /// Get RSVP status for a specific user
-  RSVPStatus getRSVPStatus(String userId) {
-    return rsvpResponses[userId] ?? RSVPStatus.pending;
+  /// Get participation status for a specific user
+  ParticipationStatus getParticipationStatus(String userId) {
+    return participationResponses[userId] ?? ParticipationStatus.blank;
   }
   
-  /// Get count of each RSVP status
-  Map<RSVPStatus, int> getRSVPCounts() {
-    final counts = <RSVPStatus, int>{
-      RSVPStatus.yes: 0,
-      RSVPStatus.maybe: 0,
-      RSVPStatus.no: 0,
-      RSVPStatus.pending: 0,
+  /// Get count of each participation status
+  Map<ParticipationStatus, int> getParticipationCounts() {
+    final counts = <ParticipationStatus, int>{
+      ParticipationStatus.blank: 0,
+      ParticipationStatus.yes: 0,
+      ParticipationStatus.maybe: 0,
+      ParticipationStatus.no: 0,
+      ParticipationStatus.attended: 0,
+      ParticipationStatus.missed: 0,
     };
     
-    for (final status in rsvpResponses.values) {
+    for (final status in participationResponses.values) {
       counts[status] = (counts[status] ?? 0) + 1;
     }
     
@@ -223,6 +271,56 @@ class Practice extends BaseModel {
     return 'https://www.google.com/maps/search/?api=1&query=$encodedAddress';
   }
   
+  /// Check if RSVP window is still open (until 30 min after practice starts)
+  bool get isRSVPWindowOpen {
+    final now = DateTime.now();
+    final rsvpDeadline = dateTime.add(const Duration(minutes: 30));
+    return now.isBefore(rsvpDeadline);
+  }
+  
+  /// Check if practice is in "past mode" (attendance can be recorded)
+  bool get isInPastMode {
+    final now = DateTime.now();
+    final practiceEnd = dateTime.add(duration);
+    return now.isAfter(practiceEnd);
+  }
+  
+  /// Check if practice is currently happening
+  bool get isCurrentlyHappening {
+    final now = DateTime.now();
+    final practiceEnd = dateTime.add(duration);
+    return now.isAfter(dateTime) && now.isBefore(practiceEnd);
+  }
+  
+  /// Get available participation statuses for this practice based on timing and user role
+  List<ParticipationStatus> getAvailableStatuses({bool isAdmin = false}) {
+    if (isAdmin) {
+      // Admins can always set attendance status for past practices
+      if (isInPastMode) {
+        return [ParticipationStatus.attended, ParticipationStatus.missed];
+      }
+      // Admins can also manage RSVP for future practices
+      return [
+        ParticipationStatus.blank,
+        ParticipationStatus.yes,
+        ParticipationStatus.maybe,
+        ParticipationStatus.no,
+      ];
+    } else {
+      // Regular users can only RSVP if window is open
+      if (isRSVPWindowOpen) {
+        return [
+          ParticipationStatus.blank,
+          ParticipationStatus.yes,
+          ParticipationStatus.maybe,
+          ParticipationStatus.no,
+        ];
+      }
+      // No options available for regular users if RSVP window closed
+      return [];
+    }
+  }
+  
   @override
   Map<String, dynamic> toJson() {
     return {
@@ -236,7 +334,7 @@ class Practice extends BaseModel {
       'duration': duration.inMinutes,
       'maxParticipants': maxParticipants,
       'participants': participants,
-      'rsvpResponses': rsvpResponses.map((key, value) => MapEntry(key, value.name)),
+      'participationResponses': participationResponses.map((key, value) => MapEntry(key, value.name)),
       'isRecurring': isRecurring,
       'recurringPattern': recurringPattern,
     };
@@ -254,10 +352,10 @@ class Practice extends BaseModel {
       duration: Duration(minutes: json['duration'] as int? ?? 120),
       maxParticipants: json['maxParticipants'] as int? ?? 20,
       participants: List<String>.from(json['participants'] as List? ?? []),
-      rsvpResponses: (json['rsvpResponses'] as Map<String, dynamic>?)?.map(
-        (key, value) => MapEntry(key, RSVPStatus.values.firstWhere(
+      participationResponses: (json['participationResponses'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, ParticipationStatus.values.firstWhere(
           (status) => status.name == value,
-          orElse: () => RSVPStatus.pending,
+          orElse: () => ParticipationStatus.blank,
         )),
       ) ?? {},
       isRecurring: json['isRecurring'] as bool? ?? false,
@@ -282,7 +380,7 @@ class Practice extends BaseModel {
     Duration? duration,
     int? maxParticipants,
     List<String>? participants,
-    Map<String, RSVPStatus>? rsvpResponses,
+    Map<String, ParticipationStatus>? participationResponses,
     bool? isRecurring,
     String? recurringPattern,
   }) {
@@ -297,7 +395,7 @@ class Practice extends BaseModel {
       duration: duration ?? this.duration,
       maxParticipants: maxParticipants ?? this.maxParticipants,
       participants: participants ?? this.participants,
-      rsvpResponses: rsvpResponses ?? this.rsvpResponses,
+      participationResponses: participationResponses ?? this.participationResponses,
       isRecurring: isRecurring ?? this.isRecurring,
       recurringPattern: recurringPattern ?? this.recurringPattern,
       createdAt: createdAt,

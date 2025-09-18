@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/level_filter_modal.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 
@@ -29,14 +29,14 @@ class PracticeDay {
 class PracticeCalendar extends StatefulWidget {
   final Club club;
   final Function(Practice)? onPracticeSelected;
-  final RSVPProvider? rsvpProvider;
+  final ParticipationProvider? participationProvider;
   final VoidCallback? onShowLevelFilter;
   
   const PracticeCalendar({
     super.key, 
     required this.club,
     this.onPracticeSelected,
-    this.rsvpProvider,
+    this.participationProvider,
     this.onShowLevelFilter,
   });
 
@@ -80,7 +80,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   ),
                 ),
                 const Spacer(),
-                _buildFilterButton(context, widget.rsvpProvider),
+                _buildFilterButton(context, widget.participationProvider),
               ],
             ),
           ),
@@ -91,11 +91,11 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildMonth(context, 'September 2025', 2025, 9, widget.rsvpProvider),
+                  _buildMonth(context, 'September 2025', 2025, 9, widget.participationProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'October 2025', 2025, 10, widget.rsvpProvider),
+                  _buildMonth(context, 'October 2025', 2025, 10, widget.participationProvider),
                   const SizedBox(height: 24),
-                  _buildMonth(context, 'November 2025', 2025, 11, widget.rsvpProvider),
+                  _buildMonth(context, 'November 2025', 2025, 11, widget.participationProvider),
                 ],
               ),
             ),
@@ -105,7 +105,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     );
   }
 
-  Widget _buildMonth(BuildContext context, String title, int year, int month, RSVPProvider? rsvpProvider) {
+  Widget _buildMonth(BuildContext context, String title, int year, int month, ParticipationProvider? participationProvider) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -118,13 +118,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           ),
         ),
         const SizedBox(height: 12),
-        _buildCalendarGrid(context, year, month, rsvpProvider),
+        _buildCalendarGrid(context, year, month, participationProvider),
       ],
     );
   }
 
-  Widget _buildCalendarGrid(BuildContext context, int year, int month, RSVPProvider? rsvpProvider) {
-    final practices = _generatePracticesForMonth(year, month, rsvpProvider);
+  Widget _buildCalendarGrid(BuildContext context, int year, int month, ParticipationProvider? participationProvider) {
+    final practices = _generatePracticesForMonth(year, month, participationProvider);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final firstDayOfMonth = DateTime(year, month, 1);
     final startingWeekday = firstDayOfMonth.weekday % 7; // Convert to 0-6 (Sunday = 0)
@@ -210,9 +210,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                             ),
                           ),
                           // Guest count indicator (lower-left corner)
-                          Consumer<RSVPProvider>(
-                            builder: (context, rsvpProvider, child) {
-                              final guestCount = _getGuestCountForDate(date, rsvpProvider);
+                          Consumer<ParticipationProvider>(
+                            builder: (context, participationProvider, child) {
+                              final guestCount = _getGuestCountForDate(date, participationProvider);
                               if (guestCount > 0) {
                                 return Positioned(
                                   bottom: 2,
@@ -382,8 +382,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
            date.day == today.day;
   }
 
-  int _getGuestCountForDate(DateTime date, RSVPProvider? rsvpProvider) {
-    if (rsvpProvider == null) return 0;
+  int _getGuestCountForDate(DateTime date, ParticipationProvider? participationProvider) {
+    if (participationProvider == null) return 0;
     
     int maxGuestCount = 0;
     
@@ -392,7 +392,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     
     // Find the highest guest count among all practices on this date
     for (final practice in practicesForDate) {
-      final guestList = rsvpProvider.getPracticeGuests(practice.id);
+      final guestList = participationProvider.getPracticeGuests(practice.id);
       if (guestList.totalGuests > maxGuestCount) {
         maxGuestCount = guestList.totalGuests;
       }
@@ -401,7 +401,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return maxGuestCount;
   }
 
-  Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month, RSVPProvider? rsvpProvider) {
+  Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
     final practices = <DateTime, List<PracticeStatus>>{};
     final today = DateTime.now();
     
@@ -449,29 +449,35 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             final isCorrectDate = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
             
             // Apply level filtering if provider is available
-            final passesLevelFilter = rsvpProvider?.shouldShowPractice(practice) ?? true;
+            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
             
             return isCorrectDate && passesLevelFilter;
           }).toList();
           
           if (realPracticesForDay.isNotEmpty) {
-            // Use real practice data with RSVP status
+            // Use real practice data with participation status
             for (final practice in realPracticesForDay) {
-              if (rsvpProvider != null) {
-                final rsvpStatus = rsvpProvider.getRSVPStatus(practice.id);
+              if (participationProvider != null) {
+                final participationStatus = participationProvider.getParticipationStatus(practice.id);
                 
-                switch (rsvpStatus) {
-                  case RSVPStatus.yes:
+                switch (participationStatus) {
+                  case ParticipationStatus.yes:
                     practiceStatuses.add(PracticeStatus.rsvpYes);
                     break;
-                  case RSVPStatus.maybe:
+                  case ParticipationStatus.maybe:
                     practiceStatuses.add(PracticeStatus.rsvpMaybe);
                     break;
-                  case RSVPStatus.no:
+                  case ParticipationStatus.no:
                     practiceStatuses.add(PracticeStatus.rsvpNo);
                     break;
-                  case RSVPStatus.pending:
+                  case ParticipationStatus.blank:
                     practiceStatuses.add(PracticeStatus.noRsvp);
+                    break;
+                  case ParticipationStatus.attended:
+                    practiceStatuses.add(PracticeStatus.attended);
+                    break;
+                  case ParticipationStatus.missed:
+                    practiceStatuses.add(PracticeStatus.notAttended);
                     break;
                 }
               } else {
@@ -563,7 +569,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           duration: Duration(hours: 2), // Default 2 hour duration
           maxParticipants: 20,
           participants: [],
-          rsvpResponses: {},
+          participationResponses: {},
         ));
       }
     }
@@ -737,12 +743,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   /// Build the filter button for the calendar header
-  Widget _buildFilterButton(BuildContext context, RSVPProvider? rsvpProvider) {
-    if (rsvpProvider == null) {
+  Widget _buildFilterButton(BuildContext context, ParticipationProvider? participationProvider) {
+    if (participationProvider == null) {
       return const SizedBox.shrink();
     }
 
-    return Consumer<RSVPProvider>(
+    return Consumer<ParticipationProvider>(
       builder: (context, provider, child) {
         final hasFiltersApplied = provider.hasLevelFiltersApplied;
         final selectedCount = provider.selectedLevels.length;

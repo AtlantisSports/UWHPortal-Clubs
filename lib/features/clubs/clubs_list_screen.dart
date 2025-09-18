@@ -8,7 +8,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/navigation_provider.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
@@ -71,9 +71,9 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     }
   }
   
-  void _handleRSVPChange(String practiceId, RSVPStatus newStatus) {
-    // Use centralized RSVP provider
-    final rsvpProvider = context.read<RSVPProvider>();
+  void _handleRSVPChange(String practiceId, ParticipationStatus newStatus) {
+    // Use centralized participation provider
+    final participationProvider = context.read<ParticipationProvider>();
     
     // Find the club that has this practice
     final clubsProvider = context.read<ClubsProvider>();
@@ -89,16 +89,16 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     }
     
     if (clubId != null) {
-      rsvpProvider.updateRSVP(clubId, practiceId, newStatus);
+      participationProvider.updateParticipationStatus(clubId, practiceId, newStatus);
     }
     
     // Show confirmation message
     if (mounted) {
-      // Prepare toast content based on RSVP status
+      // Prepare toast content based on participation status
       String message = 'RSVP updated to: ${newStatus.displayText}';
       Color toastColor = newStatus.color;
       
-      if (newStatus == RSVPStatus.maybe) {
+      if (newStatus == ParticipationStatus.maybe) {
         _showCustomToast(message, toastColor, Icons.help);
       } else {
         _showCustomToast(message, toastColor, newStatus.overlayIcon);
@@ -378,8 +378,8 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                             final club = clubsProvider.clubs[index];
                             final nextPractice = _getNextPractice(club);
                             final currentRSVP = nextPractice != null 
-                                ? nextPractice.getRSVPStatus(_currentUserId)
-                                : RSVPStatus.pending;
+                                ? nextPractice.getParticipationStatus(_currentUserId)
+                                : ParticipationStatus.blank;
                             
                             return ClubCard(
                               name: club.name,

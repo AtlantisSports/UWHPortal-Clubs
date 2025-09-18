@@ -61,9 +61,9 @@ class ClubCard extends StatefulWidget {
   final String location;
   final String? logoUrl;
   final Practice? nextPractice;
-  final RSVPStatus? currentRSVP;
+  final ParticipationStatus? currentRSVP;
   final List<Practice> allPractices; // Add this to show typical weekly schedule
-  final Function(RSVPStatus)? onRSVPChanged;
+  final Function(ParticipationStatus)? onRSVPChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
   final VoidCallback? onPracticeInfoTap; // Add callback for practice info

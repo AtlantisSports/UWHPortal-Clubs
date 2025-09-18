@@ -21,7 +21,7 @@ abstract class ClubsRepository {
   
   Future<Club> getClub(String clubId);
   Future<void> refreshClubs();
-  Future<void> updateRSVP(String clubId, String practiceId, RSVPStatus status);
+  Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status);
 }
 
 /// Implementation of clubs repository with caching
@@ -89,20 +89,20 @@ class ClubsRepositoryImpl implements ClubsRepository {
   }
 
   @override
-  Future<void> updateRSVP(String clubId, String practiceId, RSVPStatus status) async {
+  Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status) async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 300));
     
-    // Update RSVP in cached data if available
+    // Update participation status in cached data if available
     if (_cachedClubs != null) {
       for (var club in _cachedClubs!) {
         if (club.id == clubId) {
           for (var i = 0; i < club.upcomingPractices.length; i++) {
             if (club.upcomingPractices[i].id == practiceId) {
               final practice = club.upcomingPractices[i];
-              final updatedRSVPs = Map<String, RSVPStatus>.from(practice.rsvpResponses);
-              updatedRSVPs['user123'] = status; // Current user ID
-              final updatedPractice = practice.copyWith(rsvpResponses: updatedRSVPs);
+              final updatedResponses = Map<String, ParticipationStatus>.from(practice.participationResponses);
+              updatedResponses['user123'] = status; // Current user ID
+              final updatedPractice = practice.copyWith(participationResponses: updatedResponses);
               club.upcomingPractices[i] = updatedPractice;
               break;
             }
@@ -177,13 +177,13 @@ class ClubsRepositoryImpl implements ClubsRepository {
             location: 'Ryde Pool',
             address: '504 Victoria Rd, Ryde, NSW',
             tag: 'Open',
-            rsvpResponses: {
-              'user123': RSVPStatus.pending,
-              'user456': RSVPStatus.yes,
-              'user789': RSVPStatus.maybe,
-              'user101': RSVPStatus.yes,
-              'user202': RSVPStatus.no,
-              'user303': RSVPStatus.yes,
+            participationResponses: {
+              'user123': ParticipationStatus.blank,
+              'user456': ParticipationStatus.yes,
+              'user789': ParticipationStatus.maybe,
+              'user101': ParticipationStatus.yes,
+              'user202': ParticipationStatus.no,
+              'user303': ParticipationStatus.yes,
             },
           ),
         ],
@@ -275,12 +275,12 @@ class ClubsRepositoryImpl implements ClubsRepository {
             location: pattern['location'] as String,
             address: pattern['address'] as String,
             tag: pattern['tag'] as String,
-            rsvpResponses: {
-              'user123': RSVPStatus.pending, // Current user starts with no selection
-              'user456': RSVPStatus.maybe,
-              'user789': RSVPStatus.pending,
-              'user101': RSVPStatus.yes,
-              'user202': RSVPStatus.no,
+            participationResponses: {
+              'user123': ParticipationStatus.blank, // Current user starts with no selection
+              'user456': ParticipationStatus.maybe,
+              'user789': ParticipationStatus.blank,
+              'user101': ParticipationStatus.yes,
+              'user202': ParticipationStatus.no,
             },
           ),
         );

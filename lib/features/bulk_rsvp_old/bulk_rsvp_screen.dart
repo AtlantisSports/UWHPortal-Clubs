@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
-import '../../core/providers/rsvp_provider.dart';
+import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../features/clubs/clubs_provider.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -230,11 +230,11 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
     });
   }
   
-  void _handleBulkRSVP(RSVPStatus newStatus) async {
+  void _handleBulkRSVP(ParticipationStatus newStatus) async {
     if (_selectedPracticeIds.isEmpty) return;
     
     final clubsProvider = context.read<ClubsProvider>();
-    final rsvpProvider = context.read<RSVPProvider>();
+    final participationProvider = context.read<ParticipationProvider>();
     
     // Get the practices to be updated
     final allPractices = _getAvailablePractices(clubsProvider);
@@ -264,16 +264,16 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
     });
     
     try {
-      // Create bulk RSVP request
-      final request = BulkRSVPRequest(
+      // Create bulk participation request
+      final request = BulkParticipationRequest(
         practiceIds: _selectedPracticeIds.toList(),
         newStatus: newStatus,
         clubId: clubId,
-        userId: rsvpProvider.currentUserId,
+        userId: participationProvider.currentUserId,
       );
       
       // Execute bulk update
-      final result = await rsvpProvider.bulkUpdateRSVP(request);
+      final result = await participationProvider.bulkUpdateParticipation(request);
       
       // Show result
       if (mounted) {
@@ -300,7 +300,7 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
     }
   }
   
-  void _showResultDialog(BulkRSVPResult result) {
+  void _showResultDialog(BulkParticipationResult result) {
     PhoneModalUtils.showPhoneModal(
       context: context,
       child: Padding(
