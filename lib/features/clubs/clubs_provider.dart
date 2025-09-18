@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../core/models/club.dart';
+import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/utils/error_handler.dart';
 import 'clubs_repository.dart';
@@ -35,11 +36,11 @@ class ClubsProvider with ChangeNotifier {
       _clubs = await _clubsRepository.getClubs();
       
       // Initialize participation status for all upcoming practices
+      final allPractices = <Practice>[];
       for (final club in _clubs) {
-        for (final practice in club.upcomingPractices) {
-          participationProvider.initializePracticeParticipation(practice);
-        }
+        allPractices.addAll(club.upcomingPractices);
       }
+      participationProvider.initializePracticesParticipation(allPractices);
       
       notifyListeners();
     } catch (e) {

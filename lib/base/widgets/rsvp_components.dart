@@ -345,18 +345,40 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header with RSVP label, centered text, and info icon
+              // Header with RSVP label, centered text, and practice tag
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // Left: RSVP label
-                  const Text(
-                    'RSVP',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF374151),
-                    ),
+                  // Left: RSVP label with info icon
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        'RSVP',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF374151),
+                        ),
+                      ),
+                      if (widget.onInfoTap != null) ...[
+                        const SizedBox(width: 6),
+                        MouseRegion(
+                          cursor: SystemMouseCursors.click,
+                          child: GestureDetector(
+                            onTap: widget.onInfoTap,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              child: const Icon(
+                                Icons.info_outline,
+                                size: 20,
+                                color: Color(0xFF0284C7),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   // Center: Will you attend text
                   Expanded(
@@ -371,19 +393,21 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
                       ),
                     ),
                   ),
-                  // Right: Info icon
-                  if (widget.onInfoTap != null)
-                    MouseRegion(
-                      cursor: SystemMouseCursors.click,
-                      child: GestureDetector(
-                        onTap: widget.onInfoTap,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          child: const Icon(
-                            Icons.info_outline,
-                            size: 20,
-                            color: Color(0xFF0284C7),
-                          ),
+                  // Right: Practice tag
+                  if (widget.practice.tag != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                      ),
+                      child: Text(
+                        widget.practice.tag!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF0284C7),
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     )
@@ -718,9 +742,9 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
       case ParticipationStatus.attended:
-        return AppColors.success; // Green
+        return AppColors.primary; // System blue
       case ParticipationStatus.missed:
-        return AppColors.error; // Red
+        return AppColors.primary; // System blue
       case null:
         return const Color(0xFF6B7280); // Gray
     }

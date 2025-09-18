@@ -71,12 +71,11 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
   }
 
   bool _getUserAttendanceStatus(Practice practice) {
-    // For past practices, use the same logic as calendar widget to ensure consistency
+    // For past practices, use ParticipationProvider to ensure consistency
     if (_isPastEvent(practice)) {
-      // Use same hash-based mock data as calendar widget
-      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-      final hash = practiceDate.hashCode + practice.location.hashCode;
-      return hash % 3 != 0; // Same logic as calendar: hash % 3 == 0 means notAttended, else attended
+      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+      final status = participationProvider.getParticipationStatus(practice.id);
+      return status == ParticipationStatus.attended;
     }
     
     // For future practices, this method shouldn't be called, but return false as fallback
@@ -89,7 +88,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
       height: 20,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: attended ? AppColors.success : AppColors.error,
+        color: AppColors.primary, // Use system blue for both states
       ),
       child: Icon(
         attended ? Icons.check : Icons.close,
@@ -191,37 +190,15 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.grey[300]!),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    widget.practice.title,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
+              child: Center(
+                child: Text(
+                  widget.practice.title,
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
                   ),
-                  if (widget.practice.tag != null) ...[
-                    SizedBox(width: 12),
-                    Container(
-                      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                      ),
-                      child: Text(
-                        widget.practice.tag!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ],
+                ),
               ),
             ),
             // RSVP Card for future events, Attendance indicator for past events
@@ -415,6 +392,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
           children: [
             // Description
             Container(
+              width: double.infinity,
               padding: EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,

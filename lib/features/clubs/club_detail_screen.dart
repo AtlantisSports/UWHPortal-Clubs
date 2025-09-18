@@ -148,7 +148,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           club: widget.club,
           currentUserId: widget.currentUserId,
           onParticipationChanged: (practiceId, status) {
-            // Handle RSVP changes if needed
+            // Update the participation provider to ensure calendar syncs
+            final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+            participationProvider.updateParticipationStatus(widget.club.id, practiceId, status);
           },
         ),
       ),

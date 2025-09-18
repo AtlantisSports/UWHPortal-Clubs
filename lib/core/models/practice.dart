@@ -90,9 +90,9 @@ extension ParticipationStatusExtension on ParticipationStatus {
       case ParticipationStatus.no:
         return AppColors.error; // Red
       case ParticipationStatus.attended:
-        return AppColors.success; // Green (same as yes for consistency)
+        return AppColors.primary; // System blue
       case ParticipationStatus.missed:
-        return AppColors.error; // Red (same as no for consistency)
+        return AppColors.primary; // System blue
     }
   }
   
@@ -383,6 +383,7 @@ class Practice extends BaseModel {
     Map<String, ParticipationStatus>? participationResponses,
     bool? isRecurring,
     String? recurringPattern,
+    String? tag,
   }) {
     return Practice(
       id: id,
@@ -398,6 +399,7 @@ class Practice extends BaseModel {
       participationResponses: participationResponses ?? this.participationResponses,
       isRecurring: isRecurring ?? this.isRecurring,
       recurringPattern: recurringPattern ?? this.recurringPattern,
+      tag: tag ?? this.tag,
       createdAt: createdAt,
       updatedAt: DateTime.now(),
     );

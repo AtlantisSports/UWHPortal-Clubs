@@ -265,23 +265,20 @@ class ClubsRepositoryImpl implements ClubsRepository {
       
       for (int i = 0; i < dates.length; i++) {
         final date = dates[i];
+        final practiceId = '${pattern['id_prefix']}-${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+        final practiceTag = pattern['tag'] as String;
+        
         practices.add(
           Practice(
-            id: '${pattern['id_prefix']}-${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}',
+            id: practiceId,
             clubId: 'denver-uwh',
             title: pattern['title'] as String,
             description: pattern['description'] as String,
             dateTime: date,
             location: pattern['location'] as String,
             address: pattern['address'] as String,
-            tag: pattern['tag'] as String,
-            participationResponses: {
-              'user123': ParticipationStatus.blank, // Current user starts with no selection
-              'user456': ParticipationStatus.maybe,
-              'user789': ParticipationStatus.blank,
-              'user101': ParticipationStatus.yes,
-              'user202': ParticipationStatus.no,
-            },
+            tag: practiceTag,
+            participationResponses: _generateParticipationForPractice(date, practiceId),
           ),
         );
       }
@@ -296,7 +293,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
   List<DateTime> _getRecurringPracticeDates(int targetDayOfWeek, int hour, int minute) {
     final List<DateTime> dates = [];
     
-    // Start from September 1, 2025
+    // Start from September 1, 2025 (include past practices for demo)
     final startDate = DateTime(2025, 9, 1);
     // End at November 30, 2025
     final endDate = DateTime(2025, 11, 30);
@@ -314,6 +311,41 @@ class ClubsRepositoryImpl implements ClubsRepository {
     }
     
     return dates;
+  }
+
+  /// Generate participation responses for a practice based on date
+  /// For the mock app, focus on user123 as the single signed-in user
+  Map<String, ParticipationStatus> _generateParticipationForPractice(DateTime practiceDate, String practiceId) {
+    final now = DateTime.now();
+    final responses = <String, ParticipationStatus>{};
+    
+    // For user123 (the signed-in user), set status based on practice timing
+    // Compare practice end time to current time for more accurate past/future determination
+    final practiceEndTime = practiceDate.add(const Duration(hours: 2)); // Assume 2-hour practices
+    
+    if (practiceEndTime.isBefore(now)) {
+      // Past practices: Show attended/missed status (mock data for demo)
+      // All past practices must have either attended or missed, never blank
+      final hash = practiceId.hashCode.abs();
+      final statusChoice = hash % 2; // Only 2 options: attended or missed
+      
+      if (statusChoice == 0) {
+        responses['user123'] = ParticipationStatus.attended;
+      } else {
+        responses['user123'] = ParticipationStatus.missed;
+      }
+    } else {
+      // Future practices: Start with blank status (no mock data)
+      responses['user123'] = ParticipationStatus.blank;
+    }
+    
+    // Add some other users for context (but user123 is the focus)
+    responses['user456'] = ParticipationStatus.maybe;
+    responses['user789'] = ParticipationStatus.blank;
+    responses['user101'] = ParticipationStatus.yes;
+    responses['user202'] = ParticipationStatus.no;
+    
+    return responses;
   }
   
   /// Get the next single practice date (for backward compatibility)
