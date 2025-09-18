@@ -713,7 +713,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => BulkRSVPScreen(clubId: widget.club.id),
+                    builder: (context) => BulkRSVPScreen(
+                      club: widget.club,
+                      currentUserId: widget.currentUserId,
+                    ),
                   ),
                 );
               },
