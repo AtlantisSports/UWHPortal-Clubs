@@ -201,6 +201,74 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     
     return practices;
   }
+
+  /// Show confirmation dialog for clearing all future RSVPs
+  Future<void> _showClearFutureRSVPsConfirmation() async {
+    final confirmed = await PhoneModalUtils.showPhoneConfirmationDialog(
+      context: context,
+      title: 'Clear All Future RSVPs',
+      message: 'This will clear ALL of your RSVPs!\n\nAny New Player guests or Dependents associated with your RSVPs will also be cleared.\n\nVisitors and Club Members you have previously added as your guest will keep their RSVPs.\n\nThis action cannot be undone.',
+      confirmText: 'Clear RSVPs',
+      cancelText: 'Cancel',
+      isDestructive: true,
+    );
+    
+    if (confirmed) {
+      await _clearAllFutureRSVPs();
+    }
+  }
+
+  /// Clear all future RSVPs for user, new player guests, and dependents
+  Future<void> _clearAllFutureRSVPs() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+      final today = DateTime.now();
+      
+      // Get all club practices from today forward
+      final allPractices = _getClubPractices();
+      final futurePractices = allPractices.where((practice) {
+        return practice.dateTime.isAfter(today) || 
+               practice.dateTime.day == today.day;
+      }).toList();
+      
+      // Clear RSVPs for each future practice
+      for (final practice in futurePractices) {
+        // Clear user's own RSVP
+        await participationProvider.updateParticipationStatus(
+          widget.club.id, 
+          practice.id, 
+          ParticipationStatus.blank
+        );
+        
+        // Clear new player guests and dependents (preserve known Visitors/Club members)
+        final currentGuests = participationProvider.getPracticeGuests(practice.id);
+        final filteredGuests = currentGuests.guests.where((guest) {
+          // Keep guests that are known Visitors or Club members
+          // Remove new player guests and dependents
+          return guest.type == GuestType.visitor || guest.type == GuestType.clubMember;
+        }).toList();
+        
+        participationProvider.updatePracticeGuests(practice.id, filteredGuests);
+      }
+      
+      _showCustomToast(
+        'All future RSVPs cleared successfully',
+        Colors.green,
+        Icons.check_circle,
+      );
+      
+    } catch (error) {
+      _showCustomToast(
+        'Failed to clear RSVPs. Please try again.',
+        Colors.red,
+        Icons.error,
+      );
+    } finally {
+      setState(() => _isLoading = false);
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -280,6 +348,52 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Clear all future RSVPs button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : _showClearFutureRSVPsConfirmation,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                elevation: 0,
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_isLoading) ...[
+                    const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ] else ...[
+                    const Icon(Icons.event_busy, size: 18),
+                    const SizedBox(width: 8),
+                  ],
+                  const Text(
+                    'Clear all future RSVPs',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
           // Dynamic filter row based on available options
           _buildDynamicFilterRow(),
           
@@ -673,30 +787,33 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
-                  onPressed: (_canApply() && !_isLoading) ? _applyBulkRSVP : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: (_canApply() && !_isLoading) ? const Color(0xFF0284C7) : const Color(0xFFE5E7EB),
-                    foregroundColor: (_canApply() && !_isLoading) ? Colors.white : const Color(0xFF9CA3AF),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    elevation: 0,
+                child: GestureDetector(
+                  onTap: (_canApply() && !_isLoading) ? null : _showInactiveApplyMessage,
+                  child: ElevatedButton(
+                    onPressed: (_canApply() && !_isLoading) ? _applyBulkRSVP : null,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: (_canApply() && !_isLoading) ? const Color(0xFF0284C7) : const Color(0xFFE5E7EB),
+                      foregroundColor: (_canApply() && !_isLoading) ? Colors.white : const Color(0xFF9CA3AF),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      elevation: 0,
+                    ),
+                    child: _isLoading
+                        ? const SizedBox(
+                            height: 20,
+                            width: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Text(
+                            'Apply',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
                   ),
-                  child: _isLoading
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                          ),
-                        )
-                      : const Text(
-                          'Apply',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
                 ),
               ),
             ],
@@ -780,6 +897,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         _buildCustomRadioOption(
           value: 'only_announced',
           title: 'Announced',
+          tooltip: 'Only confirmed practices',
         ),
         
         // Custom date range option  
@@ -788,6 +906,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           title: (_customStartDate != null && _customEndDate != null) 
               ? _getCustomDateRangeText() 
               : 'Custom',
+          tooltip: 'Custom date range',
           trailing: (_customStartDate != null && _customEndDate != null)
               ? GestureDetector(
                   onTap: _showCustomDatePicker,
@@ -804,6 +923,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         _buildCustomRadioOption(
           value: 'all_future',
           title: 'All future',
+          tooltip: 'All events matching this same criteria even if not Announced yet',
         ),
       ],
     );
@@ -813,6 +933,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     required String value,
     required String title,
     Widget? trailing,
+    String? tooltip,
   }) {
     
     return GestureDetector(
@@ -858,6 +979,17 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               title,
               style: const TextStyle(fontSize: 14),
             ),
+            if (tooltip != null) ...[
+              const SizedBox(width: 6),
+              _TooltipWidget(
+                message: tooltip,
+                child: const Icon(
+                  Icons.help_outline,
+                  size: 16,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
+            ],
             if (trailing != null) ...[
               const SizedBox(width: 8),
               trailing,
@@ -936,6 +1068,27 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   bool _canApply() {
     return _selectedPracticeIds.isNotEmpty && _selectedRSVPChoice != null;
+  }
+
+  /// Show helpful toast when user clicks inactive Apply button
+  void _showInactiveApplyMessage() {
+    String message;
+    
+    if (_selectedPracticeIds.isEmpty && _selectedRSVPChoice == null) {
+      message = 'Please select practices and choose YES or NO to apply bulk RSVP';
+    } else if (_selectedPracticeIds.isEmpty) {
+      message = 'Please select at least one practice to apply bulk RSVP';
+    } else if (_selectedRSVPChoice == null) {
+      message = 'Please choose YES or NO to apply bulk RSVP';
+    } else {
+      message = 'Unable to apply bulk RSVP at this time';
+    }
+    
+    _showCustomToast(
+      message,
+      const Color(0xFF0284C7), // Blue color as requested
+      Icons.info_outline,
+    );
   }
   
   /// Get practice IDs based on selected practices and timeframe filters
@@ -2047,4 +2200,122 @@ class _CustomDatePickerModalState extends State<_CustomDatePickerModal> {
       ),
     );
   }
+}
+
+/// Custom tooltip widget that shows on hover/tap
+class _TooltipWidget extends StatefulWidget {
+  final String message;
+  final Widget child;
+  
+  const _TooltipWidget({
+    required this.message,
+    required this.child,
+  });
+  
+  @override
+  State<_TooltipWidget> createState() => _TooltipWidgetState();
+}
+
+class _TooltipWidgetState extends State<_TooltipWidget> {
+  bool _isVisible = false;
+  
+  void _showTooltip() {
+    setState(() {
+      _isVisible = true;
+    });
+    
+    // Auto-hide after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _isVisible = false;
+        });
+      }
+    });
+  }
+  
+  void _hideTooltip() {
+    setState(() {
+      _isVisible = false;
+    });
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _isVisible ? _hideTooltip : _showTooltip,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          widget.child,
+          if (_isVisible)
+            Positioned(
+              bottom: 25, // Position above the icon
+              left: -60, // Center horizontally relative to icon
+              child: Container(
+                width: 140,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Tooltip bubble
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF374151), // Dark gray background
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        widget.message,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          height: 1.3,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    // Arrow pointing down to the icon (moved closer)
+                    Transform.translate(
+                      offset: const Offset(0, -1), // Move arrow 1px closer to bubble
+                      child: CustomPaint(
+                        size: const Size(8, 4),
+                        painter: _TooltipArrowPainter(),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom painter for tooltip arrow (pointing down)
+class _TooltipArrowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF374151) // Same dark gray as tooltip
+      ..style = PaintingStyle.fill;
+    
+    final path = Path()
+      ..moveTo(size.width / 2, size.height) // Bottom center (tip of arrow)
+      ..lineTo(0, 0) // Top left
+      ..lineTo(size.width, 0) // Top right
+      ..close();
+    
+    canvas.drawPath(path, paint);
+  }
+  
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

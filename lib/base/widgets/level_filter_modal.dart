@@ -32,14 +32,17 @@ class _LevelFilterModalState extends State<LevelFilterModal> {
   void _applyFilters() {
     final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
     participationProvider.updateSelectedLevels(_tempSelectedLevels);
+    // Close the modal after applying filters
     widget.onFiltersChanged?.call();
-    // Don't call Navigator.pop() since this is a Stack overlay, not a route
   }
 
   void _resetFilters() {
+    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
     setState(() {
       _tempSelectedLevels.clear();
     });
+    // Apply the cleared filters immediately so changes persist, but keep modal open
+    participationProvider.updateSelectedLevels(_tempSelectedLevels);
   }
 
   @override
@@ -101,54 +104,57 @@ class _LevelFilterModalState extends State<LevelFilterModal> {
                   
                   const SizedBox(height: 32),
                   
-                  // Reset button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _resetFilters,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Reset filters',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Apply button
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: _applyFilters,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        elevation: 0,
-                      ),
-                      child: const Text(
-                        'Apply Filters',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
+                  // Button row with Reset and Apply side by side
+                  Row(
+                    children: [
+                      // Reset button (left side)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _resetFilters,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'RESET FILTERS',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ),
-                    ),
+                      
+                      const SizedBox(width: 16), // Spacing between buttons
+                      
+                      // Apply button (right side)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: _applyFilters,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: const Text(
+                            'APPLY FILTERS',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
