@@ -1640,26 +1640,32 @@ class PracticeAttendanceCard extends StatelessWidget {
 
   Widget _buildAttendanceIcon(ParticipationStatus status) {
     IconData iconData;
-    Color iconColor = const Color(0xFF0284C7); // Blue color for attendance icons
+    Color iconColor;
     
     switch (status) {
       case ParticipationStatus.attended:
         iconData = Icons.check_circle;
+        iconColor = const Color(0xFF0284C7); // Blue for attended
         break;
       case ParticipationStatus.missed:
         iconData = Icons.cancel;
+        iconColor = const Color(0xFF0284C7); // Blue for missed
         break;
       case ParticipationStatus.yes:
         iconData = Icons.check_circle_outline;
+        iconColor = AppColors.success; // Green for RSVP yes
         break;
       case ParticipationStatus.no:
         iconData = Icons.cancel_outlined;
+        iconColor = AppColors.error; // Red for RSVP no
         break;
       case ParticipationStatus.maybe:
         iconData = Icons.help_outline;
+        iconColor = const Color(0xFFD97706); // Orange for RSVP maybe
         break;
       default:
         iconData = Icons.radio_button_unchecked;
+        iconColor = Colors.grey;
     }
     
     return Icon(

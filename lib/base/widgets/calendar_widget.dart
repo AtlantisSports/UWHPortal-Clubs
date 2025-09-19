@@ -20,9 +20,20 @@ enum PracticeStatus {
   noRsvp,
 }
 
+/// Extension to provide information about whether a practice passes level filters
+class FilteredPracticeStatus {
+  final PracticeStatus status;
+  final bool passesFilter;
+
+  const FilteredPracticeStatus({
+    required this.status,
+    required this.passesFilter,
+  });
+}
+
 class PracticeDay {
   final DateTime date;
-  final List<PracticeStatus> practices;
+  final List<FilteredPracticeStatus> practices;
   
   PracticeDay({required this.date, required this.practices});
 }
@@ -268,7 +279,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     );
   }
 
-  Widget _buildPracticeIndicators(List<PracticeStatus> practices) {
+  Widget _buildPracticeIndicators(List<FilteredPracticeStatus> practices) {
     if (practices.isEmpty) return const SizedBox.shrink();
 
     final count = practices.length;
@@ -328,7 +339,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     }
   }
 
-  Widget _buildSingleIndicator(PracticeStatus status, double size) {
+  Widget _buildSingleIndicator(FilteredPracticeStatus filteredStatus, double size) {
+    final status = filteredStatus.status;
+    final passesFilter = filteredStatus.passesFilter;
+    
     Color color;
     IconData? icon;
     bool filled = false;
@@ -367,21 +381,27 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         break;
     }
 
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: filled ? color : Colors.transparent,
-        border: Border.all(color: color, width: borderWidth),
-        shape: BoxShape.circle,
+    // Apply fading for practices that don't pass the filter
+    final opacity = passesFilter ? 1.0 : 0.25; // 75% fading (25% opacity)
+
+    return Opacity(
+      opacity: opacity,
+      child: Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: filled ? color : Colors.transparent,
+          border: Border.all(color: color, width: borderWidth),
+          shape: BoxShape.circle,
+        ),
+        child: icon != null
+            ? Icon(
+                icon,
+                size: size * 0.6,
+                color: filled ? Colors.white : color, // White for filled, color for outline
+              )
+            : null,
       ),
-      child: icon != null
-          ? Icon(
-              icon,
-              size: size * 0.6,
-              color: filled ? Colors.white : color, // White for filled, color for outline
-            )
-          : null,
     );
   }
 
@@ -411,8 +431,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return maxGuestCount;
   }
 
-  Map<DateTime, List<PracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
-    final practices = <DateTime, List<PracticeStatus>>{};
+  Map<DateTime, List<FilteredPracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
+    final practices = <DateTime, List<FilteredPracticeStatus>>{};
     final today = DateTime.now();
     
     // Get typical practice schedule for this club
@@ -441,114 +461,123 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       final typicalPracticesForDay = typicalSchedule.where((p) => p['day'] == dayOfWeek).toList();
       
       if (typicalPracticesForDay.isNotEmpty) {
-        final practiceStatuses = <PracticeStatus>[];
+        final practiceStatuses = <FilteredPracticeStatus>[];
         
         if (date.isBefore(today)) {
           // Past practices - use real practice data with participation status
           final realPracticesForDay = club.upcomingPractices.where((practice) {
             final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            final isCorrectDate = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
-            
-            // Apply level filtering if provider is available
-            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
-            
-            return isCorrectDate && passesLevelFilter;
+            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
           }).toList();
           
           if (realPracticesForDay.isNotEmpty && participationProvider != null) {
             // Use real practice data with participation status
             for (final practice in realPracticesForDay) {
+              final passesLevelFilter = participationProvider.shouldShowPractice(practice);
               final participationStatus = participationProvider.getParticipationStatus(practice.id);
               
+              PracticeStatus status;
               switch (participationStatus) {
                 case ParticipationStatus.attended:
-                  practiceStatuses.add(PracticeStatus.attended);
+                  status = PracticeStatus.attended;
                   break;
                 case ParticipationStatus.missed:
-                  practiceStatuses.add(PracticeStatus.notAttended);
+                  status = PracticeStatus.notAttended;
                   break;
                 default:
                   // For past practices, fallback to mock data if no status recorded
                   final hash = practice.id.hashCode.abs();
-                  practiceStatuses.add(hash % 2 == 0 
+                  status = hash % 2 == 0 
                       ? PracticeStatus.attended 
-                      : PracticeStatus.notAttended);
+                      : PracticeStatus.notAttended;
                   break;
               }
+              
+              practiceStatuses.add(FilteredPracticeStatus(
+                status: status,
+                passesFilter: passesLevelFilter,
+              ));
             }
           } else {
-            // Fallback to typical schedule with mock data (apply level filtering)
+            // Fallback to typical schedule with mock data
             for (int i = 0; i < typicalPracticesForDay.length; i++) {
               var practice = typicalPracticesForDay[i];
               
-              // Apply level filtering to typical schedule
+              // Check level filtering for typical schedule
               final practiceTag = practice['tag'] as String?;
               final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
                   (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
               
-              if (passesLevelFilter) {
-                final hash = date.hashCode + practice['location'].hashCode;
-                practiceStatuses.add(hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
-                    ? PracticeStatus.attended 
-                    : PracticeStatus.notAttended);
-              }
+              final hash = date.hashCode + practice['location'].hashCode;
+              final status = hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
+                  ? PracticeStatus.attended 
+                  : PracticeStatus.notAttended;
+              
+              practiceStatuses.add(FilteredPracticeStatus(
+                status: status,
+                passesFilter: passesLevelFilter,
+              ));
             }
           }
         } else {
           // Future practices - check for real practices first, then fall back to typical schedule
           final realPracticesForDay = club.upcomingPractices.where((practice) {
             final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            final isCorrectDate = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
-            
-            // Apply level filtering if provider is available
-            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
-            
-            return isCorrectDate && passesLevelFilter;
+            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
           }).toList();
           
           if (realPracticesForDay.isNotEmpty) {
             // Use real practice data with participation status
             for (final practice in realPracticesForDay) {
+              final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
+              
+              PracticeStatus status;
               if (participationProvider != null) {
                 final participationStatus = participationProvider.getParticipationStatus(practice.id);
                 
                 switch (participationStatus) {
                   case ParticipationStatus.yes:
-                    practiceStatuses.add(PracticeStatus.rsvpYes);
+                    status = PracticeStatus.rsvpYes;
                     break;
                   case ParticipationStatus.maybe:
-                    practiceStatuses.add(PracticeStatus.rsvpMaybe);
+                    status = PracticeStatus.rsvpMaybe;
                     break;
                   case ParticipationStatus.no:
-                    practiceStatuses.add(PracticeStatus.rsvpNo);
+                    status = PracticeStatus.rsvpNo;
                     break;
                   case ParticipationStatus.blank:
-                    practiceStatuses.add(PracticeStatus.noRsvp);
+                    status = PracticeStatus.noRsvp;
                     break;
                   case ParticipationStatus.attended:
-                    practiceStatuses.add(PracticeStatus.attended);
+                    status = PracticeStatus.attended;
                     break;
                   case ParticipationStatus.missed:
-                    practiceStatuses.add(PracticeStatus.notAttended);
+                    status = PracticeStatus.notAttended;
                     break;
                 }
               } else {
-                practiceStatuses.add(PracticeStatus.noRsvp);
+                status = PracticeStatus.noRsvp;
               }
+              
+              practiceStatuses.add(FilteredPracticeStatus(
+                status: status,
+                passesFilter: passesLevelFilter,
+              ));
             }
           } else {
-            // No real practice data - use typical schedule with no RSVP status (apply level filtering)
+            // No real practice data - use typical schedule with no RSVP status
             for (int i = 0; i < typicalPracticesForDay.length; i++) {
               var practice = typicalPracticesForDay[i];
               
-              // Apply level filtering to typical schedule
+              // Check level filtering for typical schedule
               final practiceTag = practice['tag'] as String?;
               final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
                   (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
               
-              if (passesLevelFilter) {
-                practiceStatuses.add(PracticeStatus.noRsvp);
-              }
+              practiceStatuses.add(FilteredPracticeStatus(
+                status: PracticeStatus.noRsvp,
+                passesFilter: passesLevelFilter,
+              ));
             }
           }
         }
@@ -562,7 +591,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return practices;
   }
 
-  void _onDayTapped(BuildContext context, DateTime date, List<PracticeStatus> practicesForDay) {
+  void _onDayTapped(BuildContext context, DateTime date, List<FilteredPracticeStatus> practicesForDay) {
     // Only navigate if there are practices on this day
     if (practicesForDay.isNotEmpty) {
       // Get practice schedule to generate actual Practice objects
