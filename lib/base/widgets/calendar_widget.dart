@@ -420,15 +420,15 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     
     if (club.id == 'denver-uwh') {
       typicalSchedule = [
-        {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
-        {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
-        {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
-        {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC'},
-        {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
+        {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC', 'tag': 'Open'},
+        {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody', 'tag': 'High-Level'},
+        {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC', 'tag': 'High-Level'},
+        {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC', 'tag': 'Intermediate'},
+        {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody', 'tag': 'Open'},
       ];
     } else if (club.id == 'sydney-uwh') {
       typicalSchedule = [
-        {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
+        {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde', 'tag': 'Open'},
       ];
     }
 
@@ -447,7 +447,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           // Past practices - use real practice data with participation status
           final realPracticesForDay = club.upcomingPractices.where((practice) {
             final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+            final isCorrectDate = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+            
+            // Apply level filtering if provider is available
+            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
+            
+            return isCorrectDate && passesLevelFilter;
           }).toList();
           
           if (realPracticesForDay.isNotEmpty && participationProvider != null) {
@@ -472,13 +477,21 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               }
             }
           } else {
-            // Fallback to typical schedule with mock data
+            // Fallback to typical schedule with mock data (apply level filtering)
             for (int i = 0; i < typicalPracticesForDay.length; i++) {
               var practice = typicalPracticesForDay[i];
-              final hash = date.hashCode + practice['location'].hashCode;
-              practiceStatuses.add(hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
-                  ? PracticeStatus.attended 
-                  : PracticeStatus.notAttended);
+              
+              // Apply level filtering to typical schedule
+              final practiceTag = practice['tag'] as String?;
+              final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
+                  (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
+              
+              if (passesLevelFilter) {
+                final hash = date.hashCode + practice['location'].hashCode;
+                practiceStatuses.add(hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
+                    ? PracticeStatus.attended 
+                    : PracticeStatus.notAttended);
+              }
             }
           }
         } else {
@@ -524,9 +537,18 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               }
             }
           } else {
-            // No real practice data - use typical schedule with no RSVP status
+            // No real practice data - use typical schedule with no RSVP status (apply level filtering)
             for (int i = 0; i < typicalPracticesForDay.length; i++) {
-              practiceStatuses.add(PracticeStatus.noRsvp);
+              var practice = typicalPracticesForDay[i];
+              
+              // Apply level filtering to typical schedule
+              final practiceTag = practice['tag'] as String?;
+              final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
+                  (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
+              
+              if (passesLevelFilter) {
+                practiceStatuses.add(PracticeStatus.noRsvp);
+              }
             }
           }
         }
