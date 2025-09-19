@@ -9,6 +9,7 @@ import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 import '../../base/widgets/phone_frame.dart';
+import '../../base/widgets/rsvp_components.dart';
 
 enum PracticeStatus {
   attended,
@@ -77,6 +78,15 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () => _showParticipationLegend(),
+                  child: const Icon(
+                    Icons.help_outline,
+                    size: 16,
+                    color: Color(0xFF6B7280),
                   ),
                 ),
                 const Spacer(),
@@ -710,9 +720,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 itemBuilder: (context, index) {
                   final practice = practices[index];
                   
-                  return _PracticeSelectionItem(
+                  return PracticeAttendanceCard(
                     practice: practice,
                     participationProvider: participationProvider,
+                    showAttendanceStatus: true,
                     onTap: () {
                       PhoneFrameModal.close();
                       Future.microtask(() {
@@ -932,241 +943,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       ),
     );
   }
-}
 
-/// Separate widget for practice selection items to isolate tag rendering from Consumer logic
-class _PracticeSelectionItem extends StatelessWidget {
-  final Practice practice;
-  final ParticipationProvider? participationProvider;
-  final VoidCallback onTap;
-
-  const _PracticeSelectionItem({
-    required this.practice,
-    required this.participationProvider,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.shade300),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Blue dot indicator
-            Container(
-              width: 8,
-              height: 8,
-              margin: const EdgeInsets.only(top: 6), // Align with title baseline
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            // Practice info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title and tag row - tag always shows if present
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          practice.title,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      // Tag - completely independent of status logic
-                      if (practice.tag != null)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-                          ),
-                          child: Text(
-                            practice.tag!,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.primary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  
-                  // Date, Time, Location with Status Icon row
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Left side - date/time/location info
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Date
-                            Row(
-                              children: [
-                                Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _formatDateForCard(practice.dateTime),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            
-                            // Time
-                            Row(
-                              children: [
-                                Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    _formatTimeRange(practice.dateTime, practice.duration),
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 4),
-                            
-                            // Location
-                            Row(
-                              children: [
-                                Icon(Icons.location_on, size: 14, color: Colors.grey[600]),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: Text(
-                                    practice.location,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.grey[600],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      
-                      // Right side - Participation status icon
-                      Consumer<ParticipationProvider>(
-                        builder: (context, provider, child) {
-                          final status = provider.getParticipationStatus(practice.id);
-                          
-                          if (status == null || status == ParticipationStatus.blank) {
-                            return const SizedBox(width: 44); // Reserve space even when empty
-                          }
-                          
-                          // For attended/missed status, always show blue circle regardless of past mode
-                          if (status == ParticipationStatus.attended || status == ParticipationStatus.missed) {
-                            return Container(
-                              margin: const EdgeInsets.only(left: 12),
-                              width: 32,
-                              height: 32,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary, // Blue circle for attended/missed
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
-                                status == ParticipationStatus.attended ? Icons.check : Icons.close,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                            );
-                          }
-                          
-                          // For future practices with RSVP status, show outlined style like RSVP card
-                          return Container(
-                            margin: const EdgeInsets.only(left: 12),
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              border: Border.all(
-                                color: status.color,
-                                width: 2,
-                              ),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              status.overlayIcon,
-                              color: status.color,
-                              size: 18,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
+  /// Show participation status legend modal
+  void _showParticipationLegend() {
+    PhoneModalUtils.showPhoneFrameModal(
+      context: context,
+      child: const ParticipationStatusLegendModal(),
     );
-  }
-
-  String _formatDateForCard(DateTime dateTime) {
-    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return '${weekdays[dateTime.weekday - 1]}, ${months[dateTime.month - 1]} ${dateTime.day}';
-  }
-
-  String _formatTimeRange(DateTime dateTime, Duration duration) {
-    final startHour = dateTime.hour;
-    final startMinute = dateTime.minute;
-    final startPeriod = startHour >= 12 ? 'PM' : 'AM';
-    final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
-    
-    // Calculate end time using practice duration
-    final endTime = dateTime.add(duration);
-    final endHour = endTime.hour;
-    final endMinute = endTime.minute;
-    final endPeriod = endHour >= 12 ? 'PM' : 'AM';
-    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
-    
-    // Format time without trailing zeros
-    String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
-      final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
-      final periodStr = includePeriod ? ' $period' : '';
-      return '$hour$minuteStr$periodStr';
-    }
-    
-    // Check if we span from morning to afternoon/evening (AM to PM)
-    final spansAmPm = startPeriod != endPeriod;
-    
-    final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
-    final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
-    
-    return '$startTimeStr - $endTimeStr';
   }
 }

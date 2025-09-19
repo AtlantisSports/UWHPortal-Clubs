@@ -1359,11 +1359,14 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
   
   Future<void> _pickDate(bool isStart) async {
     final initialDate = isStart ? _startDate : _endDate;
-    final pickedDate = await showDatePicker(
+    final pickedDate = await PhoneModalUtils.showPhoneFrameModal<DateTime>(
       context: context,
-      initialDate: initialDate ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      child: _CustomDatePickerModal(
+        initialDate: initialDate ?? DateTime.now(),
+        firstDate: DateTime.now(),
+        lastDate: DateTime.now().add(const Duration(days: 365)),
+        title: isStart ? 'Select Start Date' : 'Select End Date',
+      ),
     );
     
     if (pickedDate != null) {
@@ -1935,6 +1938,110 @@ class _LevelSelectionModalState extends State<_LevelSelectionModal> {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Custom Date Picker Modal that respects phone frame boundaries
+class _CustomDatePickerModal extends StatefulWidget {
+  final DateTime initialDate;
+  final DateTime firstDate;
+  final DateTime lastDate;
+  final String title;
+  
+  const _CustomDatePickerModal({
+    required this.initialDate,
+    required this.firstDate,
+    required this.lastDate,
+    required this.title,
+  });
+  
+  @override
+  State<_CustomDatePickerModal> createState() => _CustomDatePickerModalState();
+}
+
+class _CustomDatePickerModalState extends State<_CustomDatePickerModal> {
+  late DateTime _selectedDate;
+  
+  @override
+  void initState() {
+    super.initState();
+    _selectedDate = widget.initialDate;
+  }
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  widget.title,
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+          ),
+          
+          // Calendar
+          Flexible(
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: CalendarDatePicker(
+                initialDate: _selectedDate,
+                firstDate: widget.firstDate,
+                lastDate: widget.lastDate,
+                onDateChanged: (date) {
+                  setState(() {
+                    _selectedDate = date;
+                  });
+                },
+              ),
+            ),
+          ),
+          
+          // Action buttons
+          Padding(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('Cancel'),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(_selectedDate),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
           ),
         ],
       ),

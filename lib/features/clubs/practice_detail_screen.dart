@@ -135,8 +135,18 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
           leading: IconButton(
             icon: Icon(Icons.arrow_back, color: AppColors.textPrimary),
             onPressed: () {
-              // Simply pop back to the previous screen (club details)
-              Navigator.of(context).pop();
+              // Navigate to Club Details for hierarchical navigation
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => PhoneFrameWrapper(
+                    onBackPressed: () => Navigator.of(context).pop(),
+                    child: ClubDetailScreen(
+                      club: widget.club,
+                      currentUserId: widget.currentUserId,
+                    ),
+                  ),
+                ),
+              );
             },
           ),
           title: Text(
@@ -201,31 +211,18 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                 ),
               ),
             ),
-            // RSVP Card for future events, Attendance indicator for past events
+            // RSVP Card for future events, Attendance card for past events
             _isPastEvent(widget.practice)
                 ? Container(
                     margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                    padding: EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey[300]!),
-                    ),
-                    child: Row(
-                      children: [
-                        _buildAttendanceIndicator(_getUserAttendanceStatus(widget.practice)),
-                        SizedBox(width: 12),
-                        Text(
-                          _getUserAttendanceStatus(widget.practice)
-                              ? 'You attended this practice'
-                              : 'You did not attend this practice',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ],
+                    child: Consumer<ParticipationProvider>(
+                      builder: (context, participationProvider, child) {
+                        return PracticeAttendanceCard(
+                          practice: widget.practice,
+                          participationProvider: participationProvider,
+                          showAttendanceStatus: true,
+                        );
+                      },
                     ),
                   )
                 : Container(

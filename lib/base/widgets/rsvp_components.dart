@@ -8,6 +8,7 @@ import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'guest_management_modal.dart';
 import 'phone_modal_utils.dart';
+import 'phone_frame.dart';
 
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
@@ -805,6 +806,177 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
   }
 }
 
+/// Participation Status Legend Modal
+/// Shows a key/legend explaining different participation icons
+class ParticipationStatusLegendModal extends StatelessWidget {
+  const ParticipationStatusLegendModal({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      constraints: const BoxConstraints(
+        maxHeight: 600, // Increased from default to accommodate all content
+        maxWidth: 400,
+      ),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.all(Radius.circular(16)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Modal header with close button
+          Row(
+            children: [
+              const Expanded(child: SizedBox()), // Push close button to right
+              IconButton(
+                onPressed: () => PhoneFrameModal.close(),
+                icon: const Icon(
+                  Icons.close,
+                  color: Color(0xFF6B7280),
+                ),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ],
+          ),
+          
+          // Main title
+          const Text(
+            'Announced Practices',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF111827),
+            ),
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // Note about practices
+          const Text(
+            'List of planned upcoming practices',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Divider line
+          Container(
+            height: 1,
+            color: Color(0xFFE5E7EB),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Icon legend subtitle
+          const Text(
+            'Icon legend',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF374151),
+            ),
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // Legend items
+          _buildLegendItem(
+            Icons.check_circle_outline,
+            ParticipationStatus.yes.color,
+            'YES',
+            'You will attend this practice',
+          ),
+          
+          const SizedBox(height: 16),
+          
+          _buildLegendItem(
+            Icons.help_outline,
+            ParticipationStatus.maybe.color,
+            'MAYBE',
+            'You\'re unsure about attending this practice',
+          ),
+          
+          const SizedBox(height: 16),
+          
+          _buildLegendItem(
+            Icons.cancel_outlined,
+            ParticipationStatus.no.color,
+            'NO',
+            'You will not attend this practice',
+          ),
+          
+          const SizedBox(height: 16),
+          
+          _buildLegendItem(
+            Icons.check_circle,
+            ParticipationStatus.attended.color,
+            'ATTENDED',
+            'Confirmed to have attended practice',
+          ),
+          
+          const SizedBox(height: 16),
+          
+          _buildLegendItem(
+            Icons.cancel,
+            ParticipationStatus.missed.color,
+            'MISSED',
+            'Confirmed to have not attended practice',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLegendItem(IconData icon, Color color, String title, String description) {
+    return Row(
+      children: [
+        // Icon
+        Icon(
+          icon,
+          size: 36,
+          color: color,
+        ),
+        
+        const SizedBox(width: 12),
+        
+        // Text content
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Selectable practice card for bulk RSVP operations
 class SelectablePracticeCard extends StatelessWidget {
   final Practice practice;
@@ -1336,3 +1508,218 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
     return '$weekday, $month $day • $displayHour:$minute $period';
   }
 }
+
+/// Practice Attendance Card component
+/// Displays practice information with attendance status in a consistent card format
+/// Used for both Practice Details page and Select Practice modal
+class PracticeAttendanceCard extends StatelessWidget {
+  final Practice practice;
+  final ParticipationProvider? participationProvider;
+  final VoidCallback? onTap;
+  final bool showAttendanceStatus;
+  
+  const PracticeAttendanceCard({
+    super.key,
+    required this.practice,
+    this.participationProvider,
+    this.onTap,
+    this.showAttendanceStatus = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final userStatus = participationProvider?.getParticipationStatus(practice.id);
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F000000),
+            blurRadius: 8,
+            offset: Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _formatPracticeDate(practice.dateTime),
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _formatPracticeTimeRange(practice.dateTime, practice.duration),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.location_on_outlined,
+                                size: 16,
+                                color: Color(0xFF6B7280),
+                              ),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  practice.location,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // Practice tag
+                        if (practice.tag != null) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0284C7).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3)),
+                            ),
+                            child: Text(
+                              practice.tag!,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF0284C7),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                        ],
+                        // Attendance icon
+                        if (showAttendanceStatus && userStatus != null && userStatus != ParticipationStatus.blank)
+                          _buildAttendanceIcon(userStatus),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAttendanceIcon(ParticipationStatus status) {
+    IconData iconData;
+    Color iconColor = const Color(0xFF0284C7); // Blue color for attendance icons
+    
+    switch (status) {
+      case ParticipationStatus.attended:
+        iconData = Icons.check_circle;
+        break;
+      case ParticipationStatus.missed:
+        iconData = Icons.cancel;
+        break;
+      case ParticipationStatus.yes:
+        iconData = Icons.check_circle_outline;
+        break;
+      case ParticipationStatus.no:
+        iconData = Icons.cancel_outlined;
+        break;
+      case ParticipationStatus.maybe:
+        iconData = Icons.help_outline;
+        break;
+      default:
+        iconData = Icons.radio_button_unchecked;
+    }
+    
+    return Icon(
+      iconData,
+      size: 32, // Increased from 16 to 32 (100% increase)
+      color: iconColor,
+    );
+  }
+
+  String _formatPracticeTimeRange(DateTime dateTime, Duration duration) {
+    final startHour = dateTime.hour;
+    final startMinute = dateTime.minute;
+    final startPeriod = startHour >= 12 ? 'PM' : 'AM';
+    final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
+    
+    // Calculate end time using practice duration
+    final endTime = dateTime.add(duration);
+    final endHour = endTime.hour;
+    final endMinute = endTime.minute;
+    final endPeriod = endHour >= 12 ? 'PM' : 'AM';
+    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
+    
+    // Format time without trailing zeros
+    String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
+      final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
+      final periodStr = includePeriod ? ' $period' : '';
+      return '$hour$minuteStr$periodStr';
+    }
+    
+    // Check if we span from morning to afternoon/evening (AM to PM)
+    final spansAmPm = startPeriod != endPeriod;
+    
+    final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
+    final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
+    
+    return '$startTimeStr - $endTimeStr';
+  }
+
+  String _formatPracticeDate(DateTime dateTime) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final practiceDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
+    
+    if (practiceDate == today) {
+      return 'Today';
+    } else if (practiceDate == today.add(const Duration(days: 1))) {
+      return 'Tomorrow';
+    } else if (practiceDate == today.subtract(const Duration(days: 1))) {
+      return 'Yesterday';
+    } else {
+      final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+      final months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                     'July', 'August', 'September', 'October', 'November', 'December'];
+      
+      final weekday = weekdays[dateTime.weekday - 1];
+      final month = months[dateTime.month - 1];
+      final day = dateTime.day;
+      
+      return '$weekday, $month $day';
+    }
+  }
+}
+
