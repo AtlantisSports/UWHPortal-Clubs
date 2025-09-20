@@ -157,8 +157,9 @@ class _ClubCardState extends State<ClubCard> {
             ),
             const SizedBox(height: 8),
             // Practice RSVP Card
-            PracticeRSVPCard(
+            PracticeStatusCard(
               practice: widget.nextPractice!,
+              mode: PracticeStatusCardMode.clickable,
               clubId: widget.clubId,
               currentParticipationStatus: widget.currentParticipationStatus,
               onParticipationChanged: widget.onParticipationChanged ?? (_) {},

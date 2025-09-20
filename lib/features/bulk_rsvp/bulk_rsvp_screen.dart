@@ -4,12 +4,9 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
-import '../../core/providers/participation_provider.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../core/constants/app_constants.dart';
-import '../../features/clubs/clubs_provider.dart';
 import '../../base/widgets/bulk_rsvp_manager.dart';
 import '../../base/widgets/phone_frame.dart';
 

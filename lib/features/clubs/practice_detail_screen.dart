@@ -70,34 +70,6 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
     return practiceEndTime.isBefore(now);
   }
 
-  bool _getUserAttendanceStatus(Practice practice) {
-    // For past practices, use ParticipationProvider to ensure consistency
-    if (_isPastEvent(practice)) {
-      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-      final status = participationProvider.getParticipationStatus(practice.id);
-      return status == ParticipationStatus.attended;
-    }
-    
-    // For future practices, this method shouldn't be called, but return false as fallback
-    return false;
-  }
-
-  Widget _buildAttendanceIndicator(bool attended) {
-    return Container(
-      width: 20,
-      height: 20,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: AppColors.primary, // Use system blue for both states
-      ),
-      child: Icon(
-        attended ? Icons.check : Icons.close,
-        color: Colors.white,
-        size: 14,
-      ),
-    );
-  }
-
   void _showCustomToast(String message, Color color, IconData icon) {
     setState(() {
       _toastMessage = message;
@@ -217,8 +189,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                     margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Consumer<ParticipationProvider>(
                       builder: (context, participationProvider, child) {
-                        return PracticeAttendanceCard(
+                        return PracticeStatusCard(
                           practice: widget.practice,
+                          mode: PracticeStatusCardMode.readOnly,
                           participationProvider: participationProvider,
                           showAttendanceStatus: true,
                         );
@@ -229,8 +202,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
                     margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
                     child: Consumer<ParticipationProvider>(
                       builder: (context, participationProvider, child) {
-                        return PracticeRSVPCard(
+                        return PracticeStatusCard(
                           practice: widget.practice,
+                          mode: PracticeStatusCardMode.clickable,
                           clubId: widget.club.id,
                           onParticipationChanged: widget.onParticipationChanged != null 
                               ? (status) {

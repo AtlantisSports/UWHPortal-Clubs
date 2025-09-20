@@ -4,8 +4,6 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/constants/dependent_constants.dart';
-import 'multi_select_dropdown.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
 import 'phone_frame.dart';
@@ -172,7 +170,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     
     // Debug logging
     if (type == GuestType.dependent) {
-      print('Building ${type.displayName} section with ${guests.length} guests: ${guests.map((g) => g.name).toList()}');
+      // TODO: Replace with proper logging
+      // print('Building ${type.displayName} section with ${guests.length} guests: ${guests.map((g) => g.name).toList()}');
     }
     
     return Column(
@@ -413,7 +412,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                     nameController.text.trim().isEmpty) 
                     ? null 
                     : () {
-                        print('Add button pressed for ${type.displayName} with ${_selectedDependents.length} dependents');
+                        // TODO: Replace with proper logging
+                        // print('Add button pressed for ${type.displayName} with ${_selectedDependents.length} dependents');
                         _addGuest(type);
                       },
                 style: ElevatedButton.styleFrom(
@@ -460,15 +460,17 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           waiverSigned: waiverSigned,
         );
         _guestList = _guestList.addGuest(guest);
-        print('Added dependent guest: ${guest.name}, ID: ${guest.id}, Type: ${guest.type}');
+        // TODO: Replace with proper logging
+        // print('Added dependent guest: ${guest.name}, ID: ${guest.id}, Type: ${guest.type}');
       }
       
       setState(() {
         _waiverStates[type] = false;
         _expandedSections[type] = false;
         _selectedDependents.clear();
-        print('Current guest list has ${_guestList.totalGuests} guests');
-        print('Dependents in list: ${_guestList.getGuestsByType(GuestType.dependent).map((g) => g.name).toList()}');
+        // TODO: Replace with proper logging
+        // print('Current guest list has ${_guestList.totalGuests} guests');
+        // print('Dependents in list: ${_guestList.getGuestsByType(GuestType.dependent).map((g) => g.name).toList()}');
       });
     } else {
       // Handle single guest addition for other types

@@ -9,10 +9,8 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
-import 'multi_select_dropdown.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
-import 'phone_modal.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -82,8 +80,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   void _initializeRSVPProvider() {
     // Initialize participation provider with current club practices
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-      final clubPractices = _getClubPractices();
       // Note: ParticipationProvider handles initialization differently than RSVPProvider
       // We'll work with the existing structure
     });
@@ -403,19 +399,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     );
   }
   
-  String _getDayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday: return 'Monday';
-      case DateTime.tuesday: return 'Tuesday';
-      case DateTime.wednesday: return 'Wednesday';
-      case DateTime.thursday: return 'Thursday';
-      case DateTime.friday: return 'Friday';
-      case DateTime.saturday: return 'Saturday';
-      case DateTime.sunday: return 'Sunday';
-      default: return 'Unknown';
-    }
-  }
-  
   Widget _buildDynamicFilterRow() {
     List<Widget> filters = [];
     
@@ -605,7 +588,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         border: Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
@@ -1029,7 +1012,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _showCustomDatePicker() async {
-    final result = await PhoneModalUtils.showPhoneFrameModal<Map<String, DateTime>>(
+    await PhoneModalUtils.showPhoneFrameModal<Map<String, DateTime>>(
       context: context,
       child: _CustomDateRangeModal(
         initialStartDate: _customStartDate,
@@ -1049,20 +1032,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           }
         },
       ),
-    );
-  }
-  
-  void _showDependentManagementModal() async {
-    await PhoneModalUtils.showDependentManagementModal(
-      context: context,
-      availableDependents: _availableDependents,
-      selectedDependents: _selectedDependents,
-      onDependentsChanged: (selectedDependents) {
-        setState(() {
-          _selectedDependents.clear();
-          _selectedDependents.addAll(selectedDependents);
-        });
-      },
     );
   }
   
@@ -1216,16 +1185,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       
       // Get practice IDs based on selected timeframe and filters
       final targetPracticeIds = _getTargetPracticeIds();
-      
-      // Create the bulk participation request
-      final request = BulkParticipationRequest(
-        practiceIds: targetPracticeIds,
-        newStatus: _selectedRSVPChoice!,
-        clubId: widget.club.id,
-        userId: participationProvider.currentUserId,
-        includeDependents: _includeDependents,
-        selectedDependents: _selectedDependents,
-      );
       
       // If we're including dependents and RSVPing YES, store guest data
       if (_includeDependents && _selectedRSVPChoice == ParticipationStatus.yes && _selectedDependents.isNotEmpty) {
@@ -2265,7 +2224,7 @@ class _TooltipWidgetState extends State<_TooltipWidget> {
                         borderRadius: BorderRadius.circular(6),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.2),
+                            color: Colors.black.withValues(alpha: 0.2),
                             blurRadius: 4,
                             offset: const Offset(0, 2),
                           ),

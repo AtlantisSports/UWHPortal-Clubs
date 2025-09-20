@@ -8,7 +8,6 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/phone_modal_utils.dart';
-import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
 
 enum PracticeStatus {
@@ -718,15 +717,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
-  String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final amPm = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $amPm';
-  }
-
   void _showPracticeSelectionModal(BuildContext context, List<Practice> practices, ParticipationProvider? participationProvider) {
     PhoneModalUtils.showPhoneFrameModal(
       context: context,
@@ -771,8 +761,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 itemBuilder: (context, index) {
                   final practice = practices[index];
                   
-                  return PracticeAttendanceCard(
+                  return PracticeStatusCard(
                     practice: practice,
+                    mode: PracticeStatusCardMode.readOnly,
                     participationProvider: participationProvider,
                     showAttendanceStatus: true,
                     onTap: () {
@@ -860,138 +851,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           ),
         );
       },
-    );
-  }
-
-  /// Get the participation status for a practice
-  ParticipationStatus? _getParticipationStatus(Practice practice, ParticipationProvider? participationProvider) {
-    if (participationProvider == null) return null;
-    return participationProvider.getParticipationStatus(practice.id);
-  }
-
-  /// Build a participation status icon
-  Widget? _buildParticipationStatusIcon(ParticipationStatus? status) {
-    if (status == null || status == ParticipationStatus.blank) return null;
-    
-    return Container(
-      width: 16,
-      height: 16,
-      decoration: BoxDecoration(
-        color: status.color,
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        status.overlayIcon,
-        color: Colors.white,
-        size: 10,
-      ),
-    );
-  }
-
-  /// Build participation status display (matching RSVP card format)
-  Widget _buildParticipationStatusDisplay(ParticipationStatus? status, Practice practice) {
-    if (status == null || status == ParticipationStatus.blank) {
-      return const SizedBox.shrink();
-    }
-    
-    // For past practices, use blue attendance indicators
-    if (practice.isInPastMode) {
-      return Container(
-        width: 32,
-        height: 32,
-        decoration: BoxDecoration(
-          color: AppColors.primary, // System blue for both attended/missed
-          shape: BoxShape.circle,
-        ),
-        child: Icon(
-          status == ParticipationStatus.attended ? Icons.check : Icons.close,
-          color: Colors.white,
-          size: 18,
-        ),
-      );
-    }
-    
-    // For future practices, use RSVP-style indicators
-    bool isSelected = status != ParticipationStatus.blank;
-    return Container(
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: isSelected ? status.color : Colors.transparent,
-        border: Border.all(
-          color: status.color,
-          width: 2,
-        ),
-        shape: BoxShape.circle,
-      ),
-      child: Icon(
-        status.overlayIcon,
-        color: isSelected ? Colors.white : status.color,
-        size: 18,
-      ),
-    );
-  }
-
-  /// Format date for card display (matching RSVP card format)
-  String _formatDateForCard(DateTime dateTime) {
-    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    return '${weekdays[dateTime.weekday - 1]}, ${months[dateTime.month - 1]} ${dateTime.day}';
-  }
-
-  /// Format time range for card display (matching RSVP card format)
-  String _formatTimeRange(DateTime dateTime, Duration duration) {
-    final startHour = dateTime.hour;
-    final startMinute = dateTime.minute;
-    final startPeriod = startHour >= 12 ? 'PM' : 'AM';
-    final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
-    
-    // Calculate end time using practice duration
-    final endTime = dateTime.add(duration);
-    final endHour = endTime.hour;
-    final endMinute = endTime.minute;
-    final endPeriod = endHour >= 12 ? 'PM' : 'AM';
-    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
-    
-    // Format time without trailing zeros
-    String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
-      final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
-      final periodStr = includePeriod ? ' $period' : '';
-      return '$hour$minuteStr$periodStr';
-    }
-    
-    // Check if we span from morning to afternoon/evening (AM to PM)
-    final spansAmPm = startPeriod != endPeriod;
-    
-    final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
-    final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
-    
-    return '$startTimeStr - $endTimeStr';
-  }
-
-  /// Build practice tag widget independently of status logic
-  Widget _buildPracticeTag(Practice practice) {
-    if (practice.tag == null) {
-      return const SizedBox.shrink();
-    }
-    
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: AppColors.primary.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        practice.tag!,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppColors.primary,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
     );
   }
 

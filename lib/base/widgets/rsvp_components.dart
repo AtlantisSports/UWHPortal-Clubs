@@ -8,7 +8,6 @@ import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import 'guest_management_modal.dart';
 import 'phone_modal_utils.dart';
-import 'phone_frame.dart';
 
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
@@ -301,33 +300,218 @@ class RSVPSummary extends StatelessWidget {
   }
 }
 
-/// Practice RSVP Card component with circle-based RSVP design
-/// Shows practice details with circle RSVP buttons
-class PracticeRSVPCard extends StatefulWidget {
+/// Practice Status Card component with two modes: CLICKABLE and READ_ONLY
+/// CLICKABLE mode: Interactive RSVP for future practices (replaces PracticeRSVPCard)
+/// READ_ONLY mode: Status display for past practices and modals (replaces PracticeAttendanceCard)
+enum PracticeStatusCardMode { clickable, readOnly }
+
+class PracticeStatusCard extends StatefulWidget {
   final Practice practice;
+  final PracticeStatusCardMode mode;
   final String? clubId; // Add clubId for RSVP updates
   final ParticipationStatus? currentParticipationStatus; // Optional override of participation status
   final Function(ParticipationStatus)? onParticipationChanged; // Callback when participation changes
   final VoidCallback? onLocationTap;
-  final VoidCallback? onInfoTap; // Add callback for info icon
+  final VoidCallback? onInfoTap; // Add callback for info icon (only used in CLICKABLE mode)
+  final VoidCallback? onTap; // For READ_ONLY mode card tap
+  final ParticipationProvider? participationProvider; // For READ_ONLY mode
+  final bool showAttendanceStatus; // For READ_ONLY mode
   
-  const PracticeRSVPCard({
+  const PracticeStatusCard({
     super.key,
     required this.practice,
+    required this.mode,
     this.clubId,
     this.currentParticipationStatus,
     this.onParticipationChanged,
     this.onLocationTap,
     this.onInfoTap,
+    this.onTap,
+    this.participationProvider,
+    this.showAttendanceStatus = true,
   });
   
   @override
-  State<PracticeRSVPCard> createState() => _PracticeRSVPCardState();
+  State<PracticeStatusCard> createState() => _PracticeStatusCardState();
 }
 
-class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
+class _PracticeStatusCardState extends State<PracticeStatusCard> {
   @override
   Widget build(BuildContext context) {
+    if (widget.mode == PracticeStatusCardMode.readOnly) {
+      return _buildReadOnlyCard();
+    } else {
+      return _buildClickableCard();
+    }
+  }
+
+  Widget _buildReadOnlyCard() {
+    final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
+    
+    return Container(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB), // Same light gray background as RSVP card
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with status text and practice tag - same layout as RSVP card
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Left: Status label (no info icon in read-only mode)
+              const Text(
+                'RSVP',
+                style: TextStyle(
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF374151),
+                ),
+              ),
+              // Center: Status text
+              Expanded(
+                child: Center(
+                  child: Text(
+                    _getParticipationHeaderText(userStatus),
+                    style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                      color: _getParticipationHeaderColor(userStatus),
+                    ),
+                  ),
+                ),
+              ),
+              // Right: Practice tag
+              if (widget.practice.tag != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    widget.practice.tag!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF0284C7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(width: 24), // Placeholder to maintain alignment
+            ],
+          ),
+          const SizedBox(height: 6),
+          
+          // Practice details - same layout as RSVP card
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Date
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatDate(widget.practice.dateTime),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    
+                    // Time
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            _formatTime(widget.practice.dateTime),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    
+                    // Location
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: MouseRegion(
+                            cursor: widget.onLocationTap != null 
+                                ? SystemMouseCursors.click 
+                                : SystemMouseCursors.basic,
+                            child: GestureDetector(
+                              onTap: widget.onLocationTap,
+                              child: Text(
+                                widget.practice.location,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: widget.onLocationTap != null 
+                                      ? const Color(0xFF0284C7) 
+                                      : const Color(0xFF6B7280),
+                                  decoration: widget.onLocationTap != null 
+                                      ? TextDecoration.underline 
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Status display (single disabled button showing current status)
+              if (widget.showAttendanceStatus && userStatus != null)
+                _buildReadOnlyStatusDisplay(userStatus),
+            ],
+          ),
+          
+          // Guest section for read-only mode (if user is going and has guests)
+          if (userStatus == ParticipationStatus.yes) ...[
+            const SizedBox(height: 12),
+            _buildReadOnlyGuestSection(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildClickableCard() {
     return Consumer<ParticipationProvider>(
       builder: (context, participationProvider, child) {
         // Get current participation status from provider, fallback to widget parameter
@@ -529,7 +713,111 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       },
     );
   }
-  
+
+  Widget _buildReadOnlyStatusDisplay(ParticipationStatus status) {
+    // Use exact same layout as RSVP buttons but with system blue color scheme
+    final isBlank = status == ParticipationStatus.blank;
+    final isAttendanceStatus = status == ParticipationStatus.attended || status == ParticipationStatus.missed;
+    
+    return Container(
+      width: 53, // Same as RSVP buttons
+      height: 53, // Same as RSVP buttons
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isBlank ? Colors.grey.withValues(alpha: 0.3) : AppColors.primary.withValues(alpha: 0.3),
+          width: 1,
+        ),
+        color: isBlank ? Colors.grey.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
+      ),
+      child: Center(
+        child: isAttendanceStatus 
+          ? Container(
+              width: 35,
+              height: 35,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.primary, // System blue background
+              ),
+              child: Icon(
+                status == ParticipationStatus.attended ? Icons.check : Icons.close,
+                size: 21, // 35 * 0.6
+                color: Colors.white, // White icon
+              ),
+            )
+          : Container(
+              width: 35,
+              height: 35,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isBlank ? Colors.transparent : AppColors.primary.withValues(alpha: 0.1),
+                border: Border.all(
+                  color: isBlank ? Colors.grey : AppColors.primary,
+                  width: 2.8,
+                ),
+              ),
+              child: isBlank 
+                ? null
+                : Icon(
+                    _getOverlayIcon(status),
+                    size: 21,
+                    color: AppColors.primary,
+                  ),
+            ),
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyGuestSection() {
+    if (widget.participationProvider == null) return const SizedBox.shrink();
+    
+    final guestList = widget.participationProvider!.getPracticeGuests(widget.practice.id);
+    final bringGuest = widget.participationProvider!.getBringGuestState(widget.practice.id);
+    
+    if (!bringGuest || guestList.totalGuests == 0) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Read-only guest display (no checkbox, no edit button)
+          Row(
+            children: [
+              Icon(
+                Icons.group,
+                size: 16,
+                color: const Color(0xFF0284C7),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Bringing guests',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF374151),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Bringing ${guestList.totalGuests} guest${guestList.totalGuests == 1 ? '' : 's'}',
+            style: const TextStyle(
+              fontSize: 13,
+              color: Color(0xFF6B7280),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildGuestSection(ParticipationProvider participationProvider, bool bringGuest, PracticeGuestList guestList) {
     return Container(
       padding: const EdgeInsets.all(6), // Reduced from 12 to 6 (50% reduction)
@@ -722,7 +1010,7 @@ class _PracticeRSVPCardState extends State<PracticeRSVPCard> {
       case ParticipationStatus.maybe:
         return 'Will you attend?';
       case ParticipationStatus.blank:
-        return 'Will you attend?';
+        return 'Pending';
       case ParticipationStatus.attended:
         return 'You attended';
       case ParticipationStatus.missed:
@@ -1509,223 +1797,5 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
   }
 }
 
-/// Practice Attendance Card component
-/// Displays practice information with attendance status in a consistent card format
-/// Used for both Practice Details page and Select Practice modal
-class PracticeAttendanceCard extends StatelessWidget {
-  final Practice practice;
-  final ParticipationProvider? participationProvider;
-  final VoidCallback? onTap;
-  final bool showAttendanceStatus;
-  
-  const PracticeAttendanceCard({
-    super.key,
-    required this.practice,
-    this.participationProvider,
-    this.onTap,
-    this.showAttendanceStatus = true,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    final userStatus = participationProvider?.getParticipationStatus(practice.id);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0F000000),
-            blurRadius: 8,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(12),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _formatPracticeDate(practice.dateTime),
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF111827),
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _formatPracticeTimeRange(practice.dateTime, practice.duration),
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                size: 16,
-                                color: Color(0xFF6B7280),
-                              ),
-                              const SizedBox(width: 4),
-                              Expanded(
-                                child: Text(
-                                  practice.location,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Color(0xFF6B7280),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // Practice tag
-                        if (practice.tag != null) ...[
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFF0284C7).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(color: const Color(0xFF0284C7).withOpacity(0.3)),
-                            ),
-                            child: Text(
-                              practice.tag!,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Color(0xFF0284C7),
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                        // Attendance icon
-                        if (showAttendanceStatus && userStatus != null && userStatus != ParticipationStatus.blank)
-                          _buildAttendanceIcon(userStatus),
-                      ],
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAttendanceIcon(ParticipationStatus status) {
-    IconData iconData;
-    Color iconColor;
-    
-    switch (status) {
-      case ParticipationStatus.attended:
-        iconData = Icons.check_circle;
-        iconColor = const Color(0xFF0284C7); // Blue for attended
-        break;
-      case ParticipationStatus.missed:
-        iconData = Icons.cancel;
-        iconColor = const Color(0xFF0284C7); // Blue for missed
-        break;
-      case ParticipationStatus.yes:
-        iconData = Icons.check_circle_outline;
-        iconColor = AppColors.success; // Green for RSVP yes
-        break;
-      case ParticipationStatus.no:
-        iconData = Icons.cancel_outlined;
-        iconColor = AppColors.error; // Red for RSVP no
-        break;
-      case ParticipationStatus.maybe:
-        iconData = Icons.help_outline;
-        iconColor = const Color(0xFFD97706); // Orange for RSVP maybe
-        break;
-      default:
-        iconData = Icons.radio_button_unchecked;
-        iconColor = Colors.grey;
-    }
-    
-    return Icon(
-      iconData,
-      size: 32, // Increased from 16 to 32 (100% increase)
-      color: iconColor,
-    );
-  }
-
-  String _formatPracticeTimeRange(DateTime dateTime, Duration duration) {
-    final startHour = dateTime.hour;
-    final startMinute = dateTime.minute;
-    final startPeriod = startHour >= 12 ? 'PM' : 'AM';
-    final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
-    
-    // Calculate end time using practice duration
-    final endTime = dateTime.add(duration);
-    final endHour = endTime.hour;
-    final endMinute = endTime.minute;
-    final endPeriod = endHour >= 12 ? 'PM' : 'AM';
-    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
-    
-    // Format time without trailing zeros
-    String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
-      final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
-      final periodStr = includePeriod ? ' $period' : '';
-      return '$hour$minuteStr$periodStr';
-    }
-    
-    // Check if we span from morning to afternoon/evening (AM to PM)
-    final spansAmPm = startPeriod != endPeriod;
-    
-    final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
-    final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
-    
-    return '$startTimeStr - $endTimeStr';
-  }
-
-  String _formatPracticeDate(DateTime dateTime) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final practiceDate = DateTime(dateTime.year, dateTime.month, dateTime.day);
-    
-    if (practiceDate == today) {
-      return 'Today';
-    } else if (practiceDate == today.add(const Duration(days: 1))) {
-      return 'Tomorrow';
-    } else if (practiceDate == today.subtract(const Duration(days: 1))) {
-      return 'Yesterday';
-    } else {
-      final weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-      final months = ['January', 'February', 'March', 'April', 'May', 'June', 
-                     'July', 'August', 'September', 'October', 'November', 'December'];
-      
-      final weekday = weekdays[dateTime.weekday - 1];
-      final month = months[dateTime.month - 1];
-      final day = dateTime.day;
-      
-      return '$weekday, $month $day';
-    }
-  }
-}
 

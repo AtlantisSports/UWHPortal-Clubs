@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 class MultiSelectDropdown extends StatefulWidget {
   final String label;
@@ -157,7 +156,6 @@ class _MultiSelectDropdownState extends State<MultiSelectDropdown> {
     
     // Get screen height to calculate available space
     final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
     
     // Account for phone frame UI elements (specific to our phone frame implementation)
     final phoneFrameNavigationHeight = 48.0; // From phone_frame.dart _buildNavigationBar
@@ -167,7 +165,6 @@ class _MultiSelectDropdownState extends State<MultiSelectDropdown> {
     // Calculate actual usable screen space within phone frame - be very conservative
     final usableTop = phoneFrameStatusHeight + appBarHeight;
     final usableBottom = screenHeight - phoneFrameNavigationHeight - 80; // Much larger buffer
-    final usableHeight = usableBottom - usableTop;
     
     // Calculate approximate dropdown height (item height * items + padding)
     final hasSpecialOption = widget.showAllOption || widget.showNoneOption;
@@ -218,7 +215,6 @@ class _MultiSelectDropdownState extends State<MultiSelectDropdown> {
                 ),
                 child: StatefulBuilder(
                   builder: (context, setOverlayState) {
-                    final List<Widget> children = [];
                     final totalItemsForBuild = hasSpecialOption ? widget.items.length + 1 : widget.items.length;
                     
                     // Build items in order

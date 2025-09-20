@@ -465,8 +465,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                           ),
                         ),
                         SizedBox(height: 12),
-                        PracticeRSVPCard(
+                        PracticeStatusCard(
                           practice: nextPractice,
+                          mode: PracticeStatusCardMode.clickable,
                           clubId: widget.club.id,
                           onParticipationChanged: (status) {
                             // Show toast when RSVP changes
