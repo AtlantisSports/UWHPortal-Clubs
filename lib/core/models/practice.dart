@@ -180,6 +180,7 @@ extension ParticipationStatusExtension on ParticipationStatus {
 /// Practice session model
 class Practice extends BaseModel {
   final String clubId;
+  final String? patternId; // Links to the practice pattern this instance belongs to
   final String title;
   final String description;
   final DateTime dateTime;
@@ -196,6 +197,7 @@ class Practice extends BaseModel {
   Practice({
     required super.id,
     required this.clubId,
+    this.patternId,
     required this.title,
     required this.description,
     required this.dateTime,
@@ -326,6 +328,7 @@ class Practice extends BaseModel {
     return {
       ...super.toJson(),
       'clubId': clubId,
+      'patternId': patternId,
       'title': title,
       'description': description,
       'dateTime': dateTime.toIso8601String(),
@@ -344,6 +347,7 @@ class Practice extends BaseModel {
     return Practice(
       id: json['id'] as String,
       clubId: json['clubId'] as String,
+      patternId: json['patternId'] as String?,
       title: json['title'] as String,
       description: json['description'] as String,
       dateTime: DateTime.parse(json['dateTime'] as String),
@@ -372,6 +376,7 @@ class Practice extends BaseModel {
   @override
   Practice copyWith({
     String? clubId,
+    String? patternId,
     String? title,
     String? description,
     DateTime? dateTime,
@@ -388,6 +393,7 @@ class Practice extends BaseModel {
     return Practice(
       id: id,
       clubId: clubId ?? this.clubId,
+      patternId: patternId ?? this.patternId,
       title: title ?? this.title,
       description: description ?? this.description,
       dateTime: dateTime ?? this.dateTime,

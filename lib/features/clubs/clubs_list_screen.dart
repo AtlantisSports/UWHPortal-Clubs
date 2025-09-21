@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
+import '../../core/models/practice_pattern.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../core/providers/participation_provider.dart';
@@ -28,6 +29,10 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   // Use UserService for consistent user ID
   String get _currentUserId => ServiceLocator.userService.currentUserId;
   final ScheduleService _scheduleService = ServiceLocator.scheduleService;
+  final ScrollController _scrollController = ScrollController();
+  
+  // Global keys for measuring card heights dynamically
+  final List<GlobalKey> _cardKeys = [];
   
   // Internal navigation state
   Club? _selectedClub;
@@ -57,6 +62,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     // Unregister tab handler when widget is disposed
     final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
     navigationProvider.unregisterTabBackHandler(3);
+    _scrollController.dispose();
     super.dispose();
   }
   
@@ -176,8 +182,45 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
 
   /// Get typical/template practices for club card display using ScheduleService
-  List<Practice> _getTypicalPractices(Club club) {
-    return _scheduleService.getTypicalPractices(club.id);
+  List<PracticePattern> _getTypicalPractices(Club club) {
+    return _scheduleService.getPracticePatterns(club.id);
+  }
+
+  /// Auto-scroll to ensure expanded dropdown content is visible
+  void _ensureCardVisible(int cardIndex) {
+    if (!_scrollController.hasClients) return;
+    
+    // Use addPostFrameCallback to ensure the expansion animation completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      
+      // Safety check for card keys list bounds
+      if (cardIndex >= _cardKeys.length) {
+        return;
+      }
+      
+      // Find the actual card widget using its global key
+      final GlobalKey cardKey = _cardKeys[cardIndex];
+      final BuildContext? cardContext = cardKey.currentContext;
+      
+      if (cardContext == null) {
+        return;
+      }
+      
+      final RenderBox? cardRenderBox = cardContext.findRenderObject() as RenderBox?;
+      
+      if (cardRenderBox == null) {
+        return;
+      }
+      
+      // Simple approach: use Scrollable.ensureVisible which handles all the math
+      Scrollable.ensureVisible(
+        cardContext,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+        alignment: 0.1, // Show card near bottom of viewport (10% from bottom)
+      );
+    });
   }
   
   /// Open map for practice location
@@ -307,6 +350,13 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   Widget _buildClubsTab() {
     return Consumer<ClubsProvider>(
       builder: (context, clubsProvider, child) {
+        // Ensure we have enough keys for all clubs - with safety checks
+        if (clubsProvider.clubs.isNotEmpty) {
+          while (_cardKeys.length < clubsProvider.clubs.length) {
+            _cardKeys.add(GlobalKey());
+          }
+        }
+        
         return Column(
           children: [
             // Clubs list
@@ -316,6 +366,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                   : clubsProvider.clubs.isEmpty
                       ? _buildEmptyState()
                       : ListView.builder(
+                          controller: _scrollController,
                           padding: const EdgeInsets.all(AppSpacing.small),
                           itemCount: clubsProvider.clubs.length,
                           itemBuilder: (context, index) {
@@ -326,6 +377,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                                 : ParticipationStatus.blank;
                             
                             return ClubCard(
+                              key: index < _cardKeys.length ? _cardKeys[index] : null,
                               name: club.name,
                               location: club.location,
                               logoUrl: club.logoUrl,
@@ -345,6 +397,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               onPracticeInfoTap: nextPractice != null ? () {
                                 _onPracticeInfoTap(club, nextPractice);
                               } : null,
+                              onTypicalPracticesExpanded: () => _ensureCardVisible(index),
                             );
                           },
                         ),

@@ -6,12 +6,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
+import '../../core/models/practice_pattern.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
 import '../../core/services/schedule_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/utils/time_utils.dart';
+import '../../core/utils/practice_data_consistency.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
@@ -73,6 +75,26 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     super.initState();
     _initializeFilters();
     _initializeRSVPProvider();
+    _verifyPracticeDataConsistency();
+  }
+  
+  void _verifyPracticeDataConsistency() {
+    final typicalPractices = _getRepresentativePractices();
+    
+    // Log practice lists for debugging
+    PracticeDataConsistencyVerifier.logPracticeList(
+      typicalPractices, 
+      'Bulk RSVP Representative Practices'
+    );
+    
+    // Verify each practice has valid pattern ID
+    for (final practice in typicalPractices) {
+      if (!PracticeDataConsistencyVerifier.hasValidPatternId(practice)) {
+        debugPrint('WARNING: Invalid pattern ID for practice: ${practice.title} (${practice.id})');
+      }
+    }
+    
+    debugPrint('Bulk RSVP initialized with ${typicalPractices.length} practice patterns');
   }
   
   void _initializeFilters() {
@@ -121,20 +143,67 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
-    // Use club-specific typical practices from ScheduleService
-    final typicalPractices = _scheduleService.getTypicalPractices(widget.club.id);
+    // Use practice patterns instead of typical practices to avoid date issues
+    final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
     
-    // Use the practices directly - no need to create new objects
-    // Sort by weekday (Monday=1 through Sunday=7) for consistent ordering
-    return List<Practice>.from(typicalPractices)
+    // Convert practice patterns to Practice objects for bulk RSVP display
+    // Generate representative practice instances for the current week
+    return practicePatterns.map((pattern) {
+      // Generate a practice instance for display purposes only
+      final nextOccurrenceDate = _getNextOccurrenceDate(pattern);
+      final practiceData = pattern.generatePracticeData(nextOccurrenceDate);
+      
+      // Convert the Map to a Practice object
+      return Practice(
+        id: practiceData['id'] as String,
+        clubId: practiceData['clubId'] as String,
+        title: practiceData['title'] as String,
+        description: practiceData['description'] as String,
+        dateTime: DateTime.parse(practiceData['dateTime'] as String),
+        location: practiceData['location'] as String,
+        address: practiceData['address'] as String,
+        tag: practiceData['tag'] as String?,
+        duration: Duration(minutes: practiceData['duration'] as int),
+      );
+    }).toList()
       ..sort((a, b) {
-        final dayA = a.dateTime.weekday;
-        final dayB = b.dateTime.weekday;
-        final dayComparison = dayA.compareTo(dayB);
+        // Sort by weekday, then by time
+        final dayComparison = a.dateTime.weekday.compareTo(b.dateTime.weekday);
         if (dayComparison != 0) return dayComparison;
-        // If same day, sort by time
         return a.dateTime.hour.compareTo(b.dateTime.hour);
       });
+  }
+  
+  /// Get the next occurrence date for a practice pattern
+  DateTime _getNextOccurrenceDate(PracticePattern pattern) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Find the next occurrence of this pattern
+    for (int i = 0; i < 14; i++) { // Look ahead 2 weeks
+      final testDate = today.add(Duration(days: i));
+      if (pattern.shouldGeneratePracticeOn(testDate)) {
+        return DateTime(
+          testDate.year,
+          testDate.month,
+          testDate.day,
+          pattern.startTime.hour,
+          pattern.startTime.minute,
+        );
+      }
+    }
+    
+    // Fallback: just use a date with the correct weekday
+    final targetWeekday = pattern.day.weekdayNumber;
+    final daysToAdd = (targetWeekday - now.weekday) % 7;
+    final targetDate = now.add(Duration(days: daysToAdd));
+    return DateTime(
+      targetDate.year,
+      targetDate.month,
+      targetDate.day,
+      pattern.startTime.hour,
+      pattern.startTime.minute,
+    );
   }
   
   List<Practice> _getFilteredPractices() {
@@ -1033,22 +1102,20 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         orElse: () => throw Exception('Selected representative practice not found: $selectedId'),
       );
       
-      // Find all calendar practices with the same time and location pattern
+      // Find all calendar practices that match this pattern
+      // Match by patternId directly - this is the robust identifier
       final matchingPractices = allCalendarPractices.where((p) {
-        return p.dateTime.hour == selectedRepresentative.dateTime.hour &&
-               p.dateTime.minute == selectedRepresentative.dateTime.minute &&
-               p.location == selectedRepresentative.location &&
-               p.dateTime.weekday == selectedRepresentative.dateTime.weekday;
+        return p.patternId == selectedRepresentative.id;
       }).toList();
       
       // Apply timeframe filtering
       List<Practice> timeframePractices = [];
       switch (_selectedTimeframe) {
         case 'only_announced':
-          // For testing: announced practices are Sept-Nov
+          // Filter for upcoming announced practices only
           timeframePractices = matchingPractices.where((p) {
-            final month = p.dateTime.month;
-            return month >= 9 && month <= 11; // September to November
+            final today = DateTime.now();
+            return p.dateTime.isAfter(today);
           }).toList();
           break;
           
@@ -1250,7 +1317,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   // Helper methods
   String _getDayNameForPractice(Practice practice) {
-    // For typical practices, extract day from practice ID
+    // For typical practices, extract day from practice ID - same logic as typical practices widget
     if (practice.id.startsWith('typical-')) {
       final dayPrefix = practice.id.substring(8); // Remove 'typical-'
       switch (dayPrefix) {

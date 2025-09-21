@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
+import '../../core/models/practice_pattern.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/services/schedule_service.dart';
@@ -783,8 +784,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   /// Get typical/template practices for the club using ScheduleService
-  List<Practice> _getTypicalPractices() {
-    return _scheduleService.getTypicalPractices(widget.club.id);
+  List<PracticePattern> _getTypicalPractices() {
+    return _scheduleService.getPracticePatterns(widget.club.id);
   }
 
   Widget _buildGroupsTab(BuildContext context) {
@@ -824,22 +825,23 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
 
   /// Auto-scroll to show the typical practices when expanded
   void _scrollToTypicalPractices() {
-    final context = _typicalPracticesKey.currentContext;
-    if (context != null) {
-      final RenderBox renderBox = context.findRenderObject() as RenderBox;
-      final position = renderBox.localToGlobal(Offset.zero);
+    if (!_scrollController.hasClients) return;
+    
+    // Wait for the expansion animation to complete
+    Future.delayed(const Duration(milliseconds: 350), () {
+      if (!mounted || !_scrollController.hasClients) return;
       
-      // Calculate target scroll position 
-      // We want the typical practices container to be visible with some padding from top
-      final targetScrollPosition = _scrollController.offset + position.dy - 100; // 100px padding from top
+      // Simple approach: scroll down by a fixed amount to show the expanded content
+      final currentOffset = _scrollController.offset;
+      final maxOffset = _scrollController.position.maxScrollExtent;
+      final targetOffset = (currentOffset + 200).clamp(0.0, maxOffset);
       
-      // Animate to the target position
       _scrollController.animateTo(
-        targetScrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 250),
+        targetOffset,
+        duration: const Duration(milliseconds: 500),
         curve: Curves.easeInOut,
       );
-    }
+    });
   }
 
   Widget _buildAboutTab(BuildContext context) {
@@ -847,10 +849,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
-      child: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
             // Typical Practices Dropdown
             TypicalPracticesWidget(
               key: _typicalPracticesKey,
@@ -863,9 +864,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 
                 // Auto-scroll to show the expanded typical practices list
                 if (_isTypicalPracticesExpanded) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _scrollToTypicalPractices();
-                  });
+                  _scrollToTypicalPractices();
                 }
               },
             ),
@@ -910,7 +909,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
             ),
           ],
         ),
-      ),
     );
   }
 

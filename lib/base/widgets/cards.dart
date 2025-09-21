@@ -3,6 +3,7 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/models/practice_pattern.dart';
 import '../../core/models/practice.dart';
 import 'rsvp_components.dart';
 import 'typical_practices_widget.dart';
@@ -62,12 +63,13 @@ class ClubCard extends StatefulWidget {
   final String? logoUrl;
   final Practice? nextPractice;
   final ParticipationStatus? currentParticipationStatus;
-  final List<Practice> allPractices; // Add this to show typical weekly schedule
+  final List<PracticePattern> allPractices; // Add this to show typical weekly schedule
   final Function(ParticipationStatus)? onParticipationChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
   final VoidCallback? onPracticeInfoTap; // Add callback for practice info
   final String? clubId; // Add clubId for RSVP synchronization
+  final VoidCallback? onTypicalPracticesExpanded; // Add callback for scroll behavior
   
   const ClubCard({
     super.key,
@@ -82,6 +84,7 @@ class ClubCard extends StatefulWidget {
     this.onLocationTap,
     this.onPracticeInfoTap,
     this.clubId,
+    this.onTypicalPracticesExpanded,
   });
 
   @override
@@ -174,9 +177,17 @@ class _ClubCardState extends State<ClubCard> {
               practices: widget.allPractices,
               isExpanded: _isExpanded,
               onToggle: () {
+                final wasExpanded = _isExpanded;
                 setState(() {
                   _isExpanded = !_isExpanded;
                 });
+                
+                // Trigger scroll after animation completes when expanding
+                if (!wasExpanded && _isExpanded && widget.onTypicalPracticesExpanded != null) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    widget.onTypicalPracticesExpanded!();
+                  });
+                }
               },
             ),
           ],

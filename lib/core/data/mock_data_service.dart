@@ -5,6 +5,8 @@ library;
 
 import '../models/club.dart';
 import '../models/practice.dart';
+import '../models/practice_pattern.dart';
+import '../models/practice_recurrence.dart';
 import '../models/guest.dart';
 
 /// Centralized mock data service - single source of truth for all test data
@@ -38,6 +40,7 @@ class MockDataService {
       'memberCount': 42,
       'practicePatterns': [
         {
+          'patternId': 'denver-mon-2015-vmac-1',
           'id_prefix': 'monday',
           'title': 'Monday Evening',
           'description': 'Mixed-level session with skills development, friendly games, and social time afterward.',
@@ -50,6 +53,7 @@ class MockDataService {
           'tag': 'Intermediate',
         },
         {
+          'patternId': 'denver-wed-1900-carmody-1',
           'id_prefix': 'wednesday',
           'title': 'Wednesday Evening',
           'description': 'Multi-level training accommodating all skill levels, featuring basic drills for beginners, intermediate tactical work, and friendly scrimmage games with post-practice social gathering.',
@@ -62,6 +66,7 @@ class MockDataService {
           'tag': 'Advanced',
         },
         {
+          'patternId': 'denver-thu-2015-vmac-1',
           'id_prefix': 'thursday',
           'title': 'Thursday Evening',
           'description': 'All levels welcome; bring fins & mouthguard.',
@@ -74,6 +79,21 @@ class MockDataService {
           'tag': 'Open',
         },
         {
+          'patternId': 'denver-tue-1800-epic-1',
+          'id_prefix': 'tuesday',
+          'title': 'Tuesday Evening',
+          'description': 'Biweekly mixed-level session',
+          'day': DateTime.tuesday,
+          'hour': 18,
+          'minute': 0,
+          'duration': 60, // 6:00 PM - 7:00 PM (1 hour)
+          'location': 'EPIC',
+          'address': '1801 Riverside Ave, Fort Collins, CO 80525',
+          'tag': 'Open',
+          'recurrence': 'biweekly', // Every 2 weeks
+        },
+        {
+          'patternId': 'denver-sun-1100-vmac-1',
           'id_prefix': 'sunday-morning',
           'title': 'Sunday Morning',
           'description': 'Inclusive community session welcoming players of all skill levels, featuring separate instruction tracks for beginners and experienced players, mixed-level scrimmage games, equipment sharing program, and social gathering with refreshments afterward. Perfect for families and newcomers to the sport.',
@@ -86,6 +106,7 @@ class MockDataService {
           'tag': 'Beginner',
         },
         {
+          'patternId': 'denver-sun-1500-carmody-1',
           'id_prefix': 'sunday-afternoon',
           'title': 'Sunday Afternoon',
           'description': 'Mixed-level session with skills development, friendly games, and social time afterward.',
@@ -112,6 +133,7 @@ class MockDataService {
       'memberCount': 18,
       'practicePatterns': [
         {
+          'patternId': 'sydney-fri-1900-ryde-1',
           'id_prefix': 'friday',
           'title': 'Friday Evening',
           'description': 'Comprehensive training program including technique refinement, tactical awareness development, and competitive match play suitable for intermediate to advanced players.',
@@ -172,9 +194,66 @@ class MockDataService {
     }).toList();
   }
 
-  /// Get typical/template practices for a club - single source of truth
+  /// Get practice patterns for a club - NO dates, just day names and times with recurrence
+  static List<PracticePattern> getPracticePatterns(String clubId) {
+    final clubData = _clubsData[clubId];
+    if (clubData == null) {
+      return [
+        PracticePattern(
+          id: 'default-wed-1900-pool-1',
+          clubId: clubId,
+          title: 'Wednesday Evening',
+          description: 'Weekly practice session',
+          day: PatternDay.wednesday,
+          startTime: const PatternTime(19, 0),
+          duration: const Duration(hours: 2),
+          location: 'Local Pool',
+          address: 'Local Pool Address',
+          tag: 'Open',
+          recurrence: const RecurrencePattern.weekly(),
+        ),
+      ];
+    }
+    
+    final practicePatterns = clubData['practicePatterns'] as List<Map<String, dynamic>>;
+    return practicePatterns.map((pattern) {
+      // Convert DateTime weekday number to PatternDay
+      final dayNumber = pattern['day'] as int;
+      final patternDay = PatternDay.fromWeekday(dayNumber);
+      
+      // Determine recurrence pattern
+      final recurrenceType = pattern['recurrence'] as String? ?? 'weekly';
+      RecurrencePattern recurrence;
+      switch (recurrenceType) {
+        case 'biweekly':
+          recurrence = const RecurrencePattern.biweekly();
+          break;
+        case 'weekly':
+        default:
+          recurrence = const RecurrencePattern.weekly();
+          break;
+      }
+      
+      return PracticePattern(
+        id: pattern['patternId'] as String,
+        clubId: clubId,
+        title: pattern['title'] as String,
+        description: pattern['description'] as String,
+        day: patternDay,
+        startTime: PatternTime(pattern['hour'] as int, pattern['minute'] as int),
+        duration: Duration(minutes: pattern['duration'] as int? ?? 120),
+        location: pattern['location'] as String,
+        address: pattern['address'] as String,
+        tag: pattern['tag'] as String,
+        recurrence: recurrence,
+        patternStartDate: DateTime(2025, 9, 1), // Default start date
+      );
+    }).toList();
+  }
+
+  /// Get typical/template practices for a club - DEPRECATED - use getPracticePatterns instead
   /// NOTE: This creates Practice objects for backward compatibility, but typical practices
-  /// should ideally use getTypicalPracticePatterns() for template display
+  /// should ideally use getPracticePatterns() for template display
   static List<Practice> getTypicalPractices(String clubId) {
     final clubData = _clubsData[clubId];
     if (clubData == null) {
@@ -183,18 +262,21 @@ class MockDataService {
     
     final practicePatterns = clubData['practicePatterns'] as List<Map<String, dynamic>>;
     return practicePatterns.map((pattern) {
-      // For typical practices, we only care about time, not date
-      // Use a neutral date that doesn't imply a specific occurrence
+      // For typical practices, use a fixed arbitrary date since we only care about time and pattern ID
+      final hour = pattern['hour'] as int;
+      final minute = pattern['minute'] as int;
+      final arbitraryDate = DateTime(2000, 1, 1, hour, minute); // Fixed date, no weekday logic
+      
       return Practice(
-        id: 'typical-${pattern['id_prefix']}',
+        id: pattern['patternId'] as String, // Use the stable pattern ID
         clubId: clubId,
         title: pattern['title'] as String,
         description: pattern['description'] as String,
-        dateTime: DateTime(1970, 1, 1, pattern['hour'] as int, pattern['minute'] as int), // Epoch date, only time matters
+        dateTime: arbitraryDate, // Arbitrary date - day will be extracted from pattern ID
         location: pattern['location'] as String,
         address: pattern['address'] as String,
         tag: pattern['tag'] as String,
-        duration: Duration(minutes: pattern['duration'] as int? ?? 120), // Use pattern duration or default to 2 hours
+        duration: Duration(minutes: pattern['duration'] as int? ?? 120),
       );
     }).toList();
   }
@@ -245,6 +327,7 @@ class MockDataService {
           Practice(
             id: practiceId,
             clubId: clubId,
+            patternId: pattern['patternId'] as String, // Link to the practice pattern
             title: pattern['title'] as String,
             description: pattern['description'] as String,
             dateTime: date,
@@ -307,11 +390,11 @@ class MockDataService {
     return responses;
   }
 
-  /// Get recurring practice dates from September through November 2025
+  /// Get recurring practice dates from September 2025 through March 2026
   static List<DateTime> _getRecurringPracticeDates(int dayOfWeek, int hour, int minute) {
     final dates = <DateTime>[];
     final startDate = DateTime(2025, 9, 1); // September 1, 2025
-    final endDate = DateTime(2025, 11, 30); // November 30, 2025
+    final endDate = DateTime(2026, 3, 31); // March 31, 2026 (6 months of practices)
     
     // Find first occurrence of the target day in the start month
     DateTime current = startDate;

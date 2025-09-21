@@ -3,22 +3,24 @@ library;
 
 import 'package:flutter/material.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/models/practice.dart';
-import '../../core/utils/time_utils.dart';
+import '../../core/models/practice_pattern.dart';
+import '../../core/models/practice_recurrence.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class TypicalPracticesWidget extends StatefulWidget {
-  final List<Practice> practices;
+  final List<PracticePattern> practices;
   final bool isExpanded;
   final VoidCallback onToggle;
   final String title;
+  final Function(String patternId)? onPatternSelected; // Optional callback for pattern selection
   
   const TypicalPracticesWidget({
     super.key,
     required this.practices,
     required this.isExpanded,
     required this.onToggle,
-    this.title = 'Typical weekly practices',
+    this.title = 'Recurring practices',
+    this.onPatternSelected,
   });
 
   @override
@@ -27,6 +29,30 @@ class TypicalPracticesWidget extends StatefulWidget {
 
 class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
   final Map<String, bool> _expandedDescriptions = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _verifyPatternIds();
+  }
+
+  /// Verify that all practices have valid patternIds for data consistency
+  void _verifyPatternIds() {
+    if (widget.practices.isEmpty) return;
+    
+    for (final practice in widget.practices) {
+      if (practice.id.isEmpty) {
+        debugPrint('WARNING: Practice pattern missing ID: ${practice.title}');
+      }
+      // The practice.id should be the patternId (e.g., "denver-sun-1100-vmac-1")
+      if (!practice.id.contains('-')) {
+        debugPrint('WARNING: Practice pattern ID does not look like a patternId: ${practice.id}');
+      }
+    }
+    
+    // Log pattern IDs for debugging bulk RSVP consistency
+    debugPrint('Practice pattern IDs: ${widget.practices.map((p) => p.id).toList()}');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +114,7 @@ class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
                 ? Column(
                     children: [
                       const SizedBox(height: 8),
-                      ...widget.practices.map((practice) => _buildPracticeItem(practice)),
+                      ..._buildGroupedPractices(),
                       const SizedBox(height: 8),
                     ],
                   )
@@ -99,15 +125,15 @@ class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
     );
   }
 
-  Widget _buildPracticeItem(Practice practice) {
-    // For typical practices, extract day name from practice ID instead of dateTime
-    final dayName = _getDayNameForPractice(practice);
-    final startTime = practice.dateTime;
-    final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = TimeUtils.formatTimeRange(startTime, endTime);
+  Widget _buildPracticeItem(PracticePattern practice) {
+    final dayName = practice.day.shortName;
+    final timeStr = practice.timeRangeString;
     
     final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
     final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
+    
+    // Group weekly and biweekly practices differently
+    final isWeekly = practice.recurrence.type == RecurrenceType.weekly && practice.recurrence.interval == 1;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -153,7 +179,7 @@ class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
               // Location (clickable)
               Expanded(
                 child: GestureDetector(
-                  onTap: () => _launchLocationUrl(practice.mapsUrl),
+                  onTap: () => _launchLocationUrl(_generateMapsUrl(practice.address)),
                   child: Text(
                     practice.location,
                     style: const TextStyle(
@@ -186,6 +212,19 @@ class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
               ],
             ],
           ),
+          
+          // Recurrence information (after date/time/location)
+          if (!isWeekly) ...[
+            const SizedBox(height: 4),
+            Text(
+              practice.recurrence.description,
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary.withValues(alpha: 0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
           
           // Description (collapsible)
           if (practice.description.isNotEmpty) ...[
@@ -239,50 +278,51 @@ class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
     );
   }
 
-  String _getDayNameForPractice(Practice practice) {
-    // For typical practices, extract day from practice ID
-    if (practice.id.startsWith('typical-')) {
-      final dayPrefix = practice.id.substring(8); // Remove 'typical-'
-      switch (dayPrefix) {
-        case 'monday':
-          return 'Mon';
-        case 'tuesday':
-          return 'Tue';
-        case 'wednesday':
-          return 'Wed';
-        case 'thursday':
-          return 'Thu';
-        case 'friday':
-          return 'Fri';
-        case 'saturday':
-          return 'Sat';
-        case 'sunday-morning':
-        case 'sunday-afternoon':
-          return 'Sun';
-        default:
-          return _getDayName(practice.dateTime.weekday);
+  /// Build practices grouped by recurrence type with dividers
+  List<Widget> _buildGroupedPractices() {
+    final widgets = <Widget>[];
+    
+    // Group practices by recurrence type
+    final weeklyPractices = widget.practices.where((p) => 
+      p.recurrence.type == RecurrenceType.weekly && p.recurrence.interval == 1
+    ).toList();
+    
+    final nonWeeklyPractices = widget.practices.where((p) => 
+      !(p.recurrence.type == RecurrenceType.weekly && p.recurrence.interval == 1)
+    ).toList();
+    
+    // Add weekly practices first
+    for (final practice in weeklyPractices) {
+      widgets.add(_buildPracticeItem(practice));
+    }
+    
+    // Add divider and non-weekly practices if any exist
+    if (nonWeeklyPractices.isNotEmpty) {
+      widgets.add(const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: Divider(
+          height: 1,
+          color: Colors.grey,
+          thickness: 0.5,
+        ),
+      ));
+      
+      for (final practice in nonWeeklyPractices) {
+        widgets.add(_buildPracticeItem(practice));
       }
     }
     
-    // For regular practices, use the actual date
-    return _getDayName(practice.dateTime.weekday);
-  }
-
-  String _getDayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday: return 'Mon';
-      case DateTime.tuesday: return 'Tue';
-      case DateTime.wednesday: return 'Wed';
-      case DateTime.thursday: return 'Thu';
-      case DateTime.friday: return 'Fri';
-      case DateTime.saturday: return 'Sat';
-      case DateTime.sunday: return 'Sun';
-      default: return '';
-    }
+    return widgets;
   }
 
   bool _shouldTruncateDescription(String description) {
     return description.length > 45;
+  }
+
+  /// Generate Google Maps URL from address
+  String _generateMapsUrl(String address) {
+    final encodedAddress = Uri.encodeComponent(address);
+    return 'https://www.google.com/maps/search/?api=1&query=$encodedAddress';
   }
 
   void _launchLocationUrl(String? url) async {
