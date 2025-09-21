@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/practice.dart';
+import '../../core/utils/time_utils.dart';
 import 'rsvp_components.dart';
 
 /// Base card component for consistent styling
@@ -91,6 +92,7 @@ class ClubCard extends StatefulWidget {
 class _ClubCardState extends State<ClubCard> {
   bool _isExpanded = false;
   final Map<String, bool> _expandedDescriptions = {}; // Track which descriptions are expanded
+  final GlobalKey _typicalPracticesKey = GlobalKey(); // Key for auto-scroll functionality
   
   @override
   Widget build(BuildContext context) {
@@ -171,75 +173,108 @@ class _ClubCardState extends State<ClubCard> {
           // Typical Weekly Schedule Dropdown
           if (widget.allPractices.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.medium),
-            InkWell(
-              onTap: () {
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-              },
-              borderRadius: BorderRadius.circular(AppRadius.small),
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.medium,
-                  vertical: AppSpacing.small,
-                ),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: AppColors.textSecondary.withValues(alpha: 0.3),
-                  ),
-                  borderRadius: BorderRadius.circular(AppRadius.small),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.calendar_today,
-                      size: 18,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: AppSpacing.small),
-                    const Expanded(
-                      child: Text(
-                        'Typical weekly practices',
-                        style: TextStyle(
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.primary,
+            Container(
+              key: _typicalPracticesKey,
+              child: Column(
+                children: [
+                  InkWell(
+                    onTap: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                      
+                      // Auto-scroll to show the expanded typical practices list
+                      if (_isExpanded) {
+                        // Wait for the animation to complete before scrolling
+                        Future.delayed(const Duration(milliseconds: 350), () {
+                          _scrollToTypicalPractices();
+                        });
+                      }
+                    },
+                    borderRadius: BorderRadius.circular(AppRadius.small),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: AppSpacing.medium,
+                        vertical: AppSpacing.small,
+                      ),
+                      decoration: BoxDecoration(
+                        border: Border.all(
+                          color: AppColors.textSecondary.withValues(alpha: 0.3),
                         ),
+                        borderRadius: BorderRadius.circular(AppRadius.small),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.calendar_today,
+                            size: 18,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: AppSpacing.small),
+                          const Expanded(
+                            child: Text(
+                              'Typical weekly practices',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
+                          Icon(
+                            _isExpanded ? Icons.expand_less : Icons.expand_more,
+                            color: AppColors.primary,
+                          ),
+                        ],
                       ),
                     ),
-                    Icon(
-                      _isExpanded ? Icons.expand_less : Icons.expand_more,
-                      color: AppColors.primary,
-                    ),
-                  ],
-                ),
+                  ),
+                  // Expanded Schedule Details
+                  AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeInOut,
+                    height: _isExpanded ? null : 0,
+                    child: _isExpanded
+                        ? Column(
+                            children: [
+                              const SizedBox(height: AppSpacing.small),
+                              ...widget.allPractices.map((practice) => _buildPracticeScheduleItem(practice)),
+                            ],
+                          )
+                        : const SizedBox.shrink(),
+                  ),
+                ],
               ),
             ),
           ],
-          
-          // Expanded Schedule Details
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            height: _isExpanded ? null : 0,
-            child: _isExpanded
-                ? Column(
-                    children: [
-                      const SizedBox(height: AppSpacing.small),
-                      ...widget.allPractices.map((practice) => _buildPracticeScheduleItem(practice)),
-                    ],
-                  )
-                : const SizedBox.shrink(),
-          ),
         ],
       ),
     );
+  }
+
+  /// Auto-scroll to show the typical practices when expanded
+  void _scrollToTypicalPractices() {
+    final context = _typicalPracticesKey.currentContext;
+    if (context != null && mounted) {
+      try {
+        // Use keepVisibleAtEnd to only scroll if needed and show the bottom of content
+        Scrollable.ensureVisible(
+          context,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeInOut,
+          alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+        );
+      } catch (e) {
+        // Silently handle any scroll errors
+        debugPrint('Auto-scroll failed: $e');
+      }
+    }
   }
 
   Widget _buildPracticeScheduleItem(Practice practice) {
     final dayName = _getDayName(practice.dateTime.weekday);
     final startTime = practice.dateTime;
     final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = '${_formatPracticeTime(startTime)}-${_formatPracticeTime(endTime)}';
+    final timeStr = TimeUtils.formatTimeRange(startTime, endTime);
     
     final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
     final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
@@ -437,13 +472,4 @@ class _ClubCardState extends State<ClubCard> {
     return '$truncated...';
   }
 
-  /// Format time in 12-hour format with AM/PM (matches club detail screen format)
-  String _formatPracticeTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final amPm = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $amPm';
-  }
 }

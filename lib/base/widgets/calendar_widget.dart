@@ -239,16 +239,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                   left: 2,
                                   child: Container(
                                     padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.primary,
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
                                     child: Text(
                                       '+$guestCount',
                                       style: const TextStyle(
                                         fontSize: 8,
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.white,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -282,7 +278,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     if (practices.isEmpty) return const SizedBox.shrink();
 
     final count = practices.length;
-    final size = count == 1 ? 24.0 : count == 2 ? 16.0 : 12.0; // Doubled from 12.0, 8.0, 6.0
+    final size = count == 1 ? 20.0 : count == 2 ? 16.0 : 12.0; // Single practice circle size set to 20.0
 
     if (count == 1) {
       return _buildSingleIndicator(practices[0], size);
@@ -504,8 +500,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               
               // Check level filtering for typical schedule
               final practiceTag = practice['tag'] as String?;
-              final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
-                  (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
+              final passesLevelFilter = participationProvider == null || 
+                  participationProvider.selectedLevels.isEmpty ||
+                  (practiceTag != null && participationProvider.selectedLevels.contains(practiceTag));
               
               final hash = date.hashCode + practice['location'].hashCode;
               final status = hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
@@ -570,8 +567,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               
               // Check level filtering for typical schedule
               final practiceTag = practice['tag'] as String?;
-              final passesLevelFilter = participationProvider?.selectedLevels.isEmpty ?? true ||
-                  (practiceTag != null && (participationProvider?.selectedLevels.contains(practiceTag) ?? true));
+              final passesLevelFilter = participationProvider == null || 
+                  participationProvider.selectedLevels.isEmpty ||
+                  (practiceTag != null && participationProvider.selectedLevels.contains(practiceTag));
               
               practiceStatuses.add(FilteredPracticeStatus(
                 status: PracticeStatus.noRsvp,

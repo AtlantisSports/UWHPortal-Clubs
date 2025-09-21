@@ -8,6 +8,8 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/participation_provider.dart';
+import '../../core/utils/time_utils.dart';
+import '../../core/utils/practice_schedule_utils.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -41,11 +43,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   late TabController _tabController;
   late ScrollController _scrollController;
   final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
+  final GlobalKey _typicalPracticesKey = GlobalKey(); // Add GlobalKey for typical practices container
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
   bool _isShowingLevelFilterModal = false;
   bool _isTypicalPracticesExpanded = false; // Track expansion state for typical practices dropdown
+  final Map<String, bool> _expandedDescriptions = {}; // Track description expansion for practice items
   
   // Toast state
   bool _showToast = false;
@@ -765,76 +769,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  /// Get typical/template practices for the club (same as used in bulk RSVP)
+  /// Get typical/template practices for the club using shared utility
   List<Practice> _getTypicalPractices() {
-    final typicalPractices = <Practice>[
-      Practice(
-        id: 'typical-monday',
-        clubId: widget.club.id,
-        title: 'Monday Evening',
-        description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Open',
-      ),
-      Practice(
-        id: 'typical-wednesday',
-        clubId: widget.club.id,
-        title: 'Wednesday Evening',
-        description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'High-Level',
-      ),
-      Practice(
-        id: 'typical-thursday',
-        clubId: widget.club.id,
-        title: 'Thursday Evening',
-        description: 'Intermediate players welcome.',
-        dateTime: DateTime(2025, 1, 2, 20, 0), // Template: Thursday 8:00 PM (using first Thursday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Intermediate',
-      ),
-      Practice(
-        id: 'typical-sunday-morning',
-        clubId: widget.club.id,
-        title: 'Sunday Morning',
-        description: 'Weekly practice for all skill levels.',
-        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'Open',
-      ),
-      Practice(
-        id: 'typical-sunday-afternoon',
-        clubId: widget.club.id,
-        title: 'Sunday Afternoon',
-        description: 'Afternoon session.',
-        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'Open',
-      ),
-    ];
-    
-    // Sort by day of week and time
-    typicalPractices.sort((a, b) {
-      final dayComparison = a.dateTime.weekday.compareTo(b.dateTime.weekday);
-      if (dayComparison != 0) return dayComparison;
-      return a.dateTime.hour.compareTo(b.dateTime.hour);
-    });
-    
-    return typicalPractices;
+    return PracticeScheduleUtils.getTypicalPractices(widget.club.id);
   }
 
   Widget _buildPracticeRow(Practice practice) {
     final dayName = _getDayName(practice.dateTime.weekday);
     final startTime = practice.dateTime;
     final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = '${_formatTime(startTime)}-${_formatTime(endTime)}';
+    final timeStr = TimeUtils.formatTimeRange(startTime, endTime);
+    
+    final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
+    final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
     
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -920,13 +867,38 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           // Practice description
           if (practice.description.isNotEmpty) ...[
             const SizedBox(height: 6),
-            Text(
-              practice.description,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary.withValues(alpha: 0.8),
-                fontStyle: FontStyle.italic,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(
+                    shouldTruncateDescription && !isDescriptionExpanded
+                        ? _getTruncatedDescription(practice.description)
+                        : practice.description,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary.withValues(alpha: 0.8),
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                if (shouldTruncateDescription)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _expandedDescriptions[practice.id] = !isDescriptionExpanded;
+                      });
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: Icon(
+                        isDescriptionExpanded ? Icons.expand_less : Icons.expand_more,
+                        size: 16,
+                        color: AppColors.textSecondary.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ],
         ],
@@ -969,6 +941,26 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
+  /// Auto-scroll to show the typical practices when expanded
+  void _scrollToTypicalPractices() {
+    final context = _typicalPracticesKey.currentContext;
+    if (context != null) {
+      final RenderBox renderBox = context.findRenderObject() as RenderBox;
+      final position = renderBox.localToGlobal(Offset.zero);
+      
+      // Calculate target scroll position 
+      // We want the typical practices container to be visible with some padding from top
+      final targetScrollPosition = _scrollController.offset + position.dy - 100; // 100px padding from top
+      
+      // Animate to the target position
+      _scrollController.animateTo(
+        targetScrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: const Duration(milliseconds: 500),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
   Widget _buildAboutTab(BuildContext context) {
     final typicalPractices = _getTypicalPractices();
     
@@ -980,6 +972,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           children: [
             // Typical Practices Dropdown
             Container(
+              key: _typicalPracticesKey,
               width: double.infinity,
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -994,6 +987,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       setState(() {
                         _isTypicalPracticesExpanded = !_isTypicalPracticesExpanded;
                       });
+                      
+                      // Auto-scroll to show the expanded typical practices list
+                      if (_isTypicalPracticesExpanded) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _scrollToTypicalPractices();
+                        });
+                      }
                     },
                     child: Container(
                       padding: const EdgeInsets.all(16),
@@ -1170,16 +1170,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     }
   }
 
-  /// Helper method to format time in 12-hour format
-  String _formatTime(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour == 0 ? 12 : (hour > 12 ? hour - 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    return '$displayHour:$minuteStr $period';
-  }
-
   /// Launch location URL in maps app or browser
   Future<void> _launchLocationUrl(String url) async {
     try {
@@ -1212,5 +1202,28 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         );
       }
     }
+  }
+
+  /// Determines if a description should be truncated based on visual length
+  bool _shouldTruncateDescription(String description) {
+    // Estimate if description would wrap to second line
+    // Rough estimate: more than 40 characters likely to wrap
+    return description.length > 40;
+  }
+
+  /// Returns truncated description with ellipsis
+  String _getTruncatedDescription(String description) {
+    if (description.length <= 40) return description;
+    
+    // Find a good break point (prefer word boundaries)
+    String truncated = description.substring(0, 37);
+    int lastSpace = truncated.lastIndexOf(' ');
+    
+    // If we can break at a word boundary and it's not too short, do so
+    if (lastSpace > 25) {
+      truncated = truncated.substring(0, lastSpace);
+    }
+    
+    return '$truncated...';
   }
 }

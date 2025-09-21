@@ -30,6 +30,11 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   final Map<GuestType, TextEditingController> _nameControllers = {};
   final Map<GuestType, bool> _waiverStates = {};
   List<String> _selectedDependents = []; // For multiple dependent selections
+  final ScrollController _scrollController = ScrollController(); // Add scroll controller
+  
+  // Toast state for validation feedback
+  bool _showToast = false;
+  String _toastMessage = '';
   
   @override
   void initState() {
@@ -46,6 +51,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   
   @override
   void dispose() {
+    _scrollController.dispose(); // Dispose scroll controller
     for (final controller in _nameControllers.values) {
       controller.dispose();
     }
@@ -54,13 +60,15 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 345,
-      constraints: const BoxConstraints(maxHeight: 400),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
+    return Stack(
+      children: [
+        Container(
+          width: 345,
+          constraints: const BoxConstraints(maxHeight: 500),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+          ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -90,6 +98,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           // Content
           Flexible(
             child: SingleChildScrollView(
+              controller: _scrollController, // Add scroll controller
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -125,6 +134,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                     _buildGuestTypeSection(type),
                   // Dependents section at the bottom
                   _buildGuestTypeSection(GuestType.dependent),
+                  
+                  // Bottom padding to ensure buttons are always accessible
+                  const SizedBox(height: 80),
                 ],
               ),
             ),
@@ -143,17 +155,24 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () {
-                      widget.onGuestsChanged(_guestList);
-                      // Try using PhoneFrameState.hideOverlay() directly
-                      PhoneFrameState.hideOverlay();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
+                  child: GestureDetector(
+                    onTap: !_canComplete() ? () {
+                      // Show validation toast when button is disabled but user taps
+                      _validateAndShowDoneToast();
+                    } : null,
+                    child: ElevatedButton(
+                      onPressed: _canComplete() ? () {
+                        widget.onGuestsChanged(_guestList);
+                        PhoneFrameState.hideOverlay();
+                      } : null, // null = disabled styling
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4), // Disabled blue
+                        disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+                      ),
+                      child: const Text('Done'),
                     ),
-                    child: const Text('Done'),
                   ),
                 ),
               ],
@@ -161,6 +180,39 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           ),
         ],
       ),
+        ),
+        
+        // Toast overlay (mobile-only) - positioned at top
+        if (_showToast && MediaQuery.of(context).size.width <= 768)
+          Positioned(
+            top: 20,
+            left: 20,
+            right: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.red[700],
+                borderRadius: BorderRadius.circular(8),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Text(
+                _toastMessage,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ),
+      ],
     );
   }
   
@@ -406,21 +458,25 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
             ),
             const SizedBox(width: 8),
             Expanded(
-              child: ElevatedButton(
-                onPressed: (type == GuestType.dependent ? 
-                    _selectedDependents.isEmpty : 
-                    nameController.text.trim().isEmpty) 
-                    ? null 
-                    : () {
-                        // TODO: Replace with proper logging
-                        // print('Add button pressed for ${type.displayName} with ${_selectedDependents.length} dependents');
-                        _addGuest(type);
-                      },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
+              child: GestureDetector(
+                onTap: !_canAddGuest(type) ? () {
+                  // Show validation toast when button is disabled but user taps
+                  _validateAndShowToast(type);
+                } : null,
+                child: ElevatedButton(
+                  onPressed: _canAddGuest(type) ? () {
+                    // TODO: Replace with proper logging
+                    // print('Add button pressed for ${type.displayName} with ${_selectedDependents.length} dependents');
+                    _addGuest(type);
+                  } : null, // null = disabled styling
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4), // Disabled blue
+                    disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+                  ),
+                  child: const Text('Add'),
                 ),
-                child: const Text('Add'),
               ),
             ),
           ],
@@ -431,13 +487,19 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   
   void _toggleSection(GuestType type) {
     setState(() {
-      _expandedSections[type] = !(_expandedSections[type] ?? false);
+      final wasExpanded = _expandedSections[type] ?? false;
+      _expandedSections[type] = !wasExpanded;
       
       // Close other sections
       for (final otherType in GuestType.values) {
         if (otherType != type) {
           _expandedSections[otherType] = false;
         }
+      }
+      
+      // Auto-scroll to bottom when expanding (not when collapsing)
+      if (!wasExpanded && _expandedSections[type]!) {
+        _autoScrollToBottom();
       }
     });
   }
@@ -531,5 +593,119 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         _selectedDependents.clear();
       }
     });
+  }
+
+  // Check if all guests have waivers signed (for enabling DONE button)
+  bool _allGuestsHaveWaivers() {
+    if (_guestList.totalGuests == 0) return true; // No guests = valid state
+    
+    // Check all existing guests
+    for (final guest in _guestList.guests) {
+      if (!guest.waiverSigned) return false;
+    }
+    
+    return true;
+  }
+
+  // Auto-scroll to bottom when form expands
+  void _autoScrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  // Check if ADD button should be enabled for a specific guest type
+  bool _canAddGuest(GuestType type) {
+    final nameController = _nameControllers[type]!;
+    final waiverSigned = _waiverStates[type] ?? false;
+    
+    if (type == GuestType.dependent) {
+      return _selectedDependents.isNotEmpty && waiverSigned;
+    } else {
+      return nameController.text.trim().isNotEmpty && waiverSigned;
+    }
+  }
+
+  // Show validation toast (mobile-only)
+  void _showValidationToast(String message) {
+    // Only show toasts on mobile screen layout
+    if (MediaQuery.of(context).size.width <= 768) {
+      setState(() {
+        _toastMessage = message;
+        _showToast = true;
+      });
+      
+      // Hide toast after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _showToast = false;
+          });
+        }
+      });
+    }
+  }
+
+  // Validate guest addition attempt
+  void _validateAndShowToast(GuestType type) {
+    final nameController = _nameControllers[type]!;
+    final waiverSigned = _waiverStates[type] ?? false;
+    
+    if (type == GuestType.dependent) {
+      if (_selectedDependents.isEmpty && !waiverSigned) {
+        _showValidationToast('Please select dependents and sign waiver');
+      } else if (_selectedDependents.isEmpty) {
+        _showValidationToast('Please select at least one dependent');
+      } else if (!waiverSigned) {
+        _showValidationToast('Please sign the waiver to add dependents');
+      }
+    } else {
+      if (nameController.text.trim().isEmpty && !waiverSigned) {
+        _showValidationToast('Please enter name and sign waiver');
+      } else if (nameController.text.trim().isEmpty) {
+        _showValidationToast('Please enter a name for the ${type.displayName.toLowerCase()}');
+      } else if (!waiverSigned) {
+        _showValidationToast('Please sign the waiver to add ${type.displayName.toLowerCase()}');
+      }
+    }
+  }
+
+  // Validate Done button attempt and show appropriate toast
+  void _validateAndShowDoneToast() {
+    // Check if any section is expanded (user is in process of adding)
+    for (final type in GuestType.values) {
+      final isExpanded = _expandedSections[type] ?? false;
+      if (isExpanded) {
+        _showValidationToast('Please add the ${type.displayName.toLowerCase()} or cancel the form before finishing');
+        return;
+      }
+    }
+    
+    // Check if any existing guests lack waivers
+    if (!_allGuestsHaveWaivers()) {
+      _showValidationToast('All guests must have signed waivers');
+      return;
+    }
+  }
+
+  // Enhanced DONE button validation
+  bool _canComplete() {
+    // Check if any guest type section is expanded (regardless of completion status)
+    for (final type in GuestType.values) {
+      final isExpanded = _expandedSections[type] ?? false;
+      if (isExpanded) {
+        // If any section is expanded, user is in process of adding - DONE should be disabled
+        return false;
+      }
+    }
+    
+    // All existing guests must have waivers signed
+    return _allGuestsHaveWaivers();
   }
 }

@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/practice_schedule_utils.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../base/widgets/cards.dart';
@@ -171,69 +172,9 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     return upcomingPractices.first;
   }
 
-  /// Get typical/template practices for club card display (same as in club detail screen)
+  /// Get typical/template practices for club card display using shared utility
   List<Practice> _getTypicalPractices(Club club) {
-    final typicalPractices = <Practice>[
-      Practice(
-        id: 'typical-monday',
-        clubId: club.id,
-        title: 'Monday Evening',
-        description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Open',
-      ),
-      Practice(
-        id: 'typical-wednesday',
-        clubId: club.id,
-        title: 'Wednesday Evening',
-        description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'High-Level',
-      ),
-      Practice(
-        id: 'typical-thursday',
-        clubId: club.id,
-        title: 'Thursday Evening',
-        description: 'Intermediate players welcome.',
-        dateTime: DateTime(2025, 1, 2, 20, 0), // Template: Thursday 8:00 PM (using first Thursday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Intermediate',
-      ),
-      Practice(
-        id: 'typical-sunday-morning',
-        clubId: club.id,
-        title: 'Sunday Morning',
-        description: 'Weekly practice for all skill levels.',
-        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'Open',
-      ),
-      Practice(
-        id: 'typical-sunday-afternoon',
-        clubId: club.id,
-        title: 'Sunday Afternoon',
-        description: 'Afternoon session.',
-        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'Open',
-      ),
-    ];
-    
-    // Sort by day of week and time
-    typicalPractices.sort((a, b) {
-      final dayComparison = a.dateTime.weekday.compareTo(b.dateTime.weekday);
-      if (dayComparison != 0) return dayComparison;
-      return a.dateTime.hour.compareTo(b.dateTime.hour);
-    });
-    
-    return typicalPractices;
+    return PracticeScheduleUtils.getTypicalPractices(club.id);
   }
   
   /// Open map for practice location

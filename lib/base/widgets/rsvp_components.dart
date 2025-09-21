@@ -6,6 +6,7 @@ import '../../core/models/practice.dart';
 import '../../core/models/guest.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/utils/time_utils.dart';
 import 'guest_management_modal.dart';
 import 'phone_modal_utils.dart';
 
@@ -813,6 +814,28 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               color: Color(0xFF6B7280),
             ),
           ),
+          // Guest list
+          if (guestList.guests.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            ...guestList.guests.map((guest) => Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16), // Indent guest names
+                  Expanded(
+                    child: Text(
+                      guest.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ),
+                  GuestTypeTag(guestType: guest.type),
+                ],
+              ),
+            )),
+          ],
         ],
       ),
     );
@@ -854,7 +877,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ),
               const SizedBox(width: 4),
               const Text(
-                'Bring a guest',
+                'Bring guest(s)',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -898,6 +921,26 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 color: Color(0xFF6B7280),
               ),
             ),
+            // Individual guest list
+            const SizedBox(height: 6),
+            ...guestList.guests.map((guest) => Container(
+              margin: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16), // Indent guest names
+                  Expanded(
+                    child: Text(
+                      guest.name,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: Color(0xFF374151),
+                      ),
+                    ),
+                  ),
+                  GuestTypeTag(guestType: guest.type),
+                ],
+              ),
+            )),
           ],
         ],
       ),
@@ -1346,7 +1389,7 @@ class SelectablePracticeCard extends StatelessWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _formatDateTime(practice.dateTime),
+                            TimeUtils.formatPracticeDateTime(practice.dateTime, practice.duration),
                             style: const TextStyle(
                               fontSize: 14,
                               color: Color(0xFF6B7280),
@@ -1415,22 +1458,6 @@ class SelectablePracticeCard extends StatelessWidget {
         ),
       ),
     );
-  }
-  
-  String _formatDateTime(DateTime dateTime) {
-    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    final weekday = weekdays[dateTime.weekday - 1];
-    final month = months[dateTime.month - 1];
-    final day = dateTime.day;
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    
-    return '$weekday, $month $day • $displayHour:$minute $period';
   }
 }
 
@@ -1697,7 +1724,7 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
                                 ),
                                 const SizedBox(height: 1), // Reduced spacing
                                 Text(
-                                  _formatDateTime(practice.dateTime),
+                                  TimeUtils.formatPracticeDateTime(practice.dateTime, practice.duration),
                                   style: const TextStyle(
                                     fontSize: 11, // Reduced font size
                                     color: Color(0xFF6B7280),
@@ -1779,23 +1806,38 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
       ),
     );
   }
-  
-  String _formatDateTime(DateTime dateTime) {
-    final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
-                   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
-    final weekday = weekdays[dateTime.weekday - 1];
-    final month = months[dateTime.month - 1];
-    final day = dateTime.day;
-    final hour = dateTime.hour;
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    final period = hour >= 12 ? 'PM' : 'AM';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    
-    return '$weekday, $month $day • $displayHour:$minute $period';
-  }
 }
 
 
 
+
+
+/// Widget for displaying guest type tags with practice tag styling
+class GuestTypeTag extends StatelessWidget {
+  final GuestType guestType;
+  
+  const GuestTypeTag({
+    super.key,
+    required this.guestType,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        guestType.displayName,
+        style: const TextStyle(
+          fontSize: 12,
+          color: Color(0xFF0284C7),
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+    );
+  }
+}

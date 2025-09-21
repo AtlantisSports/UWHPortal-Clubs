@@ -52,7 +52,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   // Dependent state - Simpson family mock data
   bool _includeDependents = false;
-  final List<String> _availableDependents = DependentConstants.availableDependents;
   
   // Toast state
   bool _showToast = false;
@@ -2211,7 +2210,7 @@ class _TooltipWidgetState extends State<_TooltipWidget> {
             Positioned(
               bottom: 25, // Position above the icon
               left: -60, // Center horizontally relative to icon
-              child: Container(
+              child: SizedBox(
                 width: 140,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
