@@ -2,32 +2,28 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/models/club.dart';
 
 /// Bottom sheet modal for filtering practices by level and location
 /// Follows the same design pattern as the Events filter modal
-class PracticeFilterModal extends StatefulWidget {
+class LevelFilterModal extends StatefulWidget {
   final Set<String> availableLevels;
   final Set<String> availableLocations;
-  final Club club; // Added to access practice data for validation
   final VoidCallback? onFiltersChanged;
 
-  const PracticeFilterModal({
+  const LevelFilterModal({
     super.key,
     required this.availableLevels,
     required this.availableLocations,
-    required this.club,
     this.onFiltersChanged,
   });
 
   @override
-  State<PracticeFilterModal> createState() => _PracticeFilterModalState();
+  State<LevelFilterModal> createState() => _LevelFilterModalState();
 }
 
-class _PracticeFilterModalState extends State<PracticeFilterModal> {
+class _LevelFilterModalState extends State<LevelFilterModal> {
   late Set<String> _tempSelectedLevels;
   late Set<String> _tempSelectedLocations;
-  bool _showToast = false;
 
   @override
   void initState() {
@@ -43,34 +39,6 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
     participationProvider.updateSelectedLocations(_tempSelectedLocations);
     // Close the modal after applying filters
     widget.onFiltersChanged?.call();
-  }
-
-  void _showErrorToast() {
-    setState(() {
-      _showToast = true;
-    });
-    
-    // Hide toast after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-      }
-    });
-  }
-
-  bool _hasMatchingPractices() {
-    // If no filters selected, all practices are shown
-    if (_tempSelectedLevels.isEmpty && _tempSelectedLocations.isEmpty) {
-      return true;
-    }
-
-    return widget.club.upcomingPractices.any((practice) {
-      bool levelMatch = _tempSelectedLevels.isEmpty || _tempSelectedLevels.contains(practice.tag);
-      bool locationMatch = _tempSelectedLocations.isEmpty || _tempSelectedLocations.contains(practice.location);
-      return levelMatch && locationMatch;
-    });
   }
 
   void _resetFilters() {
@@ -89,10 +57,8 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
     return Container(
       height: 400, // Fixed height to work well as bottom sheet
       padding: const EdgeInsets.all(20),
-      child: Stack(
+      child: Column(
         children: [
-          Column(
-            children: [
           // Modal handle
           Container(
             margin: const EdgeInsets.only(top: 12),
@@ -106,7 +72,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
           
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), // Reduced bottom padding by 50% (from 16 to 8)
+            padding: const EdgeInsets.all(16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -165,16 +131,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                         ),
                       ),
                       
-                      const SizedBox(width: 8), // Reduced spacing before separator
-                      
-                      // Vertical separator
-                      Container(
-                        width: 1,
-                        height: 250, // Extended height to go past lowest filter option
-                        color: Colors.grey[300],
-                      ),
-                      
-                      const SizedBox(width: 8), // Reduced spacing after separator
+                      const SizedBox(width: 16), // Spacing between columns
                       
                       // Location column (right)
                       Expanded(
@@ -199,16 +156,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                     ],
                   ),
                   
-                  const SizedBox(height: 8), // Reduced spacing by 50% (from 16 to 8)
-                  
-                  // Horizontal separator
-                  Divider(
-                    height: 1,
-                    color: Colors.grey[300],
-                    thickness: 1,
-                  ),
-                  
-                  const SizedBox(height: 16), // Spacing after separator
+                  const SizedBox(height: 24), // Reduced from 32 to 24
                   
                   // Button row with Reset and Apply side by side
                   Row(
@@ -241,9 +189,9 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                       // Apply button (right side)
                       Expanded(
                         child: ElevatedButton(
-                          onPressed: _hasMatchingPractices() ? _applyFilters : _showErrorToast,
+                          onPressed: _applyFilters,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: _hasMatchingPractices() ? AppColors.primary : Colors.grey.shade400,
+                            backgroundColor: AppColors.primary,
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 14), // Reduced from 16 to 14
                             shape: RoundedRectangleBorder(
@@ -251,12 +199,11 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                             ),
                             elevation: 0,
                           ),
-                          child: Text(
+                          child: const Text(
                             'APPLY FILTERS',
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
-                              color: _hasMatchingPractices() ? Colors.white : Colors.grey.shade600,
                             ),
                           ),
                         ),
@@ -267,38 +214,6 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
               ),
             ),
           ),
-          ],
-        ),
-      
-      // Custom toast overlay
-      if (_showToast)
-        Positioned(
-          top: 20,
-          left: 16,
-          right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade600,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Text(
-              'No practices match the selected filters. Please adjust your selection.',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
         ],
       ),
     );

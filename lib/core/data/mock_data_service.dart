@@ -44,6 +44,7 @@ class MockDataService {
           'day': DateTime.monday,
           'hour': 20,
           'minute': 15,
+          'duration': 105, // 8:15 PM - 10:00 PM (1 hour 45 minutes)
           'location': 'VMAC',
           'address': '5310 E 136th Ave, Thornton, CO',
           'tag': 'Intermediate',
@@ -55,6 +56,7 @@ class MockDataService {
           'day': DateTime.wednesday,
           'hour': 19,
           'minute': 0,
+          'duration': 90, // 7:00 PM - 8:30 PM (1 hour 30 minutes)
           'location': 'Carmody',
           'address': '2200 S Kipling St, Lakewood, CO',
           'tag': 'Advanced',
@@ -66,6 +68,7 @@ class MockDataService {
           'day': DateTime.thursday,
           'hour': 20,
           'minute': 15,
+          'duration': 105, // 8:15 PM - 10:00 PM (1 hour 45 minutes)
           'location': 'VMAC',
           'address': '5310 E 136th Ave, Thornton, CO',
           'tag': 'Open',
@@ -77,6 +80,7 @@ class MockDataService {
           'day': DateTime.sunday,
           'hour': 11,
           'minute': 0,
+          'duration': 90, // 11:00 AM - 12:30 PM (1 hour 30 minutes)
           'location': 'VMAC',
           'address': '5310 E 136th Ave, Thornton, CO',
           'tag': 'Beginner',
@@ -88,6 +92,7 @@ class MockDataService {
           'day': DateTime.sunday,
           'hour': 15,
           'minute': 0,
+          'duration': 90, // 3:00 PM - 4:30 PM (1 hour 30 minutes)
           'location': 'Carmody',
           'address': '2200 S Kipling St, Lakewood, CO',
           'tag': 'Open',
@@ -113,6 +118,7 @@ class MockDataService {
           'day': DateTime.friday,
           'hour': 19,
           'minute': 0,
+          'duration': 120, // 7:00 PM - 9:00 PM (2 hours)
           'location': 'Ryde Pool',
           'address': 'Top Ryde City Shopping Centre, NSW',
           'tag': 'Open',
@@ -188,6 +194,7 @@ class MockDataService {
         location: pattern['location'] as String,
         address: pattern['address'] as String,
         tag: pattern['tag'] as String,
+        duration: Duration(minutes: pattern['duration'] as int? ?? 120), // Use pattern duration or default to 2 hours
       );
     }).toList();
   }
@@ -244,6 +251,7 @@ class MockDataService {
             location: pattern['location'] as String,
             address: pattern['address'] as String,
             tag: pattern['tag'] as String,
+            duration: Duration(minutes: pattern['duration'] as int? ?? 120), // Use pattern duration or default to 2 hours
             participationResponses: _generateParticipationForPractice(date, practiceId),
           ),
         );
@@ -263,10 +271,11 @@ class MockDataService {
         clubId: clubId,
         title: 'Weekly Practice',
         description: 'Regular training session.',
-        dateTime: DateTime(2025, 1, 1, 19, 0), // Default: Wednesday 7:00 PM
+        dateTime: DateTime(1970, 1, 1, 19, 0), // Default: Wednesday 7:00 PM
         location: 'Local Pool',
         address: 'Contact club for details',
         tag: 'Open',
+        duration: const Duration(hours: 2), // Default 2 hours for unknown clubs
       ),
     ];
   }

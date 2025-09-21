@@ -7,7 +7,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../core/data/mock_data_service.dart';
+import '../../core/services/schedule_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -59,6 +60,7 @@ class PracticeCalendar extends StatefulWidget {
 
 class _PracticeCalendarState extends State<PracticeCalendar> {
   Club get club => widget.club;
+  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
 
   @override
   void initState() {
@@ -441,8 +443,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     final practices = <DateTime, List<FilteredPracticeStatus>>{};
     final today = DateTime.now();
     
-    // Get typical practice schedule for this club from MockDataService
-    final typicalSchedule = MockDataService.getCalendarTypicalSchedule(club.id);
+    // Get typical practice schedule for this club from ScheduleService
+    final typicalSchedule = _scheduleService.getTypicalSchedule(club.id);
 
     // Generate practices for each day in the month
     for (int day = 1; day <= DateTime(year, month + 1, 0).day; day++) {

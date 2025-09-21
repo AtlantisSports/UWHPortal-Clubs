@@ -199,7 +199,7 @@ class NextPracticeCard extends StatelessWidget {
   }
 
   String _formatTime(DateTime startTime) {
-    final endTime = startTime.add(const Duration(hours: 2)); // Default 2-hour duration
+    final endTime = startTime.add(practice!.duration); // Use actual practice duration
     return '${_formatTimeOnly(startTime)} - ${_formatTimeOnly(endTime)}';
   }
 

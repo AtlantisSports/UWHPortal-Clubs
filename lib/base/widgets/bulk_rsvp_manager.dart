@@ -9,7 +9,8 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
-import '../../core/utils/practice_schedule_utils.dart';
+import '../../core/services/schedule_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/utils/time_utils.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
@@ -32,6 +33,8 @@ class BulkRSVPManager extends StatefulWidget {
 }
 
 class _BulkRSVPManagerState extends State<BulkRSVPManager> {
+  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
+  
   // Filter state
   Set<String> _selectedLocations = <String>{}; // Changed to Set for multi-select
   Set<String> _selectedLevels = <String>{}; // Changed to Set for multi-select
@@ -118,8 +121,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
-    // Use club-specific typical practices from MockDataService (via PracticeScheduleUtils)
-    final typicalPractices = PracticeScheduleUtils.getTypicalPractices(widget.club.id);
+    // Use club-specific typical practices from ScheduleService
+    final typicalPractices = _scheduleService.getTypicalPractices(widget.club.id);
     
     // Use the practices directly - no need to create new objects
     // Sort by weekday (Monday=1 through Sunday=7) for consistent ordering

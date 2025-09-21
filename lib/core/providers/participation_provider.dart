@@ -6,15 +6,19 @@ import 'package:flutter/foundation.dart';
 import '../models/practice.dart';
 import '../models/guest.dart';
 import '../utils/error_handler.dart';
-import '../data/mock_data_service.dart';
+import '../services/user_service.dart';
 import '../../features/clubs/clubs_repository.dart';
 import '../di/service_locator.dart';
 
 class ParticipationProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
+  final UserService _userService;
   
-  ParticipationProvider({ClubsRepository? clubsRepository}) 
-    : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
+  ParticipationProvider({
+    ClubsRepository? clubsRepository,
+    UserService? userService,
+  }) : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository,
+        _userService = userService ?? ServiceLocator.userService;
 
   // Map to track participation status for each practice
   // Key: practiceId, Value: ParticipationStatus
@@ -46,7 +50,7 @@ class ParticipationProvider with ChangeNotifier {
 
   // Getters
   String? get error => _error;
-  String get currentUserId => MockDataService.currentUserId;
+  String get currentUserId => _userService.currentUserId;
   bool get isBulkOperationInProgress => _isBulkOperationInProgress;
   String? get bulkOperationStatus => _bulkOperationStatus;
   Set<String> get selectedLevels => Set.from(_selectedLevels);
@@ -107,19 +111,24 @@ class ParticipationProvider with ChangeNotifier {
   }
 
   /// Initialize mock guest data for a practice (past practices only)
-  void _initializeMockGuestData(Practice practice) {
+  void _initializeMockGuestData(Practice practice) async {
     // Only initialize if we don't already have guest data for this practice
     if (_practiceGuestsMap.containsKey(practice.id)) {
       return;
     }
     
-    // Get mock guest data from MockDataService
-    final mockGuests = MockDataService.getMockGuestsForPractice(practice.id, practice.dateTime);
-    
-    // Only set if there are guests to avoid unnecessary empty entries
-    if (mockGuests.totalGuests > 0) {
-      _practiceGuestsMap[practice.id] = mockGuests;
-      _bringGuestMap[practice.id] = true; // Set bring guest flag if guests exist
+    try {
+      // Get guest data through UserService instead of direct MockDataService access
+      final guestData = await _userService.getPracticeGuests(practice.id, practice.dateTime);
+      
+      // Only set if there are guests to avoid unnecessary empty entries
+      if (guestData.totalGuests > 0) {
+        _practiceGuestsMap[practice.id] = guestData;
+        _bringGuestMap[practice.id] = true; // Set bring guest flag if guests exist
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('Error initializing guest data for practice ${practice.id}: $e');
     }
   }
 

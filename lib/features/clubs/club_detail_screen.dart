@@ -8,7 +8,8 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../core/utils/practice_schedule_utils.dart';
+import '../../core/services/schedule_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -44,6 +45,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   late ScrollController _scrollController;
   final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
   final GlobalKey _typicalPracticesKey = GlobalKey(); // Add GlobalKey for typical practices container
+  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
@@ -780,9 +782,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  /// Get typical/template practices for the club using shared utility
+  /// Get typical/template practices for the club using ScheduleService
   List<Practice> _getTypicalPractices() {
-    return PracticeScheduleUtils.getTypicalPractices(widget.club.id);
+    return _scheduleService.getTypicalPractices(widget.club.id);
   }
 
   Widget _buildGroupsTab(BuildContext context) {

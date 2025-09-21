@@ -54,8 +54,14 @@ class ClubsRepositoryImpl implements ClubsRepository {
       return _cachedClubs!;
     }
 
-    // For development: Use centralized mock data service
-    final clubs = await MockDataService.getClubs();
+    // Use ClubsService instead of direct MockDataService access
+    final clubs = await _clubsService.getClubs(
+      page: page,
+      limit: limit,
+      search: search,
+      location: location,
+      tags: tags,
+    );
 
     // Cache basic results
     if (search == null && location == null && (tags == null || tags.isEmpty) && page == 1) {

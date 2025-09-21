@@ -7,10 +7,10 @@ import 'package:provider/provider.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/utils/practice_schedule_utils.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../core/data/mock_data_service.dart';
+import '../../core/services/schedule_service.dart';
+import '../../core/di/service_locator.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
@@ -25,8 +25,9 @@ class ClubsListScreen extends StatefulWidget {
 }
 
 class _ClubsListScreenState extends State<ClubsListScreen> {
-  // Use MockDataService for consistent user ID
-  String get _currentUserId => MockDataService.currentUserId;
+  // Use UserService for consistent user ID
+  String get _currentUserId => ServiceLocator.userService.currentUserId;
+  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
   
   // Internal navigation state
   Club? _selectedClub;
@@ -174,9 +175,9 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     return upcomingPractices.first;
   }
 
-  /// Get typical/template practices for club card display using shared utility
+  /// Get typical/template practices for club card display using ScheduleService
   List<Practice> _getTypicalPractices(Club club) {
-    return PracticeScheduleUtils.getTypicalPractices(club.id);
+    return _scheduleService.getTypicalPractices(club.id);
   }
   
   /// Open map for practice location
