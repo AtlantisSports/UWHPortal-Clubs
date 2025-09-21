@@ -340,16 +340,22 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   @override
   Widget build(BuildContext context) {
     if (widget.mode == PracticeStatusCardMode.readOnly) {
-      return _buildReadOnlyCard();
+      // Check if practice is in the past
+      final isPastEvent = widget.practice.dateTime.isBefore(DateTime.now());
+      if (isPastEvent) {
+        return _buildReadOnlyPastCard();
+      } else {
+        return _buildReadOnlyFutureCard();
+      }
     } else {
       return _buildClickableCard();
     }
   }
 
-  Widget _buildReadOnlyCard() {
+  Widget _buildReadOnlyFutureCard() {
     final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
     
-    return Container(
+    Widget cardContent = Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
       decoration: BoxDecoration(
         color: const Color(0xFFF9FAFB), // Same light gray background as RSVP card
@@ -378,7 +384,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   child: Text(
                     _getParticipationHeaderText(userStatus),
                     style: TextStyle(
-                      fontSize: 17,
+                      fontSize: 15,
                       fontWeight: (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
                       color: _getParticipationHeaderColor(userStatus),
                     ),
@@ -510,6 +516,185 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         ],
       ),
     );
+
+    // Make the entire card clickable if onTap is provided
+    if (widget.onTap != null) {
+      return InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: cardContent,
+      );
+    }
+    
+    return cardContent;
+  }
+
+  Widget _buildReadOnlyPastCard() {
+    final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
+    
+    Widget cardContent = Container(
+      padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
+      decoration: BoxDecoration(
+        color: const Color(0xFFF9FAFB), // Same light gray background as RSVP card
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFE5E7EB)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header with status text and practice tag - NO RSVP LABEL for past events
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              // Center: Status text (no left label for past events)
+              Expanded(
+                child: Center(
+                  child: Text(
+                    _getParticipationHeaderText(userStatus),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
+                      color: _getParticipationHeaderColor(userStatus),
+                    ),
+                  ),
+                ),
+              ),
+              // Right: Practice tag
+              if (widget.practice.tag != null)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
+                  ),
+                  child: Text(
+                    widget.practice.tag!,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF0284C7),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                )
+              else
+                const SizedBox(width: 24), // Placeholder to maintain alignment
+            ],
+          ),
+          const SizedBox(height: 6),
+          
+          // Practice details - same layout as RSVP card
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Date
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.calendar_today,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          _formatDate(widget.practice.dateTime),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF374151),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    
+                    // Time
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            _formatTime(widget.practice.dateTime),
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Color(0xFF6B7280),
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    
+                    // Location
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.location_on,
+                          size: 16,
+                          color: Color(0xFF6B7280),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: MouseRegion(
+                            cursor: widget.onLocationTap != null 
+                                ? SystemMouseCursors.click 
+                                : SystemMouseCursors.basic,
+                            child: GestureDetector(
+                              onTap: widget.onLocationTap,
+                              child: Text(
+                                widget.practice.location,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: widget.onLocationTap != null 
+                                      ? const Color(0xFF0284C7) 
+                                      : const Color(0xFF6B7280),
+                                  decoration: widget.onLocationTap != null 
+                                      ? TextDecoration.underline 
+                                      : null,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              
+              // Status display (single disabled button showing current status)
+              if (widget.showAttendanceStatus && userStatus != null)
+                _buildReadOnlyStatusDisplay(userStatus),
+            ],
+          ),
+          
+          // Guest section for read-only mode (if user is going and has guests)
+          if (userStatus == ParticipationStatus.yes) ...[
+            const SizedBox(height: 12),
+            _buildReadOnlyGuestSection(),
+          ],
+        ],
+      ),
+    );
+
+    // Make the entire card clickable if onTap is provided
+    if (widget.onTap != null) {
+      return InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: cardContent,
+      );
+    }
+    
+    return cardContent;
   }
 
   Widget _buildClickableCard() {
@@ -566,13 +751,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ],
                   ),
-                  // Center: Will you attend text
+                  // Center: Participation status text
                   Expanded(
                     child: Center(
                       child: Text(
                         _getParticipationHeaderText(currentParticipationStatus),
                         style: TextStyle(
-                          fontSize: 17, // Increased from 12 to 17 (12 + 5)
+                          fontSize: 15, // Reduced from 17 to 15
                           fontWeight: (currentParticipationStatus == ParticipationStatus.yes || currentParticipationStatus == ParticipationStatus.no) ? FontWeight.w500 : FontWeight.normal,
                           color: _getParticipationHeaderColor(currentParticipationStatus),
                         ),
@@ -1051,15 +1236,15 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.no:
         return 'Not going';
       case ParticipationStatus.maybe:
-        return 'Will you attend?';
+        return 'Might attend';
       case ParticipationStatus.blank:
         return 'Pending';
       case ParticipationStatus.attended:
         return 'You attended';
       case ParticipationStatus.missed:
-        return 'You missed this';
+        return 'You did not attend';
       case null:
-        return 'Will you attend?';
+        return 'Might attend';
     }
   }
 
@@ -1070,7 +1255,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.no:
         return AppColors.error; // Red
       case ParticipationStatus.maybe:
-        return const Color(0xFF6B7280); // Gray (same as default)
+        return const Color(0xFFF59E0B); // Yellow (same as status indicator)
       case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
       case ParticipationStatus.attended:
@@ -1078,7 +1263,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.missed:
         return AppColors.primary; // System blue
       case null:
-        return const Color(0xFF6B7280); // Gray
+        return const Color(0xFFF59E0B); // Yellow (for default case)
     }
   }
   

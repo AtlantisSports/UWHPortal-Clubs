@@ -10,6 +10,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/utils/practice_schedule_utils.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../core/providers/participation_provider.dart';
+import '../../core/data/mock_data_service.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
@@ -24,7 +25,8 @@ class ClubsListScreen extends StatefulWidget {
 }
 
 class _ClubsListScreenState extends State<ClubsListScreen> {
-  final String _currentUserId = 'user123'; // TODO: Get from auth service
+  // Use MockDataService for consistent user ID
+  String get _currentUserId => MockDataService.currentUserId;
   
   // Internal navigation state
   Club? _selectedClub;

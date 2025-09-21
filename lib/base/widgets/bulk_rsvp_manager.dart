@@ -10,6 +10,7 @@ import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
 import '../../core/utils/practice_schedule_utils.dart';
+import '../../core/utils/time_utils.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
@@ -117,26 +118,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
-    // Use club-specific typical practices from PracticeScheduleUtils
+    // Use club-specific typical practices from MockDataService (via PracticeScheduleUtils)
     final typicalPractices = PracticeScheduleUtils.getTypicalPractices(widget.club.id);
     
-    // Convert typical practices to representative practices with proper IDs for bulk RSVP
-    final representatives = typicalPractices.map((practice) {
-      return Practice(
-        id: 'rep-${practice.id}', // Add "rep-" prefix for bulk RSVP context
-        clubId: widget.club.id,
-        title: practice.title,
-        description: practice.description,
-        dateTime: practice.dateTime,
-        location: practice.location,
-        address: practice.address,
-        tag: practice.tag,
-        participationResponses: practice.participationResponses,
-      );
-    }).toList();
-    
+    // Use the practices directly - no need to create new objects
     // Sort by weekday (Monday=1 through Sunday=7) for consistent ordering
-    return representatives
+    return List<Practice>.from(typicalPractices)
       ..sort((a, b) {
         final dayA = a.dateTime.weekday;
         final dayB = b.dateTime.weekday;
@@ -497,7 +484,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: Text(
-                            '${_formatShortDay(practice.dateTime)} • ${_formatTimeRange(practice.dateTime)} • ${practice.location}',
+                            '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
                             style: const TextStyle(
                               fontSize: 15,
                               color: Color(0xFF111827),
@@ -1259,32 +1246,33 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   // Helper methods
-  String _formatShortDay(DateTime dateTime) {
-    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    return weekdays[dateTime.weekday - 1];
-  }
-  
-  String _formatTimeRange(DateTime dateTime) {
-    final hour = dateTime.hour;
-    final minute = dateTime.minute;
-    final period = hour >= 12 ? 'pm' : 'am';
-    final displayHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
-    final minuteStr = minute.toString().padLeft(2, '0');
-    
-    // For now, assuming practices are 1.25 hours long
-    final endTime = dateTime.add(const Duration(hours: 1, minutes: 15));
-    final endHour = endTime.hour;
-    final endMinute = endTime.minute;
-    final endPeriod = endHour >= 12 ? 'pm' : 'am';
-    final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
-    final endMinuteStr = endMinute.toString().padLeft(2, '0');
-    
-    // Show period for both times if they're different, otherwise just the end
-    if (period == endPeriod) {
-      return '$displayHour:$minuteStr–$endDisplayHour:$endMinuteStr $endPeriod';
-    } else {
-      return '$displayHour:$minuteStr $period–$endDisplayHour:$endMinuteStr $endPeriod';
+  String _getDayNameForPractice(Practice practice) {
+    // For typical practices, extract day from practice ID
+    if (practice.id.startsWith('typical-')) {
+      final dayPrefix = practice.id.substring(8); // Remove 'typical-'
+      switch (dayPrefix) {
+        case 'monday':
+          return 'Mon';
+        case 'tuesday':
+          return 'Tue';
+        case 'wednesday':
+          return 'Wed';
+        case 'thursday':
+          return 'Thu';
+        case 'friday':
+          return 'Fri';
+        case 'saturday':
+          return 'Sat';
+        case 'sunday-morning':
+        case 'sunday-afternoon':
+          return 'Sun';
+        default:
+          return TimeUtils.formatShortDayName(practice.dateTime.weekday);
+      }
     }
+    
+    // For regular practices, use the actual date
+    return TimeUtils.formatShortDayName(practice.dateTime.weekday);
   }
   
   String _truncateLevel(String level) {

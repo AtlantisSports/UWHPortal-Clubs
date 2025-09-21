@@ -8,13 +8,13 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../core/utils/time_utils.dart';
 import '../../core/utils/practice_schedule_utils.dart';
 import '../../core/providers/navigation_provider.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
-import '../../base/widgets/level_filter_modal.dart';
+import '../../base/widgets/practice_filter_modal.dart';
+import '../../base/widgets/typical_practices_widget.dart';
 import '../bulk_rsvp/bulk_rsvp_screen.dart';
 import '../../core/utils/responsive_helper.dart';
 import 'practice_detail_screen.dart';
@@ -47,9 +47,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
-  bool _isShowingLevelFilterModal = false;
+  bool _isShowingPracticeFilterModal = false;
   bool _isTypicalPracticesExpanded = false; // Track expansion state for typical practices dropdown
-  final Map<String, bool> _expandedDescriptions = {}; // Track description expansion for practice items
   
   // Toast state
   bool _showToast = false;
@@ -172,9 +171,19 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     return availableLevels;
   }
   
-  void _showLevelFilterModal() {
+  Set<String> _getAvailableLocations() {
+    final availableLocations = <String>{};
+    for (final practice in widget.club.upcomingPractices) {
+      if (practice.location.isNotEmpty) {
+        availableLocations.add(practice.location);
+      }
+    }
+    return availableLocations;
+  }
+  
+  void _showPracticeFilterModal() {
     setState(() {
-      _isShowingLevelFilterModal = true;
+      _isShowingPracticeFilterModal = true;
     });
   }
   
@@ -655,9 +664,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     return Stack(
       children: [
         // Level Filter Modal
-        if (_isShowingLevelFilterModal) ...[
-          _buildModalBackdrop(() => setState(() => _isShowingLevelFilterModal = false)),
-          _buildLevelFilterModal(),
+        if (_isShowingPracticeFilterModal) ...[
+          _buildModalBackdrop(() => setState(() => _isShowingPracticeFilterModal = false)),
+          _buildPracticeFilterModal(),
         ],
       ],
     );
@@ -698,12 +707,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  Widget _buildLevelFilterModal() {
+  Widget _buildPracticeFilterModal() {
     return _buildModalContainer(
-      child: LevelFilterModal(
+      child: PracticeFilterModal(
         availableLevels: _getAvailableLevels(),
+        availableLocations: _getAvailableLocations(),
+        club: widget.club,
         onFiltersChanged: () {
-          setState(() => _isShowingLevelFilterModal = false);
+          setState(() => _isShowingPracticeFilterModal = false);
         },
       ),
     );
@@ -759,7 +770,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   club: widget.club,
                   onPracticeSelected: _handlePracticeSelected,
                   participationProvider: participationProvider,
-                  onShowLevelFilter: _showLevelFilterModal,
+                  onShowLevelFilter: _showPracticeFilterModal,
                 );
               },
             ),
@@ -772,138 +783,6 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   /// Get typical/template practices for the club using shared utility
   List<Practice> _getTypicalPractices() {
     return PracticeScheduleUtils.getTypicalPractices(widget.club.id);
-  }
-
-  Widget _buildPracticeRow(Practice practice) {
-    final dayName = _getDayName(practice.dateTime.weekday);
-    final startTime = practice.dateTime;
-    final endTime = practice.dateTime.add(practice.duration);
-    final timeStr = TimeUtils.formatTimeRange(startTime, endTime);
-    
-    final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
-    final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
-    
-    return Container(
-      margin: const EdgeInsets.only(bottom: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(6),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              // Day text (no background)
-              Text(
-                dayName,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Time range
-              Text(
-                timeStr,
-                style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Separator
-              Text(
-                '•',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary.withValues(alpha: 0.6),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Location (clickable)
-              Expanded(
-                child: GestureDetector(
-                  onTap: () => _launchLocationUrl(practice.mapsUrl),
-                  child: Text(
-                    practice.location,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Color(0xFF0284C7), // Blue color to indicate it's clickable
-                      decoration: TextDecoration.underline,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ),
-              // Practice tag
-              if (practice.tag != null) ...[
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(4),
-                    border: Border.all(
-                      color: Colors.blue.withValues(alpha: 0.3),
-                      width: 1,
-                    ),
-                  ),
-                  child: Text(
-                    practice.tag!,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.blue,
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          // Practice description
-          if (practice.description.isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Text(
-                    shouldTruncateDescription && !isDescriptionExpanded
-                        ? _getTruncatedDescription(practice.description)
-                        : practice.description,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary.withValues(alpha: 0.8),
-                      fontStyle: FontStyle.italic,
-                    ),
-                  ),
-                ),
-                if (shouldTruncateDescription)
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _expandedDescriptions[practice.id] = !isDescriptionExpanded;
-                      });
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.only(left: 4),
-                      child: Icon(
-                        isDescriptionExpanded ? Icons.expand_less : Icons.expand_more,
-                        size: 16,
-                        color: AppColors.textSecondary.withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          ],
-        ],
-      ),
-    );
   }
 
   Widget _buildGroupsTab(BuildContext context) {
@@ -971,75 +850,22 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Typical Practices Dropdown
-            Container(
+            TypicalPracticesWidget(
               key: _typicalPracticesKey,
-              width: double.infinity,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade200),
-              ),
-              child: Column(
-                children: [
-                  // Dropdown Header
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isTypicalPracticesExpanded = !_isTypicalPracticesExpanded;
-                      });
-                      
-                      // Auto-scroll to show the expanded typical practices list
-                      if (_isTypicalPracticesExpanded) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _scrollToTypicalPractices();
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.calendar_today,
-                            size: 18,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          const Expanded(
-                            child: Text(
-                              'Typical weekly practices',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ),
-                          Icon(
-                            _isTypicalPracticesExpanded ? Icons.expand_less : Icons.expand_more,
-                            color: AppColors.primary,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  
-                  // Expanded Schedule Details
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    curve: Curves.easeInOut,
-                    height: _isTypicalPracticesExpanded ? null : 0,
-                    child: _isTypicalPracticesExpanded
-                        ? Column(
-                            children: [
-                              const SizedBox(height: 8),
-                              ...typicalPractices.map((practice) => _buildPracticeRow(practice)),
-                              const SizedBox(height: 16),
-                            ],
-                          )
-                        : const SizedBox.shrink(),
-                  ),
-                ],
-              ),
+              practices: typicalPractices,
+              isExpanded: _isTypicalPracticesExpanded,
+              onToggle: () {
+                setState(() {
+                  _isTypicalPracticesExpanded = !_isTypicalPracticesExpanded;
+                });
+                
+                // Auto-scroll to show the expanded typical practices list
+                if (_isTypicalPracticesExpanded) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _scrollToTypicalPractices();
+                  });
+                }
+              },
             ),
             
             const SizedBox(height: 24),
@@ -1154,76 +980,5 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         ),
       ),
     );
-  }
-
-  /// Helper method to get day name from weekday number
-  String _getDayName(int weekday) {
-    switch (weekday) {
-      case DateTime.monday: return 'Monday';
-      case DateTime.tuesday: return 'Tuesday';
-      case DateTime.wednesday: return 'Wednesday';
-      case DateTime.thursday: return 'Thursday';
-      case DateTime.friday: return 'Friday';
-      case DateTime.saturday: return 'Saturday';
-      case DateTime.sunday: return 'Sunday';
-      default: return '';
-    }
-  }
-
-  /// Launch location URL in maps app or browser
-  Future<void> _launchLocationUrl(String url) async {
-    try {
-      // For web, this will open in a new tab
-      // For mobile, this will try to open in maps app
-      if (await canLaunchUrl(Uri.parse(url))) {
-        await launchUrl(
-          Uri.parse(url),
-          mode: LaunchMode.externalApplication,
-        );
-      } else {
-        // Fallback: show a snackbar with the address
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Could not open location: $url'),
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-      }
-    } catch (e) {
-      // Error handling: show snackbar
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error opening location: ${e.toString()}'),
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-    }
-  }
-
-  /// Determines if a description should be truncated based on visual length
-  bool _shouldTruncateDescription(String description) {
-    // Estimate if description would wrap to second line
-    // Rough estimate: more than 40 characters likely to wrap
-    return description.length > 40;
-  }
-
-  /// Returns truncated description with ellipsis
-  String _getTruncatedDescription(String description) {
-    if (description.length <= 40) return description;
-    
-    // Find a good break point (prefer word boundaries)
-    String truncated = description.substring(0, 37);
-    int lastSpace = truncated.lastIndexOf(' ');
-    
-    // If we can break at a word boundary and it's not too short, do so
-    if (lastSpace > 25) {
-      truncated = truncated.substring(0, lastSpace);
-    }
-    
-    return '$truncated...';
   }
 }

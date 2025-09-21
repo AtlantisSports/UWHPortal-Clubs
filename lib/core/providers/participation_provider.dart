@@ -6,12 +6,12 @@ import 'package:flutter/foundation.dart';
 import '../models/practice.dart';
 import '../models/guest.dart';
 import '../utils/error_handler.dart';
+import '../data/mock_data_service.dart';
 import '../../features/clubs/clubs_repository.dart';
 import '../di/service_locator.dart';
 
 class ParticipationProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
-  final String _currentUserId = 'user123'; // TODO: Get from auth service
   
   ParticipationProvider({ClubsRepository? clubsRepository}) 
     : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
@@ -34,6 +34,9 @@ class ParticipationProvider with ChangeNotifier {
   // Level filter state (session-based persistence)
   Set<String> _selectedLevels = <String>{};
   
+  // Location filter state (session-based persistence)
+  Set<String> _selectedLocations = <String>{};
+  
   // Bulk operation tracking
   bool _isBulkOperationInProgress = false;
   String? _bulkOperationStatus;
@@ -43,11 +46,13 @@ class ParticipationProvider with ChangeNotifier {
 
   // Getters
   String? get error => _error;
-  String get currentUserId => _currentUserId;
+  String get currentUserId => MockDataService.currentUserId;
   bool get isBulkOperationInProgress => _isBulkOperationInProgress;
   String? get bulkOperationStatus => _bulkOperationStatus;
   Set<String> get selectedLevels => Set.from(_selectedLevels);
+  Set<String> get selectedLocations => Set.from(_selectedLocations);
   bool get hasLevelFiltersApplied => _selectedLevels.isNotEmpty;
+  bool get hasLocationFiltersApplied => _selectedLocations.isNotEmpty;
 
   /// Get participation status for a specific practice
   ParticipationStatus getParticipationStatus(String practiceId) {
@@ -71,11 +76,14 @@ class ParticipationProvider with ChangeNotifier {
   
   /// Initialize participation status from a practice object
   void initializePracticeParticipation(Practice practice) {
-    final status = practice.getParticipationStatus(_currentUserId);
+    final status = practice.getParticipationStatus(currentUserId);
     if (_participationStatusMap[practice.id] != status) {
       _participationStatusMap[practice.id] = status;
       // Don't notify listeners here as this is initialization
     }
+    
+    // Initialize mock guest data for past practices
+    _initializeMockGuestData(practice);
   }
   
   /// Initialize participation statuses from a list of practices
@@ -83,15 +91,35 @@ class ParticipationProvider with ChangeNotifier {
     bool hasChanges = false;
     
     for (final practice in practices) {
-      final status = practice.getParticipationStatus(_currentUserId);
+      final status = practice.getParticipationStatus(currentUserId);
       if (_participationStatusMap[practice.id] != status) {
         _participationStatusMap[practice.id] = status;
         hasChanges = true;
       }
+      
+      // Initialize mock guest data for past practices
+      _initializeMockGuestData(practice);
     }
     
     if (hasChanges) {
       notifyListeners();
+    }
+  }
+
+  /// Initialize mock guest data for a practice (past practices only)
+  void _initializeMockGuestData(Practice practice) {
+    // Only initialize if we don't already have guest data for this practice
+    if (_practiceGuestsMap.containsKey(practice.id)) {
+      return;
+    }
+    
+    // Get mock guest data from MockDataService
+    final mockGuests = MockDataService.getMockGuestsForPractice(practice.id, practice.dateTime);
+    
+    // Only set if there are guests to avoid unnecessary empty entries
+    if (mockGuests.totalGuests > 0) {
+      _practiceGuestsMap[practice.id] = mockGuests;
+      _bringGuestMap[practice.id] = true; // Set bring guest flag if guests exist
     }
   }
 
@@ -219,7 +247,7 @@ class ParticipationProvider with ChangeNotifier {
         orElse: () => throw Exception('Practice not found'),
       );
       
-      final status = practice.getParticipationStatus(_currentUserId);
+      final status = practice.getParticipationStatus(currentUserId);
       if (_participationStatusMap[practiceId] != status) {
         _participationStatusMap[practiceId] = status;
         notifyListeners();
@@ -263,9 +291,26 @@ class ParticipationProvider with ChangeNotifier {
     return levels;
   }
   
+  /// Get all available practice locations from a list of practices
+  Set<String> getAvailableLocations(List<Practice> practices) {
+    final locations = <String>{};
+    for (final practice in practices) {
+      if (practice.location.isNotEmpty) {
+        locations.add(practice.location);
+      }
+    }
+    return locations;
+  }
+  
   /// Update selected levels for filtering
   void updateSelectedLevels(Set<String> levels) {
     _selectedLevels = Set.from(levels);
+    notifyListeners();
+  }
+  
+  /// Update selected locations for filtering
+  void updateSelectedLocations(Set<String> locations) {
+    _selectedLocations = Set.from(locations);
     notifyListeners();
   }
   
@@ -275,9 +320,21 @@ class ParticipationProvider with ChangeNotifier {
     notifyListeners();
   }
   
+  /// Add a location to the filter
+  void addLocationToFilter(String location) {
+    _selectedLocations.add(location);
+    notifyListeners();
+  }
+  
   /// Remove a level from the filter
   void removeLevelFromFilter(String level) {
     _selectedLevels.remove(level);
+    notifyListeners();
+  }
+  
+  /// Remove a location from the filter
+  void removeLocationFromFilter(String location) {
+    _selectedLocations.remove(location);
     notifyListeners();
   }
   
@@ -287,11 +344,31 @@ class ParticipationProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  /// Check if a practice passes the level filter
+  /// Clear all location filters
+  void clearLocationFilters() {
+    _selectedLocations.clear();
+    notifyListeners();
+  }
+  
+  /// Clear all filters (both level and location)
+  void clearAllFilters() {
+    _selectedLevels.clear();
+    _selectedLocations.clear();
+    notifyListeners();
+  }
+  
+  /// Check if a practice passes both level and location filters
   bool shouldShowPractice(Practice practice) {
-    if (_selectedLevels.isEmpty) return true;
-    if (practice.tag == null || practice.tag!.isEmpty) return false;
-    return _selectedLevels.contains(practice.tag);
+    // Check level filter
+    final passesLevelFilter = _selectedLevels.isEmpty || 
+        (practice.tag != null && practice.tag!.isNotEmpty && _selectedLevels.contains(practice.tag));
+    
+    // Check location filter
+    final passesLocationFilter = _selectedLocations.isEmpty || 
+        _selectedLocations.contains(practice.location);
+    
+    // Practice must pass both filters
+    return passesLevelFilter && passesLocationFilter;
   }
   
   /// Debug method to see all tracked participation statuses

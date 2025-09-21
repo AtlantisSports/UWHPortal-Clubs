@@ -7,7 +7,9 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
+import '../../core/data/mock_data_service.dart';
 import '../../base/widgets/phone_modal_utils.dart';
+import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
 
 enum PracticeStatus {
@@ -57,6 +59,15 @@ class PracticeCalendar extends StatefulWidget {
 
 class _PracticeCalendarState extends State<PracticeCalendar> {
   Club get club => widget.club;
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure any lingering overlays are cleared when this widget is created
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      PhoneFrameState.hideOverlay();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -430,22 +441,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     final practices = <DateTime, List<FilteredPracticeStatus>>{};
     final today = DateTime.now();
     
-    // Get typical practice schedule for this club
-    List<Map<String, dynamic>> typicalSchedule = [];
-    
-    if (club.id == 'denver-uwh') {
-      typicalSchedule = [
-        {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC', 'tag': 'Open'},
-        {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody', 'tag': 'High-Level'},
-        {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC', 'tag': 'High-Level'},
-        {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC', 'tag': 'Intermediate'},
-        {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody', 'tag': 'Open'},
-      ];
-    } else if (club.id == 'sydney-uwh') {
-      typicalSchedule = [
-        {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde', 'tag': 'Open'},
-      ];
-    }
+    // Get typical practice schedule for this club from MockDataService
+    final typicalSchedule = MockDataService.getCalendarTypicalSchedule(club.id);
 
     // Generate practices for each day in the month
     for (int day = 1; day <= DateTime(year, month + 1, 0).day; day++) {
@@ -607,7 +604,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   List<Practice> _getPracticesForDate(DateTime date) {
     final practices = <Practice>[];
     
-    // First, check for real practices from club data
+    // Get real practices from club data (sourced from MockDataService)
     for (final practice in club.upcomingPractices) {
       final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
       final targetDate = DateTime(date.year, date.month, date.day);
@@ -617,102 +614,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       }
     }
     
-    // If no real practices found, generate from typical schedule
-    if (practices.isEmpty) {
-      // Get typical practice schedule for this club
-      List<Map<String, dynamic>> typicalSchedule = [];
-      
-      if (club.id == 'denver-uwh') {
-        typicalSchedule = [
-          {'day': DateTime.monday, 'time': '8:15 PM', 'location': 'VMAC'},
-          {'day': DateTime.wednesday, 'time': '7:00 PM', 'location': 'Carmody'},
-          {'day': DateTime.thursday, 'time': '8:15 PM', 'location': 'VMAC'},
-          {'day': DateTime.sunday, 'time': '10:00 AM', 'location': 'VMAC'},
-          {'day': DateTime.sunday, 'time': '3:00 PM', 'location': 'Carmody'},
-        ];
-      } else if (club.id == 'sydney-uwh') {
-        typicalSchedule = [
-          {'day': DateTime.friday, 'time': '7:00 PM', 'location': 'Ryde'},
-        ];
-      }
-      
-      // Find practices for this day of week
-      final dayPractices = typicalSchedule.where((p) => p['day'] == date.weekday).toList();
-      
-      for (int i = 0; i < dayPractices.length; i++) {
-        final practiceInfo = dayPractices[i];
-        
-        // Create a proper DateTime for the practice
-        final practiceDateTime = _parseTimeToDateTime(date, practiceInfo['time']);
-        
-        practices.add(Practice(
-          id: 'typical_${date.millisecondsSinceEpoch}_$i',
-          clubId: club.id,
-          title: _getPracticeTitle(practiceInfo['location'], practiceInfo['time']),
-          description: _getPracticeDescription(practiceInfo['location'], practiceInfo['time']),
-          dateTime: practiceDateTime,
-          location: practiceInfo['location'],
-          address: club.location, // Use club's address for now
-          duration: Duration(hours: 2), // Default 2 hour duration
-          maxParticipants: 20,
-          participants: [],
-          participationResponses: {},
-          tag: _getPracticeTag(practiceInfo['location'], practiceInfo['time']), // Add tag
-        ));
-      }
-    }
-    
+    // Return only real practices - no fake generation
+    // MockDataService already provides all practices for the date range
     return practices;
-  }
-
-  String _getPracticeTitle(String location, String time) {
-    // For Sunday practices, use specific titles
-    if (time.contains('AM') || time.contains('10:') || time.contains('11:') || time.contains('12:')) {
-      return 'Sunday Morning';
-    } else if (time.contains('3:') || time.contains('15:') || time.contains('PM')) {
-      return 'Sunday Afternoon';
-    } else {
-      return 'Evening Practice';
-    }
-  }
-
-  String _getPracticeTag(String location, String time) {
-    // Assign tags based on time and location to match the repository data
-    if (time.contains('AM') || time.contains('10:')) {
-      return 'Intermediate'; // Sunday Morning at VMAC
-    } else if (time.contains('3:') || time.contains('15:')) {
-      return 'Open'; // Sunday Afternoon at Carmody
-    } else if (time.contains('8:15')) {
-      return 'High-Level'; // Monday/Thursday evening practices
-    } else {
-      return 'Open'; // Default for other practices
-    }
-  }
-
-  String _getPracticeDescription(String location, String time) {
-    final timeOfDay = time.contains('AM') ? 'morning' : 
-                     (time.contains('10:') || time.contains('11:') || time.contains('12:') || time.contains('1:') || time.contains('2:') || time.contains('3:')) ? 'afternoon' : 'evening';
-    return 'Regular $timeOfDay practice session at $location. Come ready to train and improve your underwater hockey skills!';
-  }
-
-  DateTime _parseTimeToDateTime(DateTime date, String timeString) {
-    // Parse time string like "8:15 PM" or "10:00 AM"
-    final parts = timeString.split(' ');
-    final timePart = parts[0];
-    final amPm = parts[1];
-    
-    final timeComponents = timePart.split(':');
-    int hour = int.parse(timeComponents[0]);
-    int minute = int.parse(timeComponents[1]);
-    
-    // Convert to 24-hour format
-    if (amPm == 'PM' && hour != 12) {
-      hour += 12;
-    } else if (amPm == 'AM' && hour == 12) {
-      hour = 0;
-    }
-    
-    return DateTime(date.year, date.month, date.day, hour, minute);
   }
 
   void _showPracticeSelectionModal(BuildContext context, List<Practice> practices, ParticipationProvider? participationProvider) {
@@ -797,8 +701,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
     return Consumer<ParticipationProvider>(
       builder: (context, provider, child) {
-        final hasFiltersApplied = provider.hasLevelFiltersApplied;
-        final selectedCount = provider.selectedLevels.length;
+        final hasFiltersApplied = provider.hasLevelFiltersApplied || provider.hasLocationFiltersApplied;
+        final selectedCount = provider.selectedLevels.length + provider.selectedLocations.length;
         
         return Container(
           width: 40,
