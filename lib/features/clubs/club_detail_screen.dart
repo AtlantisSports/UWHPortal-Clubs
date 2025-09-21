@@ -955,7 +955,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
       // Animate to the target position
       _scrollController.animateTo(
         targetScrollPosition.clamp(0.0, _scrollController.position.maxScrollExtent),
-        duration: const Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 250),
         curve: Curves.easeInOut,
       );
     }

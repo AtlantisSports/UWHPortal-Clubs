@@ -9,6 +9,7 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
+import '../../core/utils/practice_schedule_utils.dart';
 import 'dropdown_utils.dart';
 import 'phone_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
@@ -116,58 +117,23 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
-    final representatives = <Practice>[
-      Practice(
-        id: 'rep-denver-monday',
+    // Use club-specific typical practices from PracticeScheduleUtils
+    final typicalPractices = PracticeScheduleUtils.getTypicalPractices(widget.club.id);
+    
+    // Convert typical practices to representative practices with proper IDs for bulk RSVP
+    final representatives = typicalPractices.map((practice) {
+      return Practice(
+        id: 'rep-${practice.id}', // Add "rep-" prefix for bulk RSVP context
         clubId: widget.club.id,
-        title: 'Monday Evening',
-        description: 'Beginner-friendly; arrive 10 min early.',
-        dateTime: DateTime(2025, 1, 6, 20, 15), // Template: Monday 8:15 PM (using first Monday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Open',
-      ),
-      Practice(
-        id: 'rep-denver-wednesday',
-        clubId: widget.club.id,
-        title: 'Wednesday Evening',
-        description: 'Shallow end reserved. High-level participants only.',
-        dateTime: DateTime(2025, 1, 1, 19, 0), // Template: Wednesday 7:00 PM (using first Wednesday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'High-Level',
-      ),
-      Practice(
-        id: 'rep-denver-thursday',
-        clubId: widget.club.id,
-        title: 'Thursday Evening',
-        description: 'Scrimmage heavy. High-level participants only.',
-        dateTime: DateTime(2025, 1, 2, 20, 15), // Template: Thursday 8:15 PM (using first Thursday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'High-Level',
-      ),
-      Practice(
-        id: 'rep-denver-sunday-morning',
-        clubId: widget.club.id,
-        title: 'Sunday Morning',
-        description: 'Drills + conditioning.',
-        dateTime: DateTime(2025, 1, 5, 10, 0), // Template: Sunday 10:00 AM (using first Sunday of 2025)
-        location: 'VMAC',
-        address: '5310 E 136th Ave, Thornton, CO',
-        tag: 'Intermediate',
-      ),
-      Practice(
-        id: 'rep-denver-sunday-afternoon',
-        clubId: widget.club.id,
-        title: 'Sunday Afternoon',
-        description: 'Afternoon session.',
-        dateTime: DateTime(2025, 1, 5, 15, 0), // Template: Sunday 3:00 PM (using first Sunday of 2025)
-        location: 'Carmody',
-        address: '2200 S Kipling St, Lakewood, CO',
-        tag: 'Open',
-      ),
-    ];
+        title: practice.title,
+        description: practice.description,
+        dateTime: practice.dateTime,
+        location: practice.location,
+        address: practice.address,
+        tag: practice.tag,
+        participationResponses: practice.participationResponses,
+      );
+    }).toList();
     
     // Sort by weekday (Monday=1 through Sunday=7) for consistent ordering
     return representatives

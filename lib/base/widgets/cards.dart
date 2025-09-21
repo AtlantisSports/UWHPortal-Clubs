@@ -186,7 +186,7 @@ class _ClubCardState extends State<ClubCard> {
                       // Auto-scroll to show the expanded typical practices list
                       if (_isExpanded) {
                         // Wait for the animation to complete before scrolling
-                        Future.delayed(const Duration(milliseconds: 350), () {
+                        Future.delayed(const Duration(milliseconds: 175), () {
                           _scrollToTypicalPractices();
                         });
                       }
@@ -259,7 +259,7 @@ class _ClubCardState extends State<ClubCard> {
         // Use keepVisibleAtEnd to only scroll if needed and show the bottom of content
         Scrollable.ensureVisible(
           context,
-          duration: const Duration(milliseconds: 500),
+          duration: const Duration(milliseconds: 250),
           curve: Curves.easeInOut,
           alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
         );
