@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/practice_pattern.dart';
+import '../../core/models/practice_recurrence.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
@@ -79,22 +80,22 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _verifyPracticeDataConsistency() {
-    final typicalPractices = _getRepresentativePractices();
+    final recurringPractices = _getRepresentativePractices();
     
     // Log practice lists for debugging
     PracticeDataConsistencyVerifier.logPracticeList(
-      typicalPractices, 
+      recurringPractices, 
       'Bulk RSVP Representative Practices'
     );
     
     // Verify each practice has valid pattern ID
-    for (final practice in typicalPractices) {
+    for (final practice in recurringPractices) {
       if (!PracticeDataConsistencyVerifier.hasValidPatternId(practice)) {
         debugPrint('WARNING: Invalid pattern ID for practice: ${practice.title} (${practice.id})');
       }
     }
     
-    debugPrint('Bulk RSVP initialized with ${typicalPractices.length} practice patterns');
+    debugPrint('Bulk RSVP initialized with ${recurringPractices.length} practice patterns');
   }
   
   void _initializeFilters() {
@@ -143,7 +144,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
-    // Use practice patterns instead of typical practices to avoid date issues
+    // Use practice patterns instead of recurring practices to avoid date issues
     final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
     
     // Convert practice patterns to Practice objects for bulk RSVP display
@@ -157,6 +158,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       return Practice(
         id: practiceData['id'] as String,
         clubId: practiceData['clubId'] as String,
+        patternId: pattern.id, // Link to the practice pattern
         title: practiceData['title'] as String,
         description: practiceData['description'] as String,
         dateTime: DateTime.parse(practiceData['dateTime'] as String),
@@ -507,6 +509,26 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   Widget _buildConsolidatedPracticeSelector(List<Practice> filteredPractices, ParticipationProvider participationProvider) {
+    // Get practice patterns for recurrence information
+    final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
+    final patternMap = {for (var pattern in practicePatterns) pattern.id: pattern};
+    
+    // Separate weekly and non-weekly practices
+    final weeklyPractices = <Practice>[];
+    final nonWeeklyPractices = <Practice>[];
+    
+    for (final practice in filteredPractices) {
+      final pattern = patternMap[practice.patternId ?? practice.id];
+      final isWeekly = pattern?.recurrence.type == RecurrenceType.weekly && 
+                      pattern?.recurrence.interval == 1;
+      
+      if (isWeekly) {
+        weeklyPractices.add(practice);
+      } else {
+        nonWeeklyPractices.add(practice);
+      }
+    }
+    
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -517,88 +539,223 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Practice list
-              ...filteredPractices.map((practice) {
-            final isSelected = _selectedPracticeIds.contains(practice.id);
-            
-            return InkWell(
-              onTap: () {
-                setState(() {
-                  if (isSelected) {
-                    _selectedPracticeIds.remove(practice.id);
-                  } else {
-                    _selectedPracticeIds.add(practice.id);
-                  }
-                });
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Checkbox(
-                          value: isSelected,
-                          onChanged: (value) {
-                            setState(() {
-                              if (value == true) {
-                                _selectedPracticeIds.add(practice.id);
-                              } else {
-                                _selectedPracticeIds.remove(practice.id);
-                              }
-                            });
-                          },
-                          activeColor: const Color(0xFF0284C7),
-                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          visualDensity: VisualDensity.compact,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              color: Color(0xFF111827),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        // Level tag indicator
-                        Container(
-                          width: 32,
-                          height: 24,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(4),
-                            color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-                            border: Border.all(
-                              color: const Color(0xFF0284C7),
-                              width: 1.5,
-                            ),
-                          ),
-                          child: Center(
-                            child: Text(
-                              _truncateLevel(practice.tag ?? ''),
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: Color(0xFF0284C7),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
+              // Weekly title
+              if (weeklyPractices.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Weekly',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
                     ),
-                    // Practice description (similar to club card)
-                    if (practice.description.isNotEmpty) 
-                      _buildPracticeDescription(practice),
-                  ],
+                  ),
                 ),
-              ),
-            );
-          }),
+              ],
+              
+              // Weekly practices
+              ...weeklyPractices.map((practice) => _buildWeeklyPracticeItem(practice, patternMap)),
+              
+              // Horizontal divider
+              if (weeklyPractices.isNotEmpty && nonWeeklyPractices.isNotEmpty) ...[
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Divider(
+                    color: Color(0xFFE5E7EB),
+                    thickness: 1,
+                  ),
+                ),
+              ],
+              
+              // Non-weekly practices
+              ...nonWeeklyPractices.map((practice) => _buildNonWeeklyPracticeItem(practice, patternMap)),
             ],
           ),
+        );
+  }
+
+  /// Build a weekly practice item (current format)
+  Widget _buildWeeklyPracticeItem(Practice practice, Map<String, PracticePattern> patternMap) {
+    final isSelected = _selectedPracticeIds.contains(practice.id);
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedPracticeIds.remove(practice.id);
+          } else {
+            _selectedPracticeIds.add(practice.id);
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedPracticeIds.add(practice.id);
+                      } else {
+                        _selectedPracticeIds.remove(practice.id);
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFF0284C7),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Color(0xFF111827),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Level tag indicator
+                Container(
+                  width: 32,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: const Color(0xFF0284C7),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _truncateLevel(practice.tag ?? ''),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Practice description (similar to club card)
+            if (practice.description.isNotEmpty) 
+              _buildPracticeDescription(practice),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Build a non-weekly practice item (restructured format)
+  Widget _buildNonWeeklyPracticeItem(Practice practice, Map<String, PracticePattern> patternMap) {
+    final isSelected = _selectedPracticeIds.contains(practice.id);
+    final pattern = patternMap[practice.patternId ?? practice.id];
+    
+    return InkWell(
+      onTap: () {
+        setState(() {
+          if (isSelected) {
+            _selectedPracticeIds.remove(practice.id);
+          } else {
+            _selectedPracticeIds.add(practice.id);
+          }
+        });
+      },
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Checkbox(
+                  value: isSelected,
+                  onChanged: (value) {
+                    setState(() {
+                      if (value == true) {
+                        _selectedPracticeIds.add(practice.id);
+                      } else {
+                        _selectedPracticeIds.remove(practice.id);
+                      }
+                    });
+                  },
+                  activeColor: const Color(0xFF0284C7),
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Recurrence note first (pattern description)
+                      if (pattern?.recurrence.description != null && pattern!.recurrence.description.isNotEmpty) ...[
+                        Text(
+                          pattern.recurrence.description,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w500,
+                            color: Color(0xFF6B7280),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                      ],
+                      // Day/time/location below
+                      Text(
+                        '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Level tag indicator
+                Container(
+                  width: 32,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(4),
+                    color: const Color(0xFF0284C7).withValues(alpha: 0.1),
+                    border: Border.all(
+                      color: const Color(0xFF0284C7),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _truncateLevel(practice.tag ?? ''),
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF0284C7),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            // Practice description (similar to club card)
+            if (practice.description.isNotEmpty) 
+              _buildPracticeDescription(practice),
+          ],
+        ),
+      ),
     );
   }
   
@@ -1105,17 +1262,19 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       // Find all calendar practices that match this pattern
       // Match by patternId directly - this is the robust identifier
       final matchingPractices = allCalendarPractices.where((p) {
-        return p.patternId == selectedRepresentative.id;
+        return p.patternId == selectedRepresentative.patternId;
       }).toList();
       
       // Apply timeframe filtering
       List<Practice> timeframePractices = [];
       switch (_selectedTimeframe) {
         case 'only_announced':
-          // Filter for upcoming announced practices only
+          // Filter for upcoming announced practices only (bounded by mock announced cutoff)
           timeframePractices = matchingPractices.where((p) {
-            final today = DateTime.now();
-            return p.dateTime.isAfter(today);
+            final now = DateTime.now();
+            final cutoff = AppConstants.mockAnnouncedCutoff;
+            final dt = p.dateTime;
+            return dt.isAfter(now) && (dt.isBefore(cutoff) || dt.isAtSameMomentAs(cutoff));
           }).toList();
           break;
           
@@ -1317,9 +1476,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   
   // Helper methods
   String _getDayNameForPractice(Practice practice) {
-    // For typical practices, extract day from practice ID - same logic as typical practices widget
-    if (practice.id.startsWith('typical-')) {
-      final dayPrefix = practice.id.substring(8); // Remove 'typical-'
+    // For recurring practices, extract day from practice ID - same logic as recurring practices widget
+    if (practice.id.startsWith('recurring-')) {
+      final dayPrefix = practice.id.substring(10); // Remove 'recurring-'
       switch (dayPrefix) {
         case 'monday':
           return 'Mon';
@@ -1494,7 +1653,9 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
   
   Future<void> _pickDate(bool isStart) async {
     final initialDate = isStart ? _startDate : _endDate;
-    final pickedDate = await PhoneModalUtils.showPhoneFrameModal<DateTime>(
+    // Use showPhoneModal (Navigator-backed) so inner OK/Cancel only closes the date picker,
+    // not the parent Bulk RSVP overlay.
+    final pickedDate = await PhoneModalUtils.showPhoneModal<DateTime>(
       context: context,
       child: _CustomDatePickerModal(
         initialDate: initialDate ?? DateTime.now(),
@@ -2109,76 +2270,42 @@ class _CustomDatePickerModalState extends State<_CustomDatePickerModal> {
   
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(20)),
+    // Use Flutter's DatePickerDialog for reliable selection visuals (blue filled
+    // circle with white text). Embedding it in our navigator-backed modal means
+    // only this picker closes on OK/Cancel.
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: Theme.of(context).colorScheme.copyWith(
+          primary: AppColors.primary,
+          onPrimary: Colors.white,
+          surface: Colors.white,
+          onSurface: AppColors.textPrimary,
+        ),
+        datePickerTheme: Theme.of(context).datePickerTheme.copyWith(
+          dayShape: WidgetStateProperty.all(const CircleBorder()),
+          dayBackgroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(WidgetState.selected)) return AppColors.primary; // blue filled circle
+            return Colors.transparent;
+          }),
+          dayForegroundColor: WidgetStateProperty.resolveWith<Color?>((states) {
+            if (states.contains(WidgetState.selected)) return Colors.white; // white number
+            if (states.contains(WidgetState.disabled)) return AppColors.textSecondary;
+            return AppColors.textPrimary;
+          }),
+          todayForegroundColor: WidgetStateProperty.all<Color>(AppColors.primary),
+          todayBackgroundColor: WidgetStateProperty.all<Color>(Colors.transparent),
+          todayBorder: BorderSide.none, // remove today ring
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  widget.title,
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-          ),
-          
-          // Calendar
-          Flexible(
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: CalendarDatePicker(
-                initialDate: _selectedDate,
-                firstDate: widget.firstDate,
-                lastDate: widget.lastDate,
-                onDateChanged: (date) {
-                  setState(() {
-                    _selectedDate = date;
-                  });
-                },
-              ),
-            ),
-          ),
-          
-          // Action buttons
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Cancel'),
-                ),
-                ElevatedButton(
-                  onPressed: () => Navigator.of(context).pop(_selectedDate),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: DatePickerDialog(
+        initialDate: _selectedDate,
+        firstDate: widget.firstDate,
+        lastDate: widget.lastDate,
+        currentDate: DateTime.now(), // keep 'today' state for blue text without ring
+        helpText: widget.title,
+        confirmText: 'OK',
+        cancelText: 'Cancel',
+        initialEntryMode: DatePickerEntryMode.calendarOnly,
       ),
     );
   }
