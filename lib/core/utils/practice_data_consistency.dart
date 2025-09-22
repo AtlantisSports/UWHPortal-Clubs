@@ -5,32 +5,32 @@ import 'package:flutter/foundation.dart';
 import '../models/practice.dart';
 
 class PracticeDataConsistencyVerifier {
-  /// Verify that typical practices and bulk RSVP practices have consistent patternIds
+  /// Verify that recurring practices and bulk RSVP practices have consistent patternIds
   static bool verifyConsistency({
-    required List<Practice> typicalPractices,
+    required List<Practice> recurringPractices,
     required List<Practice> bulkRSVPPractices,
     required String clubId,
   }) {
-    final typicalPatternIds = typicalPractices.map((p) => p.id).toSet();
+    final recurringPatternIds = recurringPractices.map((p) => p.id).toSet();
     final bulkRSVPPatternIds = bulkRSVPPractices.map((p) => p.id).toSet();
     
     // Check if pattern IDs match
-    final isConsistent = typicalPatternIds == bulkRSVPPatternIds;
+    final isConsistent = recurringPatternIds == bulkRSVPPatternIds;
     
     if (!isConsistent) {
       debugPrint('WARNING: Pattern ID mismatch for club $clubId');
-      debugPrint('Typical practices: $typicalPatternIds');
+      debugPrint('Recurring practices: $recurringPatternIds');
       debugPrint('Bulk RSVP practices: $bulkRSVPPatternIds');
       
       // Find missing patterns
-      final missingInBulkRSVP = typicalPatternIds.difference(bulkRSVPPatternIds);
-      final missingInTypical = bulkRSVPPatternIds.difference(typicalPatternIds);
+      final missingInBulkRSVP = recurringPatternIds.difference(bulkRSVPPatternIds);
+      final missingInRecurring = bulkRSVPPatternIds.difference(recurringPatternIds);
       
       if (missingInBulkRSVP.isNotEmpty) {
         debugPrint('Missing in bulk RSVP: $missingInBulkRSVP');
       }
-      if (missingInTypical.isNotEmpty) {
-        debugPrint('Missing in typical practices: $missingInTypical');
+      if (missingInRecurring.isNotEmpty) {
+        debugPrint('Missing in recurring practices: $missingInRecurring');
       }
     } else {
       debugPrint('✓ Practice data consistency verified for club $clubId');
@@ -39,9 +39,9 @@ class PracticeDataConsistencyVerifier {
     return isConsistent;
   }
   
-  /// Get pattern ID for a practice, handling both typical and actual practices
+  /// Get pattern ID for a practice, handling both recurring and actual practices
   static String? getPatternId(Practice practice) {
-    // For typical practices, the ID is the patternId
+    // For recurring practices, the ID is the patternId
     // For actual practices, check the patternId field
     return practice.patternId ?? practice.id;
   }

@@ -1,4 +1,4 @@
-/// Shared typical practices dropdown widget
+/// Shared recurring practices dropdown widget
 library;
 
 import 'package:flutter/material.dart';
@@ -7,14 +7,14 @@ import '../../core/models/practice_pattern.dart';
 import '../../core/models/practice_recurrence.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-class TypicalPracticesWidget extends StatefulWidget {
+class RecurringPracticesWidget extends StatefulWidget {
   final List<PracticePattern> practices;
   final bool isExpanded;
   final VoidCallback onToggle;
   final String title;
   final Function(String patternId)? onPatternSelected; // Optional callback for pattern selection
   
-  const TypicalPracticesWidget({
+  const RecurringPracticesWidget({
     super.key,
     required this.practices,
     required this.isExpanded,
@@ -24,10 +24,10 @@ class TypicalPracticesWidget extends StatefulWidget {
   });
 
   @override
-  State<TypicalPracticesWidget> createState() => _TypicalPracticesWidgetState();
+  State<RecurringPracticesWidget> createState() => _RecurringPracticesWidgetState();
 }
 
-class _TypicalPracticesWidgetState extends State<TypicalPracticesWidget> {
+class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
   final Map<String, bool> _expandedDescriptions = {};
 
   @override

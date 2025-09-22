@@ -9,21 +9,21 @@ import '../models/practice.dart';
 import '../models/practice_pattern.dart';
 
 abstract class ScheduleService {
-  List<Map<String, dynamic>> getTypicalSchedule(String clubId);
-  List<Practice> getTypicalPractices(String clubId);
+  List<Map<String, dynamic>> getRecurringSchedule(String clubId);
+  List<Practice> getRecurringPractices(String clubId);
   List<PracticePattern> getPracticePatterns(String clubId);
 }
 
 /// Mock implementation of ScheduleService for development
 class MockScheduleService implements ScheduleService {
   @override
-  List<Map<String, dynamic>> getTypicalSchedule(String clubId) {
-    return MockDataService.getCalendarTypicalSchedule(clubId);
+  List<Map<String, dynamic>> getRecurringSchedule(String clubId) {
+    return MockDataService.getCalendarRecurringSchedule(clubId);
   }
   
   @override
-  List<Practice> getTypicalPractices(String clubId) {
-    return MockDataService.getTypicalPractices(clubId);
+  List<Practice> getRecurringPractices(String clubId) {
+    return MockDataService.getRecurringPractices(clubId);
   }
   
   @override
@@ -35,14 +35,14 @@ class MockScheduleService implements ScheduleService {
 /// Production implementation would connect to real schedule API
 class ApiScheduleService implements ScheduleService {
   @override
-  List<Map<String, dynamic>> getTypicalSchedule(String clubId) {
-    // TODO: Implement API call to get typical schedule
+  List<Map<String, dynamic>> getRecurringSchedule(String clubId) {
+    // TODO: Implement API call to get recurring schedule
     throw UnimplementedError('Production schedule service not implemented');
   }
   
   @override
-  List<Practice> getTypicalPractices(String clubId) {
-    // TODO: Implement API call to get typical practices
+  List<Practice> getRecurringPractices(String clubId) {
+    // TODO: Implement API call to get recurring practices
     throw UnimplementedError('Production schedule service not implemented');
   }
   

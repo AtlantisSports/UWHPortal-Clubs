@@ -5,6 +5,7 @@ library;
 enum RecurrenceType {
   weekly,          // Every week on the same day
   biweekly,        // Every 2 weeks on the same day  
+  every3weeks,     // Every 3 weeks on the same day
   monthly,         // Same day of month (e.g., 15th of every month)
   monthlyByWeek,   // Same week and day (e.g., 2nd Tuesday of every month)
   custom,          // Custom interval in days
@@ -35,6 +36,9 @@ class RecurrencePattern {
   /// Biweekly recurrence
   const RecurrencePattern.biweekly() : this(type: RecurrenceType.weekly, interval: 2);
   
+  /// Every 3 weeks recurrence
+  const RecurrencePattern.every3weeks() : this(type: RecurrenceType.every3weeks, interval: 3);
+  
   /// Monthly on same date (e.g., 15th of every month)
   const RecurrencePattern.monthlyByDate(int dayOfMonth) 
     : this(type: RecurrenceType.monthly, dayOfMonth: dayOfMonth);
@@ -60,6 +64,9 @@ class RecurrencePattern {
         
       case RecurrenceType.biweekly:
         return 'Every 2 weeks';
+        
+      case RecurrenceType.every3weeks:
+        return 'Every 3 weeks';
         
       case RecurrenceType.monthly:
         if (dayOfMonth != null) {
@@ -131,6 +138,12 @@ class RecurrencePattern {
         final daysDiff = date.difference(patternStartDate).inDays;
         return daysDiff >= 0 && 
                daysDiff % (7 * 2) == 0 &&
+               date.weekday == patternStartDate.weekday;
+               
+      case RecurrenceType.every3weeks:
+        final daysDiff = date.difference(patternStartDate).inDays;
+        return daysDiff >= 0 && 
+               daysDiff % (7 * 3) == 0 &&
                date.weekday == patternStartDate.weekday;
                
       case RecurrenceType.monthly:

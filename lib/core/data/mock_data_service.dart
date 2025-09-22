@@ -40,7 +40,7 @@ class MockDataService {
       'memberCount': 42,
       'practicePatterns': [
         {
-          'patternId': 'denver-mon-2015-vmac-1',
+          'patternId': 'denver-uwh-mon-2015-vmac-1',
           'id_prefix': 'monday',
           'title': 'Monday Evening',
           'description': 'Mixed-level session with skills development, friendly games, and social time afterward.',
@@ -53,7 +53,7 @@ class MockDataService {
           'tag': 'Intermediate',
         },
         {
-          'patternId': 'denver-wed-1900-carmody-1',
+          'patternId': 'denver-uwh-wed-1900-carmody-1',
           'id_prefix': 'wednesday',
           'title': 'Wednesday Evening',
           'description': 'Multi-level training accommodating all skill levels, featuring basic drills for beginners, intermediate tactical work, and friendly scrimmage games with post-practice social gathering.',
@@ -66,7 +66,7 @@ class MockDataService {
           'tag': 'Advanced',
         },
         {
-          'patternId': 'denver-thu-2015-vmac-1',
+          'patternId': 'denver-uwh-thu-2015-vmac-1',
           'id_prefix': 'thursday',
           'title': 'Thursday Evening',
           'description': 'All levels welcome; bring fins & mouthguard.',
@@ -79,7 +79,7 @@ class MockDataService {
           'tag': 'Open',
         },
         {
-          'patternId': 'denver-tue-1800-epic-1',
+          'patternId': 'denver-uwh-tue-1800-epic-1',
           'id_prefix': 'tuesday',
           'title': 'Tuesday Evening',
           'description': 'Biweekly mixed-level session',
@@ -90,10 +90,11 @@ class MockDataService {
           'location': 'EPIC',
           'address': '1801 Riverside Ave, Fort Collins, CO 80525',
           'tag': 'Open',
-          'recurrence': 'biweekly', // Every 2 weeks
+            'recurrence': 'biweekly', // Every 2 weeks
+            'patternStartDate': DateTime(2025, 9, 2), // Start on first Tuesday of September 2025
         },
         {
-          'patternId': 'denver-sun-1100-vmac-1',
+          'patternId': 'denver-uwh-sun-1100-vmac-1',
           'id_prefix': 'sunday-morning',
           'title': 'Sunday Morning',
           'description': 'Inclusive community session welcoming players of all skill levels, featuring separate instruction tracks for beginners and experienced players, mixed-level scrimmage games, equipment sharing program, and social gathering with refreshments afterward. Perfect for families and newcomers to the sport.',
@@ -106,7 +107,7 @@ class MockDataService {
           'tag': 'Beginner',
         },
         {
-          'patternId': 'denver-sun-1500-carmody-1',
+          'patternId': 'denver-uwh-sun-1500-carmody-1',
           'id_prefix': 'sunday-afternoon',
           'title': 'Sunday Afternoon',
           'description': 'Mixed-level session with skills development, friendly games, and social time afterward.',
@@ -145,6 +146,42 @@ class MockDataService {
           'address': 'Top Ryde City Shopping Centre, NSW',
           'tag': 'Open',
         },
+        {
+          'patternId': 'sydney-tue-1800-olympic-3week',
+          'id_prefix': 'tuesday_3week',
+          'title': 'Tuesday Advanced (Every 3 Weeks)',
+          'description': 'Intensive training sessions focusing on advanced techniques and competitive strategies. Runs every 3 weeks on Tuesday evenings.',
+          'day': DateTime.tuesday,
+          'hour': 18,
+          'minute': 0,
+          'duration': 150, // 6:00 PM - 8:30 PM (2.5 hours)
+          'location': 'Gong',
+          'address': 'Olympic Boulevard, Sydney Olympic Park NSW',
+          'tag': 'Advanced',
+          'recurrence': {
+            'type': 'every3weeks',
+            'interval': 3,
+          },
+          'patternStartDate': DateTime(2025, 1, 7), // First Tuesday in January 2025
+        },
+        {
+          'patternId': 'sydney-sun-1400-homebush-monthly',
+          'id_prefix': 'sunday_monthly',
+          'title': 'Sunday Monthly Skills (2nd Sunday)',
+          'description': 'Monthly skills development session focusing on fundamental techniques and team building. Perfect for players looking to improve their game.',
+          'day': DateTime.sunday,
+          'hour': 14,
+          'minute': 0,
+          'duration': 180, // 2:00 PM - 5:00 PM (3 hours)
+          'location': 'Gunyama',
+          'address': '1 Bennelong Parkway, Sydney Olympic Park NSW',
+          'tag': 'Skills',
+          'recurrence': {
+            'type': 'monthlyByWeek',
+            'weekOfMonth': 2, // 2nd occurrence of the weekday in the month
+          },
+          'patternStartDate': DateTime(2025, 1, 12), // 2nd Sunday in January 2025
+        },
       ],
     },
   };
@@ -182,8 +219,8 @@ class MockDataService {
     }).toList();
   }
 
-  /// Get typical practice patterns for display - just the raw template data
-  static List<Map<String, dynamic>> getTypicalPracticePatterns(String clubId) {
+  /// Get recurring practice patterns for display - just the raw template data
+  static List<Map<String, dynamic>> getRecurringPracticePatterns(String clubId) {
     final clubData = _clubsData[clubId];
     if (clubData == null) {
       return [];
@@ -221,12 +258,29 @@ class MockDataService {
       final dayNumber = pattern['day'] as int;
       final patternDay = PatternDay.fromWeekday(dayNumber);
       
-      // Determine recurrence pattern
-      final recurrenceType = pattern['recurrence'] as String? ?? 'weekly';
+      // Determine recurrence pattern - handle both string and map formats
+      String recurrenceType = 'weekly';
+      int? weekOfMonth;
+      
+      final recurrenceData = pattern['recurrence'];
+      if (recurrenceData is String) {
+        recurrenceType = recurrenceData;
+      } else if (recurrenceData is Map<String, dynamic>) {
+        recurrenceType = recurrenceData['type'] as String? ?? 'weekly';
+        weekOfMonth = recurrenceData['weekOfMonth'] as int?;
+      }
+      
       RecurrencePattern recurrence;
       switch (recurrenceType) {
         case 'biweekly':
           recurrence = const RecurrencePattern.biweekly();
+          break;
+        case 'every3weeks':
+          recurrence = const RecurrencePattern.every3weeks();
+          break;
+        case 'monthlyByWeek':
+          final week = weekOfMonth ?? pattern['weekOfMonth'] as int? ?? 2; // Default to 2nd week
+          recurrence = RecurrencePattern.monthlyByWeek(week);
           break;
         case 'weekly':
         default:
@@ -246,23 +300,23 @@ class MockDataService {
         address: pattern['address'] as String,
         tag: pattern['tag'] as String,
         recurrence: recurrence,
-        patternStartDate: DateTime(2025, 9, 1), // Default start date
+        patternStartDate: pattern['patternStartDate'] as DateTime? ?? DateTime(2025, 9, 1), // Use pattern start date or default
       );
     }).toList();
   }
 
-  /// Get typical/template practices for a club - DEPRECATED - use getPracticePatterns instead
-  /// NOTE: This creates Practice objects for backward compatibility, but typical practices
+  /// Get recurring/template practices for a club - DEPRECATED - use getPracticePatterns instead
+  /// NOTE: This creates Practice objects for backward compatibility, but recurring practices
   /// should ideally use getPracticePatterns() for template display
-  static List<Practice> getTypicalPractices(String clubId) {
+  static List<Practice> getRecurringPractices(String clubId) {
     final clubData = _clubsData[clubId];
     if (clubData == null) {
-      return _getDefaultTypicalPractices(clubId);
+      return _getDefaultRecurringPractices(clubId);
     }
     
     final practicePatterns = clubData['practicePatterns'] as List<Map<String, dynamic>>;
     return practicePatterns.map((pattern) {
-      // For typical practices, use a fixed arbitrary date since we only care about time and pattern ID
+      // For recurring practices, use a fixed arbitrary date since we only care about time and pattern ID
       final hour = pattern['hour'] as int;
       final minute = pattern['minute'] as int;
       final arbitraryDate = DateTime(2000, 1, 1, hour, minute); // Fixed date, no weekday logic
@@ -281,8 +335,8 @@ class MockDataService {
     }).toList();
   }
 
-  /// Get typical schedule for calendar widget - derives from club data
-  static List<Map<String, dynamic>> getCalendarTypicalSchedule(String clubId) {
+  /// Get recurring schedule for calendar widget - derives from club data
+  static List<Map<String, dynamic>> getCalendarRecurringSchedule(String clubId) {
     final clubData = _clubsData[clubId];
     if (clubData == null) {
       return [
@@ -313,10 +367,21 @@ class MockDataService {
     
     // Generate practices for each pattern
     for (final pattern in practicePatterns) {
+      // Handle both string and map formats for recurrence
+      String recurrenceType = 'weekly';
+      final recurrenceData = pattern['recurrence'];
+      if (recurrenceData is String) {
+        recurrenceType = recurrenceData;
+      } else if (recurrenceData is Map<String, dynamic>) {
+        recurrenceType = recurrenceData['type'] as String? ?? 'weekly';
+      }
+      
       final dates = _getRecurringPracticeDates(
         pattern['day'] as int,
         pattern['hour'] as int,
         pattern['minute'] as int,
+        recurrence: recurrenceType,
+        startDate: pattern['patternStartDate'] as DateTime?,
       );
       
       for (int i = 0; i < dates.length; i++) {
@@ -347,10 +412,10 @@ class MockDataService {
   }
 
   /// Default practice patterns for unknown clubs
-  static List<Practice> _getDefaultTypicalPractices(String clubId) {
+  static List<Practice> _getDefaultRecurringPractices(String clubId) {
     return [
       Practice(
-        id: 'typical-default',
+        id: 'recurring-default',
         clubId: clubId,
         title: 'Weekly Practice',
         description: 'Regular training session.',
@@ -368,8 +433,11 @@ class MockDataService {
     final Map<String, ParticipationStatus> responses = {};
     final now = DateTime.now();
     
-    // For past practices: Show attended/missed status (mock data for demo)
-    if (practiceDate.isBefore(now)) {
+    // Calculate the transition point: 30 minutes after practice starts
+    final transitionPoint = practiceDate.add(const Duration(minutes: 30));
+    
+    // For practices that have passed the 30-minute mark: Show attended/missed status (mock data for demo)
+    if (now.isAfter(transitionPoint)) {
       // Vary the responses based on practice ID for consistency
       if (practiceId.hashCode % 3 == 0) {
         responses[currentUserId] = ParticipationStatus.attended;
@@ -377,7 +445,7 @@ class MockDataService {
         responses[currentUserId] = ParticipationStatus.missed;
       }
     } else {
-      // Future practices: Start with blank status (no mock data)
+      // Practices that haven't reached the 30-minute transition: Show RSVP status (blank for future practices)
       responses[currentUserId] = ParticipationStatus.blank;
     }
     
@@ -391,32 +459,106 @@ class MockDataService {
   }
 
   /// Get recurring practice dates from September 2025 through March 2026
-  static List<DateTime> _getRecurringPracticeDates(int dayOfWeek, int hour, int minute) {
+  static List<DateTime> _getRecurringPracticeDates(
+    int dayOfWeek, 
+    int hour, 
+    int minute, {
+    String recurrence = 'weekly',
+    DateTime? startDate,
+  }) {
     final dates = <DateTime>[];
-    final startDate = DateTime(2025, 9, 1); // September 1, 2025
     final endDate = DateTime(2026, 3, 31); // March 31, 2026 (6 months of practices)
     
-    // Find first occurrence of the target day in the start month
-    DateTime current = startDate;
-    while (current.weekday != dayOfWeek && current.month == startDate.month) {
-      current = current.add(const Duration(days: 1));
+    DateTime current;
+    
+    if (startDate != null) {
+      // Use the provided start date and set the time
+      current = DateTime(startDate.year, startDate.month, startDate.day, hour, minute);
+    } else {
+      // Default behavior: find first occurrence starting from September 1, 2025
+      final defaultStartDate = DateTime(2025, 9, 1);
+      current = defaultStartDate;
+      while (current.weekday != dayOfWeek && current.month == defaultStartDate.month) {
+        current = current.add(const Duration(days: 1));
+      }
+      
+      // If we didn't find the day in the start month, find it in the next month
+      if (current.month != defaultStartDate.month) {
+        current = DateTime(defaultStartDate.year, defaultStartDate.month + 1, 1);
+        while (current.weekday != dayOfWeek) {
+          current = current.add(const Duration(days: 1));
+        }
+      }
+      
+      // Set the time
+      current = DateTime(current.year, current.month, current.day, hour, minute);
     }
     
-    // If we didn't find the day in the start month, find it in the next month
-    if (current.month != startDate.month) {
-      current = DateTime(startDate.year, startDate.month + 1, 1);
-      while (current.weekday != dayOfWeek) {
-        current = current.add(const Duration(days: 1));
+    // Generate all occurrences until end date based on recurrence pattern
+    int intervalDays;
+    switch (recurrence) {
+      case 'biweekly':
+        intervalDays = 14; // Every 2 weeks
+        break;
+      case 'every3weeks':
+        intervalDays = 21; // Every 3 weeks
+        break;
+      case 'weekly':
+      default:
+        intervalDays = 7; // Every week
+        break;
+    }
+    
+    // Generate dates based on recurrence type
+    if (recurrence == 'monthlyByWeek') {
+      // Special handling for monthly by week patterns
+      dates.addAll(_generateMonthlyByWeekDates(current, endDate, dayOfWeek));
+    } else {
+      // Standard weekly/biweekly/3-weekly patterns
+      while (current.isBefore(endDate) || current.isAtSameMomentAs(endDate)) {
+        dates.add(current);
+        current = current.add(Duration(days: intervalDays));
       }
     }
     
-    // Set the time
-    current = DateTime(current.year, current.month, current.day, hour, minute);
+    return dates;
+  }
+  
+  /// Generate dates for monthly by week patterns (e.g., 2nd Sunday of each month)
+  static List<DateTime> _generateMonthlyByWeekDates(DateTime startDate, DateTime endDate, int targetWeekday) {
+    final dates = <DateTime>[];
     
-    // Generate all occurrences until end date
-    while (current.isBefore(endDate) || current.isAtSameMomentAs(endDate)) {
-      dates.add(current);
-      current = current.add(const Duration(days: 7)); // Next week
+    // Start from the month of the start date
+    var currentMonth = DateTime(startDate.year, startDate.month, 1);
+    
+    while (currentMonth.isBefore(endDate) || currentMonth.month == endDate.month) {
+      // Find the 2nd occurrence of the target weekday in this month
+      var firstOccurrence = currentMonth;
+      while (firstOccurrence.weekday != targetWeekday) {
+        firstOccurrence = firstOccurrence.add(const Duration(days: 1));
+      }
+      
+      // Get the 2nd occurrence (add 7 days)
+      final secondOccurrence = firstOccurrence.add(const Duration(days: 7));
+      
+      // Make sure it's still in the same month and set the correct time
+      if (secondOccurrence.month == currentMonth.month) {
+        final practiceDate = DateTime(
+          secondOccurrence.year,
+          secondOccurrence.month,
+          secondOccurrence.day,
+          startDate.hour,
+          startDate.minute,
+        );
+        
+        if (practiceDate.isAfter(startDate.subtract(const Duration(days: 1))) && 
+            (practiceDate.isBefore(endDate) || practiceDate.isAtSameMomentAs(endDate))) {
+          dates.add(practiceDate);
+        }
+      }
+      
+      // Move to next month
+      currentMonth = DateTime(currentMonth.year, currentMonth.month + 1, 1);
     }
     
     return dates;

@@ -12,15 +12,14 @@ import '../../core/providers/participation_provider.dart';
 import '../../core/services/schedule_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/providers/navigation_provider.dart';
+import '../../core/utils/responsive_helper.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/practice_filter_modal.dart';
-import '../../base/widgets/typical_practices_widget.dart';
+import '../../base/widgets/recurring_practices_widget.dart';
 import '../bulk_rsvp/bulk_rsvp_screen.dart';
-import '../../core/utils/responsive_helper.dart';
 import 'practice_detail_screen.dart';
-// ...existing code...
 
 class ClubDetailScreen extends StatefulWidget {
   final Club club;
@@ -45,13 +44,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   late TabController _tabController;
   late ScrollController _scrollController;
   final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
-  final GlobalKey _typicalPracticesKey = GlobalKey(); // Add GlobalKey for typical practices container
+  final GlobalKey _recurringPracticesKey = GlobalKey(); // Add GlobalKey for recurring practices container
   final ScheduleService _scheduleService = ServiceLocator.scheduleService;
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
   bool _isShowingPracticeFilterModal = false;
-  bool _isTypicalPracticesExpanded = false; // Track expansion state for typical practices dropdown
+  bool _isRecurringPracticesExpanded = false; // Track expansion state for recurring practices dropdown
   
   // Toast state
   bool _showToast = false;
@@ -251,7 +250,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     const phoneStatusBarHeight = 44.0; // From phone frame implementation
     const appBottomNavHeight = 56.0; // App's bottom navigation bar (Home, Events, etc.)
     const systemNavBarHeight = 48.0; // System navigation bar (black bar with home button)
-    const tabBarHeight = 48.0; // The tab bar itself (RSVP, Typical Practices, etc.)
+    const tabBarHeight = 48.0; // The tab bar itself (RSVP, Recurring Practices, etc.)
     const paddingAdjustment = 16.0; // Account for various paddings and margins
     final appBarHeight = AppBar().preferredSize.height; // 56px
     
@@ -783,8 +782,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  /// Get typical/template practices for the club using ScheduleService
-  List<PracticePattern> _getTypicalPractices() {
+  /// Get recurring/template practices for the club using ScheduleService
+  List<PracticePattern> _getRecurringPractices() {
     return _scheduleService.getPracticePatterns(widget.club.id);
   }
 
@@ -823,8 +822,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  /// Auto-scroll to show the typical practices when expanded
-  void _scrollToTypicalPractices() {
+  /// Auto-scroll to show the recurring practices when expanded
+  void _scrollToRecurringPractices() {
     if (!_scrollController.hasClients) return;
     
     // Wait for the expansion animation to complete
@@ -845,26 +844,26 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   Widget _buildAboutTab(BuildContext context) {
-    final typicalPractices = _getTypicalPractices();
+    final recurringPractices = _getRecurringPractices();
     
     return Padding(
       padding: const EdgeInsets.all(16.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-            // Typical Practices Dropdown
-            TypicalPracticesWidget(
-              key: _typicalPracticesKey,
-              practices: typicalPractices,
-              isExpanded: _isTypicalPracticesExpanded,
+            // Recurring Practices Dropdown
+            RecurringPracticesWidget(
+              key: _recurringPracticesKey,
+              practices: recurringPractices,
+              isExpanded: _isRecurringPracticesExpanded,
               onToggle: () {
                 setState(() {
-                  _isTypicalPracticesExpanded = !_isTypicalPracticesExpanded;
+                  _isRecurringPracticesExpanded = !_isRecurringPracticesExpanded;
                 });
                 
-                // Auto-scroll to show the expanded typical practices list
-                if (_isTypicalPracticesExpanded) {
-                  _scrollToTypicalPractices();
+                // Auto-scroll to show the expanded recurring practices list
+                if (_isRecurringPracticesExpanded) {
+                  _scrollToRecurringPractices();
                 }
               },
             ),

@@ -181,8 +181,8 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     return upcomingPractices.first;
   }
 
-  /// Get typical/template practices for club card display using ScheduleService
-  List<PracticePattern> _getTypicalPractices(Club club) {
+  /// Get recurring/template practices for club card display using ScheduleService
+  List<PracticePattern> _getRecurringPractices(Club club) {
     return _scheduleService.getPracticePatterns(club.id);
   }
 
@@ -383,7 +383,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               logoUrl: club.logoUrl,
                               nextPractice: nextPractice,
                               currentParticipationStatus: currentParticipationStatus,
-                              allPractices: _getTypicalPractices(club), // Use typical practices instead of upcoming
+                              allPractices: _getRecurringPractices(club), // Use recurring practices instead of upcoming
                               clubId: club.id, // Pass clubId for RSVP synchronization
                               onParticipationChanged: (status) {
                                 if (nextPractice != null) {
@@ -397,7 +397,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                               onPracticeInfoTap: nextPractice != null ? () {
                                 _onPracticeInfoTap(club, nextPractice);
                               } : null,
-                              onTypicalPracticesExpanded: () => _ensureCardVisible(index),
+                              onRecurringPracticesExpanded: () => _ensureCardVisible(index),
                             );
                           },
                         ),
@@ -477,6 +477,13 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           ),
           const SizedBox(height: AppSpacing.large),
           PrimaryButton(
+            text: 'Create Club',
+            onPressed: () {
+              // TODO: Navigate to create club screen
+            },
+          ),
+          const SizedBox(height: AppSpacing.medium),
+          PrimaryButton(
             text: 'Get Notified',
             onPressed: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -511,17 +518,10 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           ),
           const SizedBox(height: AppSpacing.small),
           Text(
-            'Be the first to create a club!',
+            'Join your first club!',
             style: AppTextStyles.bodyMedium.copyWith(
               color: AppColors.textSecondary,
             ),
-          ),
-          const SizedBox(height: AppSpacing.large),
-          PrimaryButton(
-            text: 'Create Club',
-            onPressed: () {
-              // TODO: Navigate to create club screen
-            },
           ),
         ],
       ),

@@ -309,6 +309,122 @@ class PracticePattern {
     );
   }
 
+  /// Calculate the next occurrence of this practice pattern from today
+  DateTime? getNextOccurrence() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    
+    // Start from the pattern start date or today, whichever is later
+    DateTime startDate = patternStartDate != null 
+        ? DateTime(patternStartDate!.year, patternStartDate!.month, patternStartDate!.day)
+        : today;
+    
+    if (startDate.isBefore(today)) {
+      startDate = today;
+    }
+    
+    // Find the target weekday
+    final targetWeekday = _dayToWeekday(day);
+    
+    // Find the next occurrence of this weekday from the start date
+    DateTime candidate = startDate;
+    while (candidate.weekday != targetWeekday) {
+      candidate = candidate.add(const Duration(days: 1));
+    }
+    
+    // Handle different recurrence types
+    if (recurrence.type == RecurrenceType.monthlyByWeek) {
+      // Monthly by week pattern (e.g., 2nd Sunday of every month)
+      return _getNextMonthlyByWeekOccurrence(today, targetWeekday);
+    } else if (recurrence.type == RecurrenceType.weekly || 
+               recurrence.type == RecurrenceType.biweekly ||
+               recurrence.type == RecurrenceType.every3weeks) {
+      // Weekly-based patterns with intervals
+      final patternStart = patternStartDate ?? DateTime(2025, 9, 1);
+      final patternStartDay = DateTime(patternStart.year, patternStart.month, patternStart.day);
+      
+      // Find the first occurrence of target weekday on/after pattern start
+      DateTime firstOccurrence = patternStartDay;
+      while (firstOccurrence.weekday != targetWeekday) {
+        firstOccurrence = firstOccurrence.add(const Duration(days: 1));
+      }
+      
+      // Calculate interval in days based on pattern type
+      int intervalDays;
+      switch (recurrence.type) {
+        case RecurrenceType.weekly:
+          intervalDays = recurrence.interval * 7;
+          break;
+        case RecurrenceType.biweekly:
+          intervalDays = 14;
+          break;
+        case RecurrenceType.every3weeks:
+          intervalDays = 21;
+          break;
+        default:
+          intervalDays = 7;
+      }
+      
+      // Find the next occurrence that aligns with the pattern
+      DateTime candidate = firstOccurrence;
+      while (candidate.isBefore(startDate)) {
+        candidate = candidate.add(Duration(days: intervalDays));
+      }
+      
+      // If candidate is before today, find the next occurrence
+      while (candidate.isBefore(today)) {
+        candidate = candidate.add(Duration(days: intervalDays));
+      }
+      
+      return candidate;
+    }
+    
+    // Fallback for other patterns
+    return candidate;
+  }
+  
+  /// Get next occurrence for monthly by week patterns
+  DateTime? _getNextMonthlyByWeekOccurrence(DateTime today, int targetWeekday) {
+    final weekOfMonth = recurrence.weekOfMonth ?? 2; // Default to 2nd week
+    
+    // Start from this month
+    var currentMonth = DateTime(today.year, today.month, 1);
+    
+    for (int monthOffset = 0; monthOffset < 12; monthOffset++) {
+      final checkMonth = DateTime(currentMonth.year, currentMonth.month + monthOffset, 1);
+      
+      // Find the first occurrence of target weekday in this month
+      var firstOccurrence = checkMonth;
+      while (firstOccurrence.weekday != targetWeekday) {
+        firstOccurrence = firstOccurrence.add(const Duration(days: 1));
+      }
+      
+      // Calculate the target occurrence (e.g., 2nd occurrence)
+      final targetOccurrence = firstOccurrence.add(Duration(days: (weekOfMonth - 1) * 7));
+      
+      // Make sure it's still in the same month
+      if (targetOccurrence.month == checkMonth.month && 
+          (targetOccurrence.isAfter(today) || targetOccurrence.isAtSameMomentAs(today))) {
+        return targetOccurrence;
+      }
+    }
+    
+    return null; // No occurrence found in the next 12 months
+  }
+
+  /// Convert PatternDay to weekday number
+  int _dayToWeekday(PatternDay day) {
+    switch (day) {
+      case PatternDay.monday: return DateTime.monday;
+      case PatternDay.tuesday: return DateTime.tuesday;
+      case PatternDay.wednesday: return DateTime.wednesday;
+      case PatternDay.thursday: return DateTime.thursday;
+      case PatternDay.friday: return DateTime.friday;
+      case PatternDay.saturday: return DateTime.saturday;
+      case PatternDay.sunday: return DateTime.sunday;
+    }
+  }
+
   @override
   bool operator ==(Object other) {
     return other is PracticePattern && other.id == id;

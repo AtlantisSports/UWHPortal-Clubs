@@ -7,24 +7,29 @@ class AppConstants {
   // API Configuration
   static const String baseApiUrl = 'https://api.uwhportal.com';
   static const String apiVersion = 'v1';
-  
+
   // App Information
   static const String appName = 'UWH Portal - Clubs';
   static const String appVersion = '1.0.0';
-  
+
   // Storage Keys
   static const String authTokenKey = 'auth_token';
   static const String userPreferencesKey = 'user_preferences';
   static const String themeKey = 'theme_mode';
-  
+
   // Pagination
   static const int defaultPageSize = 20;
   static const int maxPageSize = 100;
-  
+
   // Timeouts
   static const Duration apiTimeout = Duration(seconds: 30);
   static const Duration cacheTimeout = Duration(minutes: 5);
-  
+
+  // Announced practices (mock) cutoff
+  // For mock data, treat "Announced" practices as those on or before this date (inclusive).
+  // Adjust as needed per test scenario.
+  static final DateTime mockAnnouncedCutoff = DateTime(2025, 11, 9, 23, 59, 59);
+
   // Asset Paths
   static const String logoAsset = 'assets/images/logo.png';
   static const String placeholderImage = 'assets/images/placeholder.png';
@@ -36,28 +41,28 @@ class AppColors {
   static const Color primary = Color(0xFF0077BE); // Ocean blue
   static const Color primaryDark = Color(0xFF005A9C);
   static const Color primaryLight = Color(0xFF33A1DB);
-  
+
   // Secondary Colors
   static const Color secondary = Color(0xFF00C853); // Success green
   static const Color secondaryDark = Color(0xFF00A644);
   static const Color secondaryLight = Color(0xFF5EFC82);
-  
+
   // Neutral Colors
   static const Color background = Color(0xFFF5F5F5);
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceDark = Color(0xFF121212);
-  
+
   // Text Colors
   static const Color textPrimary = Color(0xFF212121);
   static const Color textSecondary = Color(0xFF757575);
   static const Color textDisabled = Color(0xFFBDBDBD);
-  
+
   // Status Colors
   static const Color success = Color(0xFF4CAF50);
   static const Color warning = Color(0xFFFF9800);
   static const Color error = Color(0xFFF44336);
   static const Color info = Color(0xFF2196F3);
-  
+
   // Club/Event specific colors
   static const Color eventActive = Color(0xFF4CAF50);
   static const Color eventUpcoming = Color(0xFF2196F3);

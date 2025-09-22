@@ -6,7 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/models/practice.dart';
 import 'rsvp_components.dart';
-import 'typical_practices_widget.dart';
+import 'recurring_practices_widget.dart';
 
 /// Base card component for consistent styling
 class BaseCard extends StatelessWidget {
@@ -63,13 +63,13 @@ class ClubCard extends StatefulWidget {
   final String? logoUrl;
   final Practice? nextPractice;
   final ParticipationStatus? currentParticipationStatus;
-  final List<PracticePattern> allPractices; // Add this to show typical weekly schedule
+  final List<PracticePattern> allPractices; // Add this to show recurring weekly schedule
   final Function(ParticipationStatus)? onParticipationChanged;
   final VoidCallback? onTap;
   final VoidCallback? onLocationTap;
   final VoidCallback? onPracticeInfoTap; // Add callback for practice info
   final String? clubId; // Add clubId for RSVP synchronization
-  final VoidCallback? onTypicalPracticesExpanded; // Add callback for scroll behavior
+  final VoidCallback? onRecurringPracticesExpanded; // Add callback for scroll behavior
   
   const ClubCard({
     super.key,
@@ -84,7 +84,7 @@ class ClubCard extends StatefulWidget {
     this.onLocationTap,
     this.onPracticeInfoTap,
     this.clubId,
-    this.onTypicalPracticesExpanded,
+    this.onRecurringPracticesExpanded,
   });
 
   @override
@@ -170,10 +170,10 @@ class _ClubCardState extends State<ClubCard> {
             ),
           ],
           
-          // Typical Weekly Schedule Dropdown
+          // Recurring Weekly Schedule Dropdown
           if (widget.allPractices.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.medium),
-            TypicalPracticesWidget(
+            RecurringPracticesWidget(
               practices: widget.allPractices,
               isExpanded: _isExpanded,
               onToggle: () {
@@ -183,9 +183,9 @@ class _ClubCardState extends State<ClubCard> {
                 });
                 
                 // Trigger scroll after animation completes when expanding
-                if (!wasExpanded && _isExpanded && widget.onTypicalPracticesExpanded != null) {
+                if (!wasExpanded && _isExpanded && widget.onRecurringPracticesExpanded != null) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
-                    widget.onTypicalPracticesExpanded!();
+                    widget.onRecurringPracticesExpanded!();
                   });
                 }
               },

@@ -7,8 +7,6 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../core/services/schedule_service.dart';
-import '../../core/di/service_locator.dart';
 import '../../base/widgets/phone_modal_utils.dart';
 import '../../base/widgets/phone_frame.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -60,7 +58,6 @@ class PracticeCalendar extends StatefulWidget {
 
 class _PracticeCalendarState extends State<PracticeCalendar> {
   Club get club => widget.club;
-  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
 
   @override
   void initState() {
@@ -442,94 +439,63 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   Map<DateTime, List<FilteredPracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
     final practices = <DateTime, List<FilteredPracticeStatus>>{};
     final today = DateTime.now();
-    
-    // Get typical practice schedule for this club from ScheduleService
-    final typicalSchedule = _scheduleService.getTypicalSchedule(club.id);
 
     // Generate practices for each day in the month
     for (int day = 1; day <= DateTime(year, month + 1, 0).day; day++) {
       final date = DateTime(year, month, day);
-      final dayOfWeek = date.weekday;
       
-      // Find typical practices for this day of week
-      final typicalPracticesForDay = typicalSchedule.where((p) => p['day'] == dayOfWeek).toList();
+      // Check for real practices on this specific date
+      final realPracticesForDay = club.upcomingPractices.where((practice) {
+        final dt = practice.dateTime;
+        final practiceDate = DateTime(dt.year, dt.month, dt.day);
+        final isSameDay = practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
+        if (!isSameDay) return false;
+        // Only show past/today practices and future practices up to the announced cutoff
+        final todayDate = DateTime(today.year, today.month, today.day);
+        final cutoff = AppConstants.mockAnnouncedCutoff;
+        final cutoffDate = DateTime(cutoff.year, cutoff.month, cutoff.day);
+        return practiceDate.isBefore(todayDate) ||
+               practiceDate.isAtSameMomentAs(todayDate) ||
+               (practiceDate.isAfter(todayDate) && (practiceDate.isBefore(cutoffDate) || practiceDate.isAtSameMomentAs(cutoffDate)));
+      }).toList();
       
-      if (typicalPracticesForDay.isNotEmpty) {
+      if (realPracticesForDay.isNotEmpty) {
         final practiceStatuses = <FilteredPracticeStatus>[];
         
-        if (date.isBefore(today)) {
-          // Past practices - use real practice data with participation status
-          final realPracticesForDay = club.upcomingPractices.where((practice) {
-            final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
-          }).toList();
-          
-          if (realPracticesForDay.isNotEmpty && participationProvider != null) {
+        // Check if this date has practices that need status evaluation
+        final dateHasPractices = realPracticesForDay.isNotEmpty;
+        final isDateInPastOrToday = !date.isAfter(today);
+        
+        if (isDateInPastOrToday && dateHasPractices) {
+          // Past practices and today's practices - use real practice data with participation status
+          if (participationProvider != null) {
             // Use real practice data with participation status
             for (final practice in realPracticesForDay) {
               final passesLevelFilter = participationProvider.shouldShowPractice(practice);
               final participationStatus = participationProvider.getParticipationStatus(practice.id);
               
-              PracticeStatus status;
-              switch (participationStatus) {
-                case ParticipationStatus.attended:
-                  status = PracticeStatus.attended;
-                  break;
-                case ParticipationStatus.missed:
-                  status = PracticeStatus.notAttended;
-                  break;
-                default:
-                  // For past practices, fallback to mock data if no status recorded
-                  final hash = practice.id.hashCode.abs();
-                  status = hash % 2 == 0 
-                      ? PracticeStatus.attended 
-                      : PracticeStatus.notAttended;
-                  break;
-              }
-              
-              practiceStatuses.add(FilteredPracticeStatus(
-                status: status,
-                passesFilter: passesLevelFilter,
-              ));
-            }
-          } else {
-            // Fallback to typical schedule with mock data
-            for (int i = 0; i < typicalPracticesForDay.length; i++) {
-              var practice = typicalPracticesForDay[i];
-              
-              // Check level filtering for typical schedule
-              final practiceTag = practice['tag'] as String?;
-              final passesLevelFilter = participationProvider == null || 
-                  participationProvider.selectedLevels.isEmpty ||
-                  (practiceTag != null && participationProvider.selectedLevels.contains(practiceTag));
-              
-              final hash = date.hashCode + practice['location'].hashCode;
-              final status = hash % 2 == 0  // Changed from % 3 to % 2 to match repository logic
-                  ? PracticeStatus.attended 
-                  : PracticeStatus.notAttended;
-              
-              practiceStatuses.add(FilteredPracticeStatus(
-                status: status,
-                passesFilter: passesLevelFilter,
-              ));
-            }
-          }
-        } else {
-          // Future practices - check for real practices first, then fall back to typical schedule
-          final realPracticesForDay = club.upcomingPractices.where((practice) {
-            final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
-            return practiceDate.year == year && practiceDate.month == month && practiceDate.day == day;
-          }).toList();
-          
-          if (realPracticesForDay.isNotEmpty) {
-            // Use real practice data with participation status
-            for (final practice in realPracticesForDay) {
-              final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
+              // Check if practice has transitioned to attendance tracking (30+ minutes after start)
+              final now = DateTime.now();
+              final transitionTime = practice.dateTime.add(const Duration(minutes: 30));
+              final hasTransitioned = now.isAfter(transitionTime);
               
               PracticeStatus status;
-              if (participationProvider != null) {
-                final participationStatus = participationProvider.getParticipationStatus(practice.id);
-                
+              if (hasTransitioned) {
+                // Practice has been running for 30+ minutes, show attendance status
+                switch (participationStatus) {
+                  case ParticipationStatus.attended:
+                    status = PracticeStatus.attended;
+                    break;
+                  case ParticipationStatus.missed:
+                    status = PracticeStatus.notAttended;
+                    break;
+                  default:
+                    // For practices that should show attendance but don't have status, show as no RSVP
+                    status = PracticeStatus.noRsvp;
+                    break;
+                }
+              } else {
+                // Practice hasn't transitioned yet, show RSVP status
                 switch (participationStatus) {
                   case ParticipationStatus.yes:
                     status = PracticeStatus.rsvpYes;
@@ -540,18 +506,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   case ParticipationStatus.no:
                     status = PracticeStatus.rsvpNo;
                     break;
-                  case ParticipationStatus.blank:
+                  default:
                     status = PracticeStatus.noRsvp;
                     break;
-                  case ParticipationStatus.attended:
-                    status = PracticeStatus.attended;
-                    break;
-                  case ParticipationStatus.missed:
-                    status = PracticeStatus.notAttended;
-                    break;
                 }
-              } else {
-                status = PracticeStatus.noRsvp;
               }
               
               practiceStatuses.add(FilteredPracticeStatus(
@@ -559,22 +517,44 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 passesFilter: passesLevelFilter,
               ));
             }
-          } else {
-            // No real practice data - use typical schedule with no RSVP status
-            for (int i = 0; i < typicalPracticesForDay.length; i++) {
-              var practice = typicalPracticesForDay[i];
+          }
+        } else {
+          // Future practices - use real practice data with participation status
+          for (final practice in realPracticesForDay) {
+            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
+            
+            PracticeStatus status;
+            if (participationProvider != null) {
+              final participationStatus = participationProvider.getParticipationStatus(practice.id);
               
-              // Check level filtering for typical schedule
-              final practiceTag = practice['tag'] as String?;
-              final passesLevelFilter = participationProvider == null || 
-                  participationProvider.selectedLevels.isEmpty ||
-                  (practiceTag != null && participationProvider.selectedLevels.contains(practiceTag));
-              
-              practiceStatuses.add(FilteredPracticeStatus(
-                status: PracticeStatus.noRsvp,
-                passesFilter: passesLevelFilter,
-              ));
+              switch (participationStatus) {
+                case ParticipationStatus.yes:
+                  status = PracticeStatus.rsvpYes;
+                  break;
+                case ParticipationStatus.maybe:
+                  status = PracticeStatus.rsvpMaybe;
+                  break;
+                case ParticipationStatus.no:
+                  status = PracticeStatus.rsvpNo;
+                  break;
+                case ParticipationStatus.blank:
+                  status = PracticeStatus.noRsvp;
+                  break;
+                case ParticipationStatus.attended:
+                  status = PracticeStatus.attended;
+                  break;
+                case ParticipationStatus.missed:
+                  status = PracticeStatus.notAttended;
+                  break;
+              }
+            } else {
+              status = PracticeStatus.noRsvp;
             }
+            
+            practiceStatuses.add(FilteredPracticeStatus(
+              status: status,
+              passesFilter: passesLevelFilter,
+            ));
           }
         }
         
@@ -608,11 +588,22 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     
     // Get real practices from club data (sourced from MockDataService)
     for (final practice in club.upcomingPractices) {
-      final practiceDate = DateTime(practice.dateTime.year, practice.dateTime.month, practice.dateTime.day);
+      final dt = practice.dateTime;
+      final practiceDate = DateTime(dt.year, dt.month, dt.day);
       final targetDate = DateTime(date.year, date.month, date.day);
-      
+
       if (practiceDate.isAtSameMomentAs(targetDate)) {
-        practices.add(practice);
+        // Only include past/today practices and future practices up to the announced cutoff
+        final now = DateTime.now();
+        final todayDate = DateTime(now.year, now.month, now.day);
+        final cutoff = AppConstants.mockAnnouncedCutoff;
+        final cutoffDate = DateTime(cutoff.year, cutoff.month, cutoff.day);
+        final allowed = practiceDate.isBefore(todayDate) ||
+                        practiceDate.isAtSameMomentAs(todayDate) ||
+                        (practiceDate.isAfter(todayDate) && (practiceDate.isBefore(cutoffDate) || practiceDate.isAtSameMomentAs(cutoffDate)));
+        if (allowed) {
+          practices.add(practice);
+        }
       }
     }
     
