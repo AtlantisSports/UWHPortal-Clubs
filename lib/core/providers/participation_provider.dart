@@ -79,7 +79,7 @@ class ParticipationProvider with ChangeNotifier {
   }
   
   /// Initialize participation status from a practice object
-  void initializePracticeParticipation(Practice practice) {
+  Future<void> initializePracticeParticipation(Practice practice) async {
     final status = practice.getParticipationStatus(currentUserId);
     if (_participationStatusMap[practice.id] != status) {
       _participationStatusMap[practice.id] = status;
@@ -87,11 +87,11 @@ class ParticipationProvider with ChangeNotifier {
     }
     
     // Initialize mock guest data for past practices
-    _initializeMockGuestData(practice);
+    await _initializeMockGuestData(practice);
   }
   
   /// Initialize participation statuses from a list of practices
-  void initializePracticesParticipation(List<Practice> practices) {
+  Future<void> initializePracticesParticipation(List<Practice> practices) async {
     bool hasChanges = false;
     
     for (final practice in practices) {
@@ -102,7 +102,7 @@ class ParticipationProvider with ChangeNotifier {
       }
       
       // Initialize mock guest data for past practices
-      _initializeMockGuestData(practice);
+      await _initializeMockGuestData(practice);
     }
     
     if (hasChanges) {
@@ -111,10 +111,18 @@ class ParticipationProvider with ChangeNotifier {
   }
 
   /// Initialize mock guest data for a practice (past practices only)
-  void _initializeMockGuestData(Practice practice) async {
+  Future<void> _initializeMockGuestData(Practice practice) async {
     // Only initialize if we don't already have guest data for this practice
     if (_practiceGuestsMap.containsKey(practice.id)) {
       return;
+    }
+    
+    // Only initialize guest data for recent past practices (within last 30 days)
+    // to avoid performance issues with processing years of data
+    final now = DateTime.now();
+    final thirtyDaysAgo = now.subtract(const Duration(days: 30));
+    if (practice.dateTime.isBefore(thirtyDaysAgo)) {
+      return; // Skip old practices
     }
     
     try {

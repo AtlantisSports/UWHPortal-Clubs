@@ -960,7 +960,9 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     final guestList = widget.participationProvider!.getPracticeGuests(widget.practice.id);
     final bringGuest = widget.participationProvider!.getBringGuestState(widget.practice.id);
     
-    if (!bringGuest || guestList.totalGuests == 0) return const SizedBox.shrink();
+    // For read-only past practices, show guests if they exist regardless of bringGuest state
+    // This displays historical data - what actually happened
+    if (guestList.totalGuests == 0) return const SizedBox.shrink();
     
     return Container(
       padding: const EdgeInsets.all(6),

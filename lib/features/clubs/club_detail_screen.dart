@@ -465,8 +465,10 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                     final nextPractice = _getNextPractice();
                     if (nextPractice == null) return const SizedBox.shrink();
                     
-                    // Initialize participation status if needed
-                    participationProvider.initializePracticeParticipation(nextPractice);
+                    // Initialize participation status if needed (async call deferred)
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      participationProvider.initializePracticeParticipation(nextPractice);
+                    });
                     
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,

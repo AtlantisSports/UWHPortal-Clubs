@@ -458,7 +458,7 @@ class MockDataService {
     return responses;
   }
 
-  /// Get recurring practice dates from September 2025 through March 2026
+  /// Get recurring practice dates from September 2025 through November 2025
   static List<DateTime> _getRecurringPracticeDates(
     int dayOfWeek, 
     int hour, 
@@ -467,7 +467,7 @@ class MockDataService {
     DateTime? startDate,
   }) {
     final dates = <DateTime>[];
-    final endDate = DateTime(2026, 3, 31); // March 31, 2026 (6 months of practices)
+    final endDate = DateTime(2025, 11, 9); // November 9, 2025
     
     DateTime current;
     
@@ -574,7 +574,7 @@ class MockDataService {
 
   // ===== MOCK GUEST DATA =====
 
-  /// Get mock guests for a practice (only for past practices)
+  /// Get mock guests for a practice (only for past practices where user attended)
   static PracticeGuestList getMockGuestsForPractice(String practiceId, DateTime practiceDate) {
     final now = DateTime.now();
     
@@ -583,9 +583,19 @@ class MockDataService {
       return const PracticeGuestList();
     }
     
-    // Use practice ID hash to deterministically decide if this practice has guests
+    // Use practice ID hash to deterministically decide attendance and guests
     final hash = practiceId.hashCode;
-    final shouldHaveGuests = (hash % 4) == 0; // ~25% of past practices have guests
+    
+    // Use SAME logic as _generateParticipationForPractice for attendance
+    // Only attended practices (not missed) can have guests
+    final userAttended = (hash % 3) == 0; // Same as participation status logic
+    
+    if (!userAttended) {
+      return const PracticeGuestList(); // No guests if user didn't attend (has MISSED status)
+    }
+    
+    // Now check if attended practice has guests (25% of attended practices have guests)
+    final shouldHaveGuests = (hash % 4) == 0; 
     
     if (!shouldHaveGuests) {
       return const PracticeGuestList();

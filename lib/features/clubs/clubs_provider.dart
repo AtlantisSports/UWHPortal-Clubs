@@ -40,7 +40,7 @@ class ClubsProvider with ChangeNotifier {
       for (final club in _clubs) {
         allPractices.addAll(club.upcomingPractices);
       }
-      participationProvider.initializePracticesParticipation(allPractices);
+      await participationProvider.initializePracticesParticipation(allPractices);
       
       notifyListeners();
     } catch (e) {
