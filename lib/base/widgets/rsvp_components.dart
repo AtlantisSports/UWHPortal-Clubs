@@ -676,8 +676,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             ],
           ),
           
-          // Guest section for read-only mode (if user is going and has guests)
-          if (userStatus == ParticipationStatus.yes) ...[
+          // Guest section for read-only mode (show if attended or going and guests exist)
+          if (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.attended) ...[
             const SizedBox(height: 12),
             _buildReadOnlyGuestSection(),
           ],
@@ -958,8 +958,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     if (widget.participationProvider == null) return const SizedBox.shrink();
     
     final guestList = widget.participationProvider!.getPracticeGuests(widget.practice.id);
-    final bringGuest = widget.participationProvider!.getBringGuestState(widget.practice.id);
-    
+
     // For read-only past practices, show guests if they exist regardless of bringGuest state
     // This displays historical data - what actually happened
     if (guestList.totalGuests == 0) return const SizedBox.shrink();
@@ -984,23 +983,25 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ),
               const SizedBox(width: 8),
               const Text(
-                'Bringing guests',
+                'Guests',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: Color(0xFF374151),
                 ),
               ),
+              const SizedBox(width: 6),
+              Text(
+                '+${guestList.totalGuests}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Bringing ${guestList.totalGuests} guest${guestList.totalGuests == 1 ? '' : 's'}',
-            style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF6B7280),
-            ),
-          ),
+
           // Guest list
           if (guestList.guests.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -1071,6 +1072,17 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   color: Color(0xFF374151),
                 ),
               ),
+              if (guestList.totalGuests > 0) ...[
+                const SizedBox(width: 6),
+                Text(
+                  '+${guestList.totalGuests}',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
               if (bringGuest) ...[
                 const Spacer(), // Push the button to the right
                 MouseRegion(
@@ -1101,15 +1113,6 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           // Guest list display (only show if guests exist)
           if (bringGuest && guestList.totalGuests > 0) ...[
             const SizedBox(height: 8),
-            Text(
-              'Bringing ${guestList.totalGuests} guest${guestList.totalGuests == 1 ? '' : 's'}',
-              style: const TextStyle(
-                fontSize: 13,
-                color: Color(0xFF6B7280),
-              ),
-            ),
-            // Individual guest list
-            const SizedBox(height: 6),
             ...guestList.guests.map((guest) => Container(
               margin: const EdgeInsets.only(bottom: 4),
               child: Row(

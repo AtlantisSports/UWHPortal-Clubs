@@ -438,7 +438,7 @@ class MockDataService {
     
     // For practices that have passed the 30-minute mark: Show attended/missed status (mock data for demo)
     if (now.isAfter(transitionPoint)) {
-      // Vary the responses based on practice ID for consistency
+      // Default deterministic assignment based on hash
       if (practiceId.hashCode % 3 == 0) {
         responses[currentUserId] = ParticipationStatus.attended;
       } else {
@@ -448,13 +448,13 @@ class MockDataService {
       // Practices that haven't reached the 30-minute transition: Show RSVP status (blank for future practices)
       responses[currentUserId] = ParticipationStatus.blank;
     }
-    
+
     // Add some other users for context
     responses[mockUser2] = ParticipationStatus.maybe;
     responses[mockUser3] = ParticipationStatus.blank;
     responses[mockUser4] = ParticipationStatus.yes;
     responses[mockUser5] = ParticipationStatus.no;
-    
+
     return responses;
   }
 
@@ -585,18 +585,31 @@ class MockDataService {
     
     // Use practice ID hash to deterministically decide attendance and guests
     final hash = practiceId.hashCode;
-    
-    // Use SAME logic as _generateParticipationForPractice for attendance
-    // Only attended practices (not missed) can have guests
-    final userAttended = (hash % 3) == 0; // Same as participation status logic
-    
+
+    // Determine recent Denver day-of-week categories for adjusted probabilities
+    final recentCutoff = now.subtract(const Duration(days: 30));
+    final isRecentPast = practiceDate.isBefore(now) && practiceDate.isAfter(recentCutoff);
+    final isDenver = practiceId.startsWith('denver-uwh-');
+    final isDenverSundayRecent = isDenver && practiceDate.weekday == DateTime.sunday && isRecentPast;
+    final isDenverThursdayRecent = isDenver && practiceDate.weekday == DateTime.thursday && isRecentPast;
+
+    // Use SAME logic as _generateParticipationForPractice for attendance (no overrides)
+    bool userAttended = (hash % 3) == 0; // Default deterministic
+
     if (!userAttended) {
       return const PracticeGuestList(); // No guests if user didn't attend (has MISSED status)
     }
-    
-    // Now check if attended practice has guests (25% of attended practices have guests)
-    final shouldHaveGuests = (hash % 4) == 0; 
-    
+
+    // Now check if attended practice has guests (30% for recent Denver Sun/Thu, otherwise 25%)
+    bool shouldHaveGuests;
+    if (isDenverSundayRecent || isDenverThursdayRecent) {
+      // 30% chance
+      shouldHaveGuests = (hash % 10) < 3;
+    } else {
+      // default 25%
+      shouldHaveGuests = (hash % 4) == 0;
+    }
+
     if (!shouldHaveGuests) {
       return const PracticeGuestList();
     }
