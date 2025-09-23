@@ -826,21 +826,25 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
 
   /// Auto-scroll to show the recurring practices when expanded
   void _scrollToRecurringPractices() {
-    if (!_scrollController.hasClients) return;
-    
-    // Wait for the expansion animation to complete
-    Future.delayed(const Duration(milliseconds: 350), () {
-      if (!mounted || !_scrollController.hasClients) return;
-      
-      // Simple approach: scroll down by a fixed amount to show the expanded content
-      final currentOffset = _scrollController.offset;
-      final maxOffset = _scrollController.position.maxScrollExtent;
-      final targetOffset = (currentOffset + 200).clamp(0.0, maxOffset);
-      
-      _scrollController.animateTo(
-        targetOffset,
+    // Wait for the expansion animation to complete, then scroll
+    Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+
+      final BuildContext? recurringPracticesContext = _recurringPracticesKey.currentContext;
+
+      if (recurringPracticesContext == null) {
+        debugPrint('RecurringPractices context is null, cannot scroll');
+        return;
+      }
+
+      debugPrint('Scrolling to show expanded recurring practices');
+
+      // Use ensureVisible to show the expanded widget
+      Scrollable.ensureVisible(
+        recurringPracticesContext,
         duration: const Duration(milliseconds: 500),
-        curve: Curves.easeInOut,
+        curve: Curves.easeOut,
+        alignment: 0.1,
       );
     });
   }

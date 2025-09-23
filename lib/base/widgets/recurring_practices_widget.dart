@@ -146,19 +146,6 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Recurrence information first (if not weekly)
-          if (!isWeekly) ...[
-            Text(
-              _formatNextOccurrence(practice),
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 4),
-          ],
-          
           Row(
             children: [
               // Day text (no background)
@@ -226,8 +213,21 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
               ],
             ],
           ),
-          
-          // Description after the day/time/location (moved from above)
+
+          // Recurrence information between day/time and description (if not weekly)
+          if (!isWeekly) ...[
+            const SizedBox(height: 4),
+            Text(
+              _formatNextOccurrence(practice),
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+
+          // Description after the day/time/location
           if (practice.description.isNotEmpty) ...[
             const SizedBox(height: 6),
             if (shouldTruncateDescription) ...[

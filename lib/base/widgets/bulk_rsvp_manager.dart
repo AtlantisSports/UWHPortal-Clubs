@@ -734,8 +734,17 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Recurrence note first (pattern description)
+                      // Day/time/location first
+                      Text(
+                        '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
+                        style: const TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF111827),
+                        ),
+                      ),
+                      // Recurrence note below day/time/location
                       if (pattern?.recurrence.description != null && pattern!.recurrence.description.isNotEmpty) ...[
+                        const SizedBox(height: 2),
                         Text(
                           pattern.recurrence.description,
                           style: const TextStyle(
@@ -744,16 +753,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                             color: Color(0xFF6B7280),
                           ),
                         ),
-                        const SizedBox(height: 2),
                       ],
-                      // Day/time/location below
-                      Text(
-                        '${_getDayNameForPractice(practice)} • ${TimeUtils.formatTimeRangeWithDuration(practice.dateTime, practice.duration)} • ${practice.location}',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          color: Color(0xFF111827),
-                        ),
-                      ),
                     ],
                   ),
                 ),
