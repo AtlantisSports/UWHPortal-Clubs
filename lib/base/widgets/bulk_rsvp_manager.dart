@@ -16,7 +16,7 @@ import '../../core/di/service_locator.dart';
 import '../../core/utils/time_utils.dart';
 import '../../core/utils/practice_data_consistency.dart';
 import 'dropdown_utils.dart';
-import 'phone_modal_utils.dart';
+import 'phone_aware_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 
@@ -226,7 +226,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
   /// Show confirmation dialog for clearing all future RSVPs
   Future<void> _showClearFutureRSVPsConfirmation() async {
-    final confirmed = await PhoneModalUtils.showPhoneConfirmationDialog(
+    final confirmed = await _showConfirmationDialog(
       context: context,
       title: 'Clear All Future RSVPs',
       message: 'This will clear ALL of your RSVPs!\n\nAny New Player guests or Dependents associated with your RSVPs will also be cleared.\n\nVisitors and Club Members you have previously added as your guest will keep their RSVPs.\n\nThis action cannot be undone.',
@@ -238,6 +238,39 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     if (confirmed) {
       await _clearAllFutureRSVPs();
     }
+  }
+
+  /// Show a confirmation dialog using standard Flutter dialog
+  Future<bool> _showConfirmationDialog({
+    required BuildContext context,
+    required String title,
+    required String message,
+    required String confirmText,
+    required String cancelText,
+    bool isDestructive = false,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(cancelText),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: isDestructive ? ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ) : null,
+            child: Text(confirmText),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   /// Clear all future RSVPs for user, new player guests, and dependents
@@ -1193,7 +1226,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   void _showCustomDatePicker() async {
-    await PhoneModalUtils.showPhoneFrameModal<Map<String, DateTime>>(
+    await PhoneAwareModalUtils.showPhoneAwareDialog<Map<String, DateTime>>(
       context: context,
       child: _CustomDateRangeModal(
         initialStartDate: _customStartDate,
@@ -1655,9 +1688,9 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
     final initialDate = isStart ? _startDate : _endDate;
     // Use showPhoneModal (Navigator-backed) so inner OK/Cancel only closes the date picker,
     // not the parent Bulk RSVP overlay.
-    final pickedDate = await PhoneModalUtils.showPhoneModal<DateTime>(
+    final pickedDate = await showDialog<DateTime>(
       context: context,
-      child: _CustomDatePickerModal(
+      builder: (context) => _CustomDatePickerModal(
         initialDate: initialDate ?? DateTime.now(),
         firstDate: DateTime.now(),
         lastDate: DateTime.now().add(const Duration(days: 365)),
@@ -1707,7 +1740,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
         'end': finalEndDate,
       });
     }
-    PhoneFrameModal.close();
+    Navigator.of(context).pop();
   }
   
   @override
@@ -1740,7 +1773,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
                   if (widget.onResult != null) {
                     widget.onResult!(null); // Cancel with no result
                   }
-                  PhoneFrameModal.close();
+                  Navigator.of(context).pop();
                 },
                 icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
                 padding: EdgeInsets.zero,
@@ -1865,7 +1898,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
                     if (widget.onResult != null) {
                       widget.onResult!(null); // Cancel with no result
                     }
-                    PhoneFrameModal.close();
+                    Navigator.of(context).pop();
                   },
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
@@ -1956,7 +1989,7 @@ class _LocationSelectionModalState extends State<_LocationSelectionModal> {
                 ),
               ),
               IconButton(
-                onPressed: () => PhoneFrameModal.close(),
+                onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -2028,7 +2061,7 @@ class _LocationSelectionModalState extends State<_LocationSelectionModal> {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => PhoneFrameModal.close(),
+                  onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -2050,7 +2083,7 @@ class _LocationSelectionModalState extends State<_LocationSelectionModal> {
                 child: ElevatedButton(
                   onPressed: () {
                     widget.onSelectionChanged(_tempSelection);
-                    PhoneFrameModal.close();
+                    Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0284C7),
@@ -2121,7 +2154,7 @@ class _LevelSelectionModalState extends State<_LevelSelectionModal> {
                 ),
               ),
               IconButton(
-                onPressed: () => PhoneFrameModal.close(),
+                onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
@@ -2193,7 +2226,7 @@ class _LevelSelectionModalState extends State<_LevelSelectionModal> {
             children: [
               Expanded(
                 child: TextButton(
-                  onPressed: () => PhoneFrameModal.close(),
+                  onPressed: () => Navigator.of(context).pop(),
                   style: TextButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(
@@ -2215,7 +2248,7 @@ class _LevelSelectionModalState extends State<_LevelSelectionModal> {
                 child: ElevatedButton(
                   onPressed: () {
                     widget.onSelectionChanged(_tempSelection);
-                    PhoneFrameModal.close();
+                    Navigator.of(context).pop();
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF0284C7),

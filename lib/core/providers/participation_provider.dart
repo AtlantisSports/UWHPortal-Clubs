@@ -1,5 +1,5 @@
-/// Unified participation status provider
-/// Handles both RSVP and attendance management for practices
+/// Core participation status provider - focused on RSVP/attendance only
+/// Handles participation status and guest management for practices
 library;
 
 import 'package:flutter/foundation.dart';
@@ -13,7 +13,7 @@ import '../di/service_locator.dart';
 class ParticipationProvider with ChangeNotifier {
   final ClubsRepository _clubsRepository;
   final UserService _userService;
-  
+
   ParticipationProvider({
     ClubsRepository? clubsRepository,
     UserService? userService,
@@ -23,40 +23,24 @@ class ParticipationProvider with ChangeNotifier {
   // Map to track participation status for each practice
   // Key: practiceId, Value: ParticipationStatus
   final Map<String, ParticipationStatus> _participationStatusMap = {};
-  
+
   // Map to track guest lists for each practice
   // Key: practiceId, Value: PracticeGuestList
   final Map<String, PracticeGuestList> _practiceGuestsMap = {};
-  
+
   // Map to track "bring guest" checkbox state for each practice
   // Key: practiceId, Value: bool
   final Map<String, bool> _bringGuestMap = {};
-  
+
   // Map to track loading states for each practice
   final Map<String, bool> _loadingStates = {};
-  
-  // Level filter state (session-based persistence)
-  Set<String> _selectedLevels = <String>{};
-  
-  // Location filter state (session-based persistence)
-  Set<String> _selectedLocations = <String>{};
-  
-  // Bulk operation tracking
-  bool _isBulkOperationInProgress = false;
-  String? _bulkOperationStatus;
-  
+
   // Error tracking
   String? _error;
 
   // Getters
   String? get error => _error;
   String get currentUserId => _userService.currentUserId;
-  bool get isBulkOperationInProgress => _isBulkOperationInProgress;
-  String? get bulkOperationStatus => _bulkOperationStatus;
-  Set<String> get selectedLevels => Set.from(_selectedLevels);
-  Set<String> get selectedLocations => Set.from(_selectedLocations);
-  bool get hasLevelFiltersApplied => _selectedLevels.isNotEmpty;
-  bool get hasLocationFiltersApplied => _selectedLocations.isNotEmpty;
 
   /// Get participation status for a specific practice
   ParticipationStatus getParticipationStatus(String practiceId) {
@@ -201,16 +185,8 @@ class ParticipationProvider with ChangeNotifier {
   }
   
   /// Bulk update participation status for multiple practices
+  /// Note: Consider moving to separate BulkOperationsProvider for better separation
   Future<BulkParticipationResult> bulkUpdateParticipation(BulkParticipationRequest request) async {
-    if (_isBulkOperationInProgress) {
-      throw Exception('Another bulk operation is already in progress');
-    }
-    
-    _isBulkOperationInProgress = true;
-    _bulkOperationStatus = 'Processing ${request.practiceIds.length} practices...';
-    _setError(null);
-    notifyListeners();
-
     final successfulIds = <String>[];
     final failedIds = <String>[];
     final errors = <String, String>{};
@@ -219,23 +195,20 @@ class ParticipationProvider with ChangeNotifier {
       for (final practiceId in request.practiceIds) {
         try {
           await updateParticipationStatus(
-            request.clubId, 
-            practiceId, 
+            request.clubId,
+            practiceId,
             request.newStatus,
             isAdmin: false, // Bulk operations are typically user-initiated
           );
           successfulIds.add(practiceId);
-          _bulkOperationStatus = 'Updated ${successfulIds.length}/${request.practiceIds.length} practices...';
-          notifyListeners();
         } catch (error) {
           failedIds.add(practiceId);
           errors[practiceId] = error.toString();
         }
       }
-    } finally {
-      _isBulkOperationInProgress = false;
-      _bulkOperationStatus = null;
-      notifyListeners();
+    } catch (e) {
+      // Handle any unexpected errors
+      debugPrint('Bulk operation error: $e');
     }
 
     return BulkParticipationResult(
@@ -294,100 +267,7 @@ class ParticipationProvider with ChangeNotifier {
       notifyListeners();
     }
   }
-  
-  /// Level Filter Management
-  
-  /// Get all available practice levels from a list of practices
-  Set<String> getAvailableLevels(List<Practice> practices) {
-    final levels = <String>{};
-    for (final practice in practices) {
-      if (practice.tag != null && practice.tag!.isNotEmpty) {
-        levels.add(practice.tag!);
-      }
-    }
-    return levels;
-  }
-  
-  /// Get all available practice locations from a list of practices
-  Set<String> getAvailableLocations(List<Practice> practices) {
-    final locations = <String>{};
-    for (final practice in practices) {
-      if (practice.location.isNotEmpty) {
-        locations.add(practice.location);
-      }
-    }
-    return locations;
-  }
-  
-  /// Update selected levels for filtering
-  void updateSelectedLevels(Set<String> levels) {
-    _selectedLevels = Set.from(levels);
-    notifyListeners();
-  }
-  
-  /// Update selected locations for filtering
-  void updateSelectedLocations(Set<String> locations) {
-    _selectedLocations = Set.from(locations);
-    notifyListeners();
-  }
-  
-  /// Add a level to the filter
-  void addLevelToFilter(String level) {
-    _selectedLevels.add(level);
-    notifyListeners();
-  }
-  
-  /// Add a location to the filter
-  void addLocationToFilter(String location) {
-    _selectedLocations.add(location);
-    notifyListeners();
-  }
-  
-  /// Remove a level from the filter
-  void removeLevelFromFilter(String level) {
-    _selectedLevels.remove(level);
-    notifyListeners();
-  }
-  
-  /// Remove a location from the filter
-  void removeLocationFromFilter(String location) {
-    _selectedLocations.remove(location);
-    notifyListeners();
-  }
-  
-  /// Clear all level filters
-  void clearLevelFilters() {
-    _selectedLevels.clear();
-    notifyListeners();
-  }
-  
-  /// Clear all location filters
-  void clearLocationFilters() {
-    _selectedLocations.clear();
-    notifyListeners();
-  }
-  
-  /// Clear all filters (both level and location)
-  void clearAllFilters() {
-    _selectedLevels.clear();
-    _selectedLocations.clear();
-    notifyListeners();
-  }
-  
-  /// Check if a practice passes both level and location filters
-  bool shouldShowPractice(Practice practice) {
-    // Check level filter
-    final passesLevelFilter = _selectedLevels.isEmpty || 
-        (practice.tag != null && practice.tag!.isNotEmpty && _selectedLevels.contains(practice.tag));
-    
-    // Check location filter
-    final passesLocationFilter = _selectedLocations.isEmpty || 
-        _selectedLocations.contains(practice.location);
-    
-    // Practice must pass both filters
-    return passesLevelFilter && passesLocationFilter;
-  }
-  
+
   /// Debug method to see all tracked participation statuses
   void debugPrintParticipation() {
     debugPrint('=== Participation Provider Debug ===');
@@ -396,4 +276,7 @@ class ParticipationProvider with ChangeNotifier {
     }
     debugPrint('====================================');
   }
+
+  /// Note: Filter management has been moved to PracticeFilterProvider
+  /// This keeps ParticipationProvider focused on participation status only
 }

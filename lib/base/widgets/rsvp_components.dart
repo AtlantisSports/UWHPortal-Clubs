@@ -8,7 +8,7 @@ import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/time_utils.dart';
 import 'guest_management_modal.dart';
-import 'phone_modal_utils.dart';
+import 'phone_aware_modal_utils.dart';
 
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
@@ -1138,7 +1138,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
   
   void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
-    PhoneModalUtils.showPhoneFrameModal(
+    PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: GuestManagementModal(
         initialGuests: guestList,
@@ -1335,139 +1335,142 @@ class ParticipationStatusLegendModal extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(24),
-      constraints: const BoxConstraints(
-        maxHeight: 600, // Increased from default to accommodate all content
-        maxWidth: 400,
-      ),
       decoration: const BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.all(Radius.circular(16)),
+        borderRadius: BorderRadius.all(Radius.circular(12)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Modal header with close button
-          Row(
-            children: [
-              const Expanded(child: SizedBox()), // Push close button to right
-              IconButton(
-                onPressed: () => PhoneFrameModal.close(),
-                icon: const Icon(
-                  Icons.close,
+          // Header with title and close button
+          Container(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'Announced Practices',
+                    style: TextStyle(
+                      color: Color(0xFF111827),
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
                   color: Color(0xFF6B7280),
                 ),
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+              ],
+            ),
+          ),
+
+          // Content area
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Subtitle
+                  const Text(
+                    'All practices that have been announced as confirmed',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Horizontal divider
+                  Container(
+                    height: 1,
+                    color: Color(0xFFE5E7EB),
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Section title
+                  const Text(
+                    'Participation Status Key',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF374151),
+                    ),
+                  ),
+
+                  const SizedBox(height: 16),
+          
+                  // Legend items (simple rows without containers)
+                  _buildSimpleLegendItem(
+                    Icons.check_circle_outline,
+                    ParticipationStatus.yes.color,
+                    'YES',
+                    'You will attend this practice',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSimpleLegendItem(
+                    Icons.help_outline,
+                    ParticipationStatus.maybe.color,
+                    'MAYBE',
+                    'You\'re unsure about attending this practice',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSimpleLegendItem(
+                    Icons.cancel_outlined,
+                    ParticipationStatus.no.color,
+                    'NO',
+                    'You will not attend this practice',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSimpleLegendItem(
+                    Icons.check_circle,
+                    ParticipationStatus.attended.color,
+                    'ATTENDED',
+                    'Confirmed to have attended practice',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildSimpleLegendItem(
+                    Icons.cancel,
+                    ParticipationStatus.missed.color,
+                    'MISSED',
+                    'Confirmed to have not attended practice',
+                  ),
+                ],
               ),
-            ],
-          ),
-          
-          // Main title
-          const Text(
-            'Announced Practices',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF111827),
             ),
-          ),
-          
-          const SizedBox(height: 8),
-          
-          // Note about practices
-          const Text(
-            'List of planned upcoming practices',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Color(0xFF6B7280),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Divider line
-          Container(
-            height: 1,
-            color: Color(0xFFE5E7EB),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Icon legend subtitle
-          const Text(
-            'Icon legend',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF374151),
-            ),
-          ),
-          
-          const SizedBox(height: 16),
-          
-          // Legend items
-          _buildLegendItem(
-            Icons.check_circle_outline,
-            ParticipationStatus.yes.color,
-            'YES',
-            'You will attend this practice',
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildLegendItem(
-            Icons.help_outline,
-            ParticipationStatus.maybe.color,
-            'MAYBE',
-            'You\'re unsure about attending this practice',
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildLegendItem(
-            Icons.cancel_outlined,
-            ParticipationStatus.no.color,
-            'NO',
-            'You will not attend this practice',
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildLegendItem(
-            Icons.check_circle,
-            ParticipationStatus.attended.color,
-            'ATTENDED',
-            'Confirmed to have attended practice',
-          ),
-          
-          const SizedBox(height: 16),
-          
-          _buildLegendItem(
-            Icons.cancel,
-            ParticipationStatus.missed.color,
-            'MISSED',
-            'Confirmed to have not attended practice',
           ),
         ],
       ),
     );
   }
 
-  Widget _buildLegendItem(IconData icon, Color color, String title, String description) {
+  Widget _buildSimpleLegendItem(IconData icon, Color color, String title, String description) {
     return Row(
       children: [
-        // Icon
+        // Icon without background container
         Icon(
           icon,
-          size: 36,
+          size: 24,
           color: color,
         ),
-        
+
         const SizedBox(width: 12),
-        
+
         // Text content
         Expanded(
           child: Column(

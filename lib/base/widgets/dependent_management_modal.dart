@@ -2,7 +2,6 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'phone_modal_utils.dart';
 
 class DependentManagementModal extends StatefulWidget {
   final List<String> availableDependents;
@@ -57,7 +56,7 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
                   if (widget.onClose != null) {
                     widget.onClose!();
                   } else {
-                    PhoneFrameModal.close();
+                    Navigator.of(context).pop();
                   }
                 },
                 icon: const Icon(Icons.close, color: Color(0xFF6B7280)),
@@ -121,7 +120,7 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
                     if (widget.onClose != null) {
                       widget.onClose!();
                     } else {
-                      PhoneFrameModal.close();
+                      Navigator.of(context).pop();
                     }
                   },
                   style: TextButton.styleFrom(
@@ -149,7 +148,7 @@ class _DependentManagementModalState extends State<DependentManagementModal> {
                     if (widget.onClose != null) {
                       widget.onClose!();
                     } else {
-                      PhoneFrameModal.close();
+                      Navigator.of(context).pop();
                     }
                   },
                   style: ElevatedButton.styleFrom(

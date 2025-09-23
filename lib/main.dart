@@ -10,6 +10,7 @@ import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
 import 'core/providers/navigation_provider.dart';
 import 'core/providers/participation_provider.dart';
+import 'core/providers/practice_filter_provider.dart';
 import 'core/providers/user_provider.dart';
 import 'features/clubs/clubs_list_screen.dart';
 import 'features/clubs/clubs_provider.dart';
@@ -40,9 +41,10 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => UserProvider()),
         ChangeNotifierProvider(create: (_) => ParticipationProvider()),
+        ChangeNotifierProvider(create: (_) => PracticeFilterProvider()),
         ChangeNotifierProxyProvider<ParticipationProvider, ClubsProvider>(
           create: (context) => ClubsProvider(participationProvider: context.read<ParticipationProvider>()),
-          update: (context, participationProvider, clubsProvider) => 
+          update: (context, participationProvider, clubsProvider) =>
               clubsProvider ?? ClubsProvider(participationProvider: participationProvider),
         ),
         ChangeNotifierProvider(create: (_) => NavigationProvider()),

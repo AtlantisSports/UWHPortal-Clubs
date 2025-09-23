@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/providers/participation_provider.dart';
+import '../../core/providers/practice_filter_provider.dart';
 import '../../core/constants/app_constants.dart';
 
 /// Bottom sheet modal for filtering practices by level and location
@@ -28,28 +28,28 @@ class _LevelFilterModalState extends State<LevelFilterModal> {
   @override
   void initState() {
     super.initState();
-    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-    _tempSelectedLevels = Set.from(participationProvider.selectedLevels);
-    _tempSelectedLocations = Set.from(participationProvider.selectedLocations);
+    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
+    _tempSelectedLevels = Set.from(filterProvider.selectedLevels);
+    _tempSelectedLocations = Set.from(filterProvider.selectedLocations);
   }
 
   void _applyFilters() {
-    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-    participationProvider.updateSelectedLevels(_tempSelectedLevels);
-    participationProvider.updateSelectedLocations(_tempSelectedLocations);
+    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
+    filterProvider.updateSelectedLevels(_tempSelectedLevels);
+    filterProvider.updateSelectedLocations(_tempSelectedLocations);
     // Close the modal after applying filters
     widget.onFiltersChanged?.call();
   }
 
   void _resetFilters() {
-    final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
     setState(() {
       _tempSelectedLevels.clear();
       _tempSelectedLocations.clear();
     });
     // Apply the cleared filters immediately so changes persist, but keep modal open
-    participationProvider.updateSelectedLevels(_tempSelectedLevels);
-    participationProvider.updateSelectedLocations(_tempSelectedLocations);
+    filterProvider.updateSelectedLevels(_tempSelectedLevels);
+    filterProvider.updateSelectedLocations(_tempSelectedLocations);
   }
 
   @override

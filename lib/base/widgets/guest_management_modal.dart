@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
 import 'dropdown_utils.dart';
-import 'phone_modal_utils.dart';
-import 'phone_frame.dart';
 
 class GuestManagementModal extends StatefulWidget {
   final PracticeGuestList initialGuests;
@@ -87,7 +85,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () => PhoneFrameModal.close(),
+                  onPressed: () => Navigator.of(context).pop(),
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
                 ),
@@ -149,7 +147,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               children: [
                 Expanded(
                   child: TextButton(
-                    onPressed: () => PhoneFrameState.hideOverlay(),
+                    onPressed: () => Navigator.of(context).pop(),
                     child: const Text('Cancel'),
                   ),
                 ),
@@ -163,7 +161,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                     child: ElevatedButton(
                       onPressed: _canComplete() ? () {
                         widget.onGuestsChanged(_guestList);
-                        PhoneFrameState.hideOverlay();
+                        Navigator.of(context).pop();
                       } : null, // null = disabled styling
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,

@@ -188,7 +188,7 @@ class PhoneFrameState extends State<PhoneFrame> {
                 _buildNavigationBar(),
               ],
             ),
-            // Overlay for modals (appears above everything)
+            // Overlay for modals (appears above everything) - DEPRECATED: Use PhoneAwareModalUtils instead
             if (_overlayWidget != null)
               Positioned.fill(
                 child: _overlayWidget!,

@@ -1,0 +1,5 @@
+lib/base/widgets/rsvp_components.dart
+lib/core/data/mock_data_service.dart
+lib/core/providers/participation_provider.dart
+lib/features/clubs/club_detail_screen.dart
+lib/features/clubs/clubs_provider.dart

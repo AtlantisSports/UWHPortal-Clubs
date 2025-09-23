@@ -1,0 +1,6 @@
+## Cleaned_and_Optimized...origin/Cleaned_and_Optimized
+?? .augment_git_diff_names.txt
+?? .augment_git_last.txt
+?? .augment_git_status.txt
+?? .augment_git_status_after.txt
+?? .augment_git_untracked.txt

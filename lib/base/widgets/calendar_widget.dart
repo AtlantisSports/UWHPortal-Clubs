@@ -7,8 +7,8 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
-import '../../base/widgets/phone_modal_utils.dart';
-import '../../base/widgets/phone_frame.dart';
+import '../../core/providers/practice_filter_provider.dart';
+import '../../base/widgets/phone_aware_modal_utils.dart';
 import '../../base/widgets/rsvp_components.dart';
 
 enum PracticeStatus {
@@ -62,10 +62,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   @override
   void initState() {
     super.initState();
-    // Ensure any lingering overlays are cleared when this widget is created
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      PhoneFrameState.hideOverlay();
-    });
+    // No longer need to clear overlays - using standard Flutter modals
   }
 
   @override
@@ -470,8 +467,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           // Past practices and today's practices - use real practice data with participation status
           if (participationProvider != null) {
             // Use real practice data with participation status
+            final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
             for (final practice in realPracticesForDay) {
-              final passesLevelFilter = participationProvider.shouldShowPractice(practice);
+              final passesLevelFilter = filterProvider.shouldShowPractice(practice);
               final participationStatus = participationProvider.getParticipationStatus(practice.id);
               
               // Check if practice has transitioned to attendance tracking (30+ minutes after start)
@@ -520,8 +518,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           }
         } else {
           // Future practices - use real practice data with participation status
+          final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
           for (final practice in realPracticesForDay) {
-            final passesLevelFilter = participationProvider?.shouldShowPractice(practice) ?? true;
+            final passesLevelFilter = filterProvider.shouldShowPractice(practice);
             
             PracticeStatus status;
             if (participationProvider != null) {
@@ -613,7 +612,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   void _showPracticeSelectionModal(BuildContext context, List<Practice> practices, ParticipationProvider? participationProvider) {
-    PhoneModalUtils.showPhoneFrameModal(
+    PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: Container(
         decoration: const BoxDecoration(
@@ -637,7 +636,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     ),
                   ),
                   IconButton(
-                    onPressed: () => PhoneFrameModal.close(),
+                    onPressed: () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close),
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
@@ -662,7 +661,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     participationProvider: participationProvider,
                     showAttendanceStatus: true,
                     onTap: () {
-                      PhoneFrameModal.close();
+                      Navigator.of(context).pop();
                       Future.microtask(() {
                         widget.onPracticeSelected?.call(practice);
                       });
@@ -676,7 +675,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             Padding(
               padding: const EdgeInsets.all(20),
               child: TextButton(
-                onPressed: () => PhoneFrameModal.close(),
+                onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Cancel'),
               ),
             ),
@@ -688,14 +687,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
   /// Build the filter button for the calendar header
   Widget _buildFilterButton(BuildContext context, ParticipationProvider? participationProvider) {
-    if (participationProvider == null) {
-      return const SizedBox.shrink();
-    }
-
-    return Consumer<ParticipationProvider>(
-      builder: (context, provider, child) {
-        final hasFiltersApplied = provider.hasLevelFiltersApplied || provider.hasLocationFiltersApplied;
-        final selectedCount = provider.selectedLevels.length + provider.selectedLocations.length;
+    return Consumer<PracticeFilterProvider>(
+      builder: (context, filterProvider, child) {
+        final hasFiltersApplied = filterProvider.hasLevelFiltersApplied || filterProvider.hasLocationFiltersApplied;
+        final selectedCount = filterProvider.selectedLevels.length + filterProvider.selectedLocations.length;
         
         return Container(
           width: 40,
@@ -751,7 +746,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
   /// Show participation status legend modal
   void _showParticipationLegend() {
-    PhoneModalUtils.showPhoneFrameModal(
+    PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: const ParticipationStatusLegendModal(),
     );

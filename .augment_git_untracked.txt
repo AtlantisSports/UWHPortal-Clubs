@@ -1,0 +1,3 @@
+.augment_git_diff_names.txt
+.augment_git_status.txt
+.augment_git_untracked.txt
