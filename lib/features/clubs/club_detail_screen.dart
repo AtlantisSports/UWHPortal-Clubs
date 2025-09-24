@@ -1,6 +1,7 @@
 
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -8,6 +9,7 @@ import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/constants/phone_frame_constants.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/services/schedule_service.dart';
 import '../../core/di/service_locator.dart';
@@ -245,18 +247,12 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   /// Calculate dynamic height for tab content to allow tab bar to stick at top when scrolled
   double _calculateDynamicTabHeight(BuildContext context) {
     // Since this is a phone mockup in a browser, use realistic phone screen dimensions
-    // Galaxy S23 dimensions: 393x852 dp
-    const phoneScreenHeight = 852.0;
-    const phoneStatusBarHeight = 44.0; // From phone frame implementation
-    const appBottomNavHeight = 56.0; // App's bottom navigation bar (Home, Events, etc.)
-    const systemNavBarHeight = 48.0; // System navigation bar (black bar with home button)
-    const tabBarHeight = 48.0; // The tab bar itself (RSVP, Recurring Practices, etc.)
+    // Galaxy S23 dimensions from PhoneFrameConstants
     const paddingAdjustment = 16.0; // Account for various paddings and margins
-    final appBarHeight = AppBar().preferredSize.height; // 56px
     
     // Calculate the space available for tab content when tab bar is at the desired position
     // Tab bar should remain visible, so subtract its height too
-    final tabContentHeight = phoneScreenHeight - phoneStatusBarHeight - appBarHeight - tabBarHeight - appBottomNavHeight - systemNavBarHeight - paddingAdjustment;
+    final tabContentHeight = PhoneFrameConstants.phoneScreenHeight - PhoneFrameConstants.statusBarHeight - PhoneFrameConstants.appBarHeight - PhoneFrameConstants.tabBarHeight - PhoneFrameConstants.appBottomNavHeight - PhoneFrameConstants.systemNavBarHeight - paddingAdjustment;
     
     // Ensure minimum usable height for calendar content
     const minHeight = 300.0;
@@ -308,17 +304,16 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   
   @override
   Widget build(BuildContext context) {
-    // Force mobile layout since we're always within a phone frame
+    // Check if we're on mobile web (real mobile browser)
+    final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
+                                  defaultTargetPlatform == TargetPlatform.android ||
+                                  MediaQuery.of(context).size.width < 600);
+
     final EdgeInsets responsivePadding = const EdgeInsets.all(16.0);
-    
-    // Ensure content fits within phone frame constraints
-    return ConstrainedBox(
-      constraints: const BoxConstraints(
-        maxWidth: 393, // Galaxy S23 width - match phone frame
-      ),
-      child: Stack(
-        children: [
-          Scaffold(
+
+    final scaffoldContent = Stack(
+      children: [
+        Scaffold(
       appBar: AppBar(
         title: Text(_showingBulkRSVP 
             ? 'BULK RSVP' 
@@ -656,12 +651,25 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 ),
               ),
             ),
-          
+
           // Modal overlays using the same pattern as profile screen
           _buildModalOverlays(),
         ],
-      ),
-    ); // Close ConstrainedBox
+      );
+
+    // Return with or without phone frame constraints based on platform
+    if (isMobileWeb) {
+      // For mobile web, return scaffold directly without constraints
+      return scaffoldContent;
+    } else {
+      // For desktop/browser, use phone frame constraints
+      return ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 393, // Galaxy S23 width - match phone frame
+        ),
+        child: scaffoldContent,
+      );
+    }
   }
 
   Widget _buildModalOverlays() {

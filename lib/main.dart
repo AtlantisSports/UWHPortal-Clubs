@@ -5,6 +5,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'core/constants/app_constants.dart';
 import 'core/di/service_locator.dart';
@@ -107,37 +108,48 @@ class MyApp extends StatelessWidget {
         ),
         home: Consumer<NavigationProvider>(
           builder: (context, navigationProvider, child) {
-            return PhoneFrameWrapper(
-              onBackPressed: () {
-                debugPrint('📱 Back button pressed');
-                
-                // First check if drawer is open
-                if (navigationProvider.isDrawerOpen) {
-                  debugPrint('📱 Drawer is open, closing it');
-                  final navContext = NavigationService.context;
-                  if (navContext != null) {
-                    Navigator.of(navContext).pop();
+            // Check if we're on mobile web (real mobile browser)
+            final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
+                                          defaultTargetPlatform == TargetPlatform.android ||
+                                          MediaQuery.of(context).size.width < 600);
+
+            if (isMobileWeb) {
+              // For mobile web, skip phone frame and show app directly
+              return const MainNavigationScreen();
+            } else {
+              // For desktop/browser, use phone frame simulation
+              return PhoneFrameWrapper(
+                onBackPressed: () {
+                  debugPrint('📱 Back button pressed');
+
+                  // First check if drawer is open
+                  if (navigationProvider.isDrawerOpen) {
+                    debugPrint('📱 Drawer is open, closing it');
+                    final navContext = NavigationService.context;
+                    if (navContext != null) {
+                      Navigator.of(navContext).pop();
+                      return;
+                    }
+                  }
+
+                  // Try tab navigation history
+                  if (navigationProvider.handlePhoneBackNavigation()) {
+                    debugPrint('📱 Phone back navigation succeeded');
                     return;
                   }
-                }
-                
-                // Try tab navigation history
-                if (navigationProvider.handlePhoneBackNavigation()) {
-                  debugPrint('📱 Phone back navigation succeeded');
-                  return;
-                }
-                
-                // Fallback to regular navigation
-                final navContext = NavigationService.context;
-                if (navContext != null && Navigator.of(navContext).canPop()) {
-                  debugPrint('📱 Using regular navigation pop');
-                  Navigator.of(navContext).pop();
-                } else {
-                  debugPrint('📱 Cannot pop navigation stack');
-                }
-              },
-              child: const MainNavigationScreen(),
-            );
+
+                  // Fallback to regular navigation
+                  final navContext = NavigationService.context;
+                  if (navContext != null && Navigator.of(navContext).canPop()) {
+                    debugPrint('📱 Using regular navigation pop');
+                    Navigator.of(navContext).pop();
+                  } else {
+                    debugPrint('📱 Cannot pop navigation stack');
+                  }
+                },
+                child: const MainNavigationScreen(),
+              );
+            }
           },
         ),
         // Use default route generation for snappy navigation

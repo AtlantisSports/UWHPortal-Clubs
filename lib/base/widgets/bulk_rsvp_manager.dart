@@ -12,6 +12,8 @@ import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
 import '../../core/services/schedule_service.dart';
+import '../../core/services/rsvp_service.dart';
+import '../../core/services/practice_filter_service.dart';
 import '../../core/di/service_locator.dart';
 import '../../core/utils/time_utils.dart';
 import '../../core/utils/practice_data_consistency.dart';
@@ -209,19 +211,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   List<Practice> _getFilteredPractices() {
-    var practices = _getClubPractices();
-    
-    // Apply location filter (skip if "All locations" is selected)
-    if (_selectedLocations.isNotEmpty && !_selectedLocations.contains('All locations')) {
-      practices = practices.where((p) => _selectedLocations.contains(p.location)).toList();
-    }
-    
-    // Apply level filter (skip if "All levels" is selected)
-    if (_selectedLevels.isNotEmpty && !_selectedLevels.contains('All levels')) {
-      practices = practices.where((p) => p.tag != null && _selectedLevels.contains(p.tag!)).toList();
-    }
-    
-    return practices;
+    final practices = _getClubPractices();
+
+    return practiceFilterService.applyFilters(
+      practices: practices,
+      selectedLocations: _selectedLocations,
+      selectedLevels: _selectedLevels,
+    );
   }
 
   /// Show confirmation dialog for clearing all future RSVPs
@@ -1250,7 +1246,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
   
   bool _canApply() {
-    return _selectedPracticeIds.isNotEmpty && _selectedRSVPChoice != null;
+    return rsvpService.canApplyBulkRSVP(
+      selectedPracticeIds: _selectedPracticeIds.toList(),
+      selectedChoice: _selectedRSVPChoice,
+    );
   }
 
   /// Show helpful toast when user clicks inactive Apply button
@@ -1298,43 +1297,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return p.patternId == selectedRepresentative.patternId;
       }).toList();
       
-      // Apply timeframe filtering
-      List<Practice> timeframePractices = [];
-      switch (_selectedTimeframe) {
-        case 'only_announced':
-          // Filter for upcoming announced practices only (bounded by mock announced cutoff)
-          timeframePractices = matchingPractices.where((p) {
-            final now = DateTime.now();
-            final cutoff = AppConstants.mockAnnouncedCutoff;
-            final dt = p.dateTime;
-            return dt.isAfter(now) && (dt.isBefore(cutoff) || dt.isAtSameMomentAs(cutoff));
-          }).toList();
-          break;
-          
-        case 'custom':
-          // Custom date range
-          if (_customStartDate != null && _customEndDate != null) {
-            timeframePractices = matchingPractices.where((p) {
-              final practiceDate = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
-              final startDate = DateTime(_customStartDate!.year, _customStartDate!.month, _customStartDate!.day);
-              final endDate = DateTime(_customEndDate!.year, _customEndDate!.month, _customEndDate!.day);
-              return practiceDate.isAtSameMomentAs(startDate) || 
-                     practiceDate.isAtSameMomentAs(endDate) ||
-                     (practiceDate.isAfter(startDate) && practiceDate.isBefore(endDate));
-            }).toList();
-          }
-          break;
-          
-        case 'all_future':
-          // All future practices from today
-          final today = DateTime.now();
-          final todayDate = DateTime(today.year, today.month, today.day);
-          timeframePractices = matchingPractices.where((p) {
-            final practiceDate = DateTime(p.dateTime.year, p.dateTime.month, p.dateTime.day);
-            return practiceDate.isAtSameMomentAs(todayDate) || practiceDate.isAfter(todayDate);
-          }).toList();
-          break;
-      }
+      // Apply timeframe filtering using service
+      final timeframePractices = rsvpService.filterPracticesByTimeframe(
+        practices: matchingPractices,
+        timeframe: _selectedTimeframe,
+        customStartDate: _customStartDate,
+        customEndDate: _customEndDate,
+        announcedCutoff: AppConstants.mockAnnouncedCutoff,
+      );
       
       // Apply future-only filter to timeframe results
       final today = DateTime.now();

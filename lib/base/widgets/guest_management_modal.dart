@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
+import '../../core/services/guest_service.dart';
 import 'dropdown_utils.dart';
 
 class GuestManagementModal extends StatefulWidget {
@@ -595,14 +596,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
 
   // Check if all guests have waivers signed (for enabling DONE button)
   bool _allGuestsHaveWaivers() {
-    if (_guestList.totalGuests == 0) return true; // No guests = valid state
-    
-    // Check all existing guests
-    for (final guest in _guestList.guests) {
-      if (!guest.waiverSigned) return false;
-    }
-    
-    return true;
+    return guestService.allGuestsHaveWaivers(_guestList.guests);
   }
 
   // Auto-scroll to bottom when form expands
@@ -622,11 +616,16 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   bool _canAddGuest(GuestType type) {
     final nameController = _nameControllers[type]!;
     final waiverSigned = _waiverStates[type] ?? false;
-    
+
     if (type == GuestType.dependent) {
+      // For dependents, check if any are selected and waiver is signed
       return _selectedDependents.isNotEmpty && waiverSigned;
     } else {
-      return nameController.text.trim().isNotEmpty && waiverSigned;
+      // For other types, use the service validation
+      return guestService.canAddGuest(
+        name: nameController.text,
+        waiverSigned: waiverSigned,
+      );
     }
   }
 
@@ -654,8 +653,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   void _validateAndShowToast(GuestType type) {
     final nameController = _nameControllers[type]!;
     final waiverSigned = _waiverStates[type] ?? false;
-    
+
     if (type == GuestType.dependent) {
+      // Special handling for dependents
       if (_selectedDependents.isEmpty && !waiverSigned) {
         _showValidationToast('Please select dependents and sign waiver');
       } else if (_selectedDependents.isEmpty) {
@@ -664,12 +664,23 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         _showValidationToast('Please sign the waiver to add dependents');
       }
     } else {
-      if (nameController.text.trim().isEmpty && !waiverSigned) {
-        _showValidationToast('Please enter name and sign waiver');
-      } else if (nameController.text.trim().isEmpty) {
-        _showValidationToast('Please enter a name for the ${type.displayName.toLowerCase()}');
-      } else if (!waiverSigned) {
-        _showValidationToast('Please sign the waiver to add ${type.displayName.toLowerCase()}');
+      // Use service for validation error message
+      final error = guestService.getGuestValidationError(
+        name: nameController.text,
+        waiverSigned: waiverSigned,
+      );
+
+      if (error != null) {
+        // Customize the error message for better UX
+        if (error.contains('name') && error.contains('waiver')) {
+          _showValidationToast('Please enter name and sign waiver');
+        } else if (error.contains('name')) {
+          _showValidationToast('Please enter a name for the ${type.displayName.toLowerCase()}');
+        } else if (error.contains('waiver')) {
+          _showValidationToast('Please sign the waiver to add ${type.displayName.toLowerCase()}');
+        } else {
+          _showValidationToast(error);
+        }
       }
     }
   }
@@ -685,9 +696,10 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       }
     }
     
-    // Check if any existing guests lack waivers
-    if (!_allGuestsHaveWaivers()) {
-      _showValidationToast('All guests must have signed waivers');
+    // Check if any existing guests lack waivers using service
+    final error = guestService.getGuestListValidationError(_guestList.guests);
+    if (error != null) {
+      _showValidationToast(error);
       return;
     }
   }

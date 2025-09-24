@@ -2,6 +2,7 @@
 library;
 
 import 'dart:async';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -91,9 +92,12 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return PhoneFrameWrapper(
-      onBackPressed: () => Navigator.of(context).pop(),
-      child: Stack(
+    // Check if we're on mobile web (real mobile browser)
+    final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
+                                  defaultTargetPlatform == TargetPlatform.android ||
+                                  MediaQuery.of(context).size.width < 600);
+
+    final scaffoldContent = Stack(
         children: [
           PopScope(
             canPop: true, // Allow system back button to work normally
@@ -352,8 +356,19 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
               ),
             ),
         ],
-      ),
-    );
+      );
+
+    // Return with or without phone frame constraints based on platform
+    if (isMobileWeb) {
+      // For mobile web, return scaffold directly without phone frame
+      return scaffoldContent;
+    } else {
+      // For desktop/browser, use phone frame simulation
+      return PhoneFrameWrapper(
+        onBackPressed: () => Navigator.of(context).pop(),
+        child: scaffoldContent,
+      );
+    }
   }
 
   Widget _buildAboutTab(BuildContext context) {

@@ -2,16 +2,17 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../constants/phone_frame_constants.dart';
 
 /// Responsive breakpoints optimized for Galaxy S23 dimensions
 class ResponsiveBreakpoints {
-  // Galaxy S23 specific dimensions
-  static const double galaxyS23Width = 393.0; // Galaxy S23 logical width
-  static const double galaxyS23Height = 851.0; // Galaxy S23 logical height
-  
+  // Galaxy S23 specific dimensions (using PhoneFrameConstants)
+  static const double galaxyS23Width = PhoneFrameConstants.phoneWidth;
+  static const double galaxyS23Height = PhoneFrameConstants.phoneHeight;
+
   // Responsive breakpoints
-  static const double mobile = 393; // Galaxy S23 width as mobile breakpoint
-  static const double smallMobile = 320; // Smaller phones
+  static const double mobile = PhoneFrameConstants.mobileBreakpoint;
+  static const double smallMobile = PhoneFrameConstants.smallMobileBreakpoint;
   static const double tablet = 768;
   static const double desktop = 1024;
   static const double largeDesktop = 1440;

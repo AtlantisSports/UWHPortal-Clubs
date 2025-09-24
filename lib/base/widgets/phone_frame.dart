@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/utils/navigation_service.dart';
+import '../../core/constants/phone_frame_constants.dart';
 
 /// Creates a realistic phone frame around the app content
 class PhoneFrame extends StatefulWidget {
@@ -155,11 +156,11 @@ class PhoneFrameState extends State<PhoneFrame> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 393, // Galaxy S23 width
-      height: 851, // Galaxy S23 height
+      width: PhoneFrameConstants.phoneWidth,
+      height: PhoneFrameConstants.phoneHeight,
       decoration: BoxDecoration(
         color: Colors.black,
-        borderRadius: BorderRadius.circular(25), // Galaxy S23 rounded corners
+        borderRadius: BorderRadius.circular(PhoneFrameConstants.phoneFrameBorderRadius),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.3),
@@ -169,7 +170,7 @@ class PhoneFrameState extends State<PhoneFrame> {
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(20), // Match Galaxy S23 inner radius
+        borderRadius: BorderRadius.circular(PhoneFrameConstants.phoneFrameInnerRadius),
         child: Stack(
           children: [
             // Main phone content
@@ -201,7 +202,7 @@ class PhoneFrameState extends State<PhoneFrame> {
 
   Widget _buildStatusBar() {
     return Container(
-      height: 44, // Standard iOS status bar height
+      height: PhoneFrameConstants.statusBarHeight,
       width: double.infinity,
       color: Colors.grey[100],
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -400,8 +401,8 @@ class PhoneFrameWrapper extends StatelessWidget {
           child: Transform.scale(
             scale: 1.0, // Fixed scale - never changes
             child: SizedBox(
-              width: 393, // Fixed Galaxy S23 width - never changes
-              height: 851, // Fixed Galaxy S23 height - never changes
+              width: PhoneFrameConstants.phoneWidth,
+              height: PhoneFrameConstants.phoneHeight,
               child: PhoneFrame(
                 onBackPressed: onBackPressed,
                 child: child,

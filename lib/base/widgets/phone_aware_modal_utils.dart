@@ -3,6 +3,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import '../../core/constants/phone_frame_constants.dart';
 
 /// Utility functions for showing modals that preserve phone frame boundaries
 /// while using standard Flutter modal APIs
@@ -36,10 +37,10 @@ class PhoneAwareModalUtils {
             children: [
               // Backdrop - only covers app content area, preserving phone frame
               Positioned(
-                left: (MediaQuery.of(context).size.width - 393) / 2, // Center to phone
-                top: (MediaQuery.of(context).size.height - 851) / 2 + 44, // Phone center + status bar
-                width: 393, // Phone width
-                height: 851 - 44 - 48, // Phone height minus status bar and nav bar
+                left: PhoneFrameConstants.getPhoneCenterX(MediaQuery.of(context).size.width),
+                top: PhoneFrameConstants.getModalBackdropTop(MediaQuery.of(context).size.height),
+                width: PhoneFrameConstants.phoneWidth,
+                height: PhoneFrameConstants.getModalBackdropHeight(),
                 child: Container(
                   color: barrierColor,
                   child: barrierDismissible
@@ -60,8 +61,8 @@ class PhoneAwareModalUtils {
                     ),
                     child: ConstrainedBox(
                       constraints: const BoxConstraints(
-                        maxWidth: 345, // Constrained to phone frame
-                        maxHeight: 500,
+                        maxWidth: PhoneFrameConstants.maxModalWidth,
+                        maxHeight: PhoneFrameConstants.maxModalHeight,
                       ),
                       child: Material(
                         borderRadius: BorderRadius.circular(12),
@@ -120,9 +121,9 @@ class PhoneAwareModalUtils {
               ),
               // Bottom sheet content - slides up from bottom of app area
               Positioned(
-                left: (MediaQuery.of(context).size.width - 393) / 2,
-                bottom: (MediaQuery.of(context).size.height - 851) / 2 + 48, // Above phone nav
-                width: 393,
+                left: PhoneFrameConstants.getPhoneCenterX(MediaQuery.of(context).size.width),
+                bottom: PhoneFrameConstants.getBottomSheetBottom(MediaQuery.of(context).size.height),
+                width: PhoneFrameConstants.phoneWidth,
                 child: SlideTransition(
                   position: Tween<Offset>(
                     begin: const Offset(0, 1),
@@ -136,7 +137,7 @@ class PhoneAwareModalUtils {
                     elevation: 8,
                     child: ConstrainedBox(
                       constraints: BoxConstraints(
-                        maxHeight: (851 - 44 - 48) * 0.75, // 75% of app content area
+                        maxHeight: PhoneFrameConstants.maxBottomSheetHeight,
                       ),
                       child: child,
                     ),

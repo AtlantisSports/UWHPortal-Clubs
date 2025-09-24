@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/providers/user_provider.dart';
@@ -21,14 +22,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Container(
-        constraints: const BoxConstraints(
-          maxWidth: 393, // Galaxy S23 width - match phone frame
-        ),
-        child: Stack(
-          children: [
-            Scaffold(
+    // Check if we're on mobile web (real mobile browser)
+    final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
+                                  defaultTargetPlatform == TargetPlatform.android ||
+                                  MediaQuery.of(context).size.width < 600);
+
+    final scaffoldContent = Stack(
+      children: [
+        Scaffold(
               backgroundColor: Colors.grey[100],
               appBar: AppBar(
                 title: const Text('Profile'),
@@ -97,13 +98,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
             ),
-            
+
             // Modal overlays using the same pattern as level filter
             _buildModalOverlays(),
           ],
+        );
+
+    // Return with or without phone frame constraints based on platform
+    if (isMobileWeb) {
+      // For mobile web, return scaffold directly without constraints
+      return scaffoldContent;
+    } else {
+      // For desktop/browser, use phone frame constraints
+      return Center(
+        child: Container(
+          constraints: const BoxConstraints(
+            maxWidth: 393, // Galaxy S23 width - match phone frame
+          ),
+          child: scaffoldContent,
         ),
-      ),
-    );
+      );
+    }
   }
 
   Widget _buildModalOverlays() {
