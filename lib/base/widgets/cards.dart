@@ -173,22 +173,29 @@ class _ClubCardState extends State<ClubCard> {
           // Recurring Weekly Schedule Dropdown
           if (widget.allPractices.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.medium),
-            RecurringPracticesWidget(
-              practices: widget.allPractices,
-              isExpanded: _isExpanded,
-              onToggle: () {
-                final wasExpanded = _isExpanded;
-                setState(() {
-                  _isExpanded = !_isExpanded;
-                });
-                
-                // Trigger scroll after animation completes when expanding
-                if (!wasExpanded && _isExpanded && widget.onRecurringPracticesExpanded != null) {
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    widget.onRecurringPracticesExpanded!();
-                  });
-                }
+            // Wrap in GestureDetector to prevent tap events from bubbling up to the card's onTap
+            GestureDetector(
+              onTap: () {
+                // Absorb tap events to prevent navigation to club detail page
+                // This empty handler prevents the tap from bubbling up to the parent card
               },
+              child: RecurringPracticesWidget(
+                practices: widget.allPractices,
+                isExpanded: _isExpanded,
+                onToggle: () {
+                  final wasExpanded = _isExpanded;
+                  setState(() {
+                    _isExpanded = !_isExpanded;
+                  });
+
+                  // Trigger scroll after animation completes when expanding
+                  if (!wasExpanded && _isExpanded && widget.onRecurringPracticesExpanded != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      widget.onRecurringPracticesExpanded!();
+                    });
+                  }
+                },
+              ),
             ),
           ],
         ],

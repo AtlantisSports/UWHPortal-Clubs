@@ -10,6 +10,29 @@ import '../../core/utils/time_utils.dart';
 import 'guest_management_modal.dart';
 import 'phone_aware_modal_utils.dart';
 
+/// Truncate tag to 4 characters (exact same as bulk RSVP)
+String truncateTag(String tag) {
+  if (tag.isEmpty) return '';
+
+  // Special mappings for common levels to fit in 4 characters
+  switch (tag.toLowerCase()) {
+    case 'high-level':
+    case 'high level':
+      return 'HIGH';
+    case 'intermediate':
+      return 'INT';
+    case 'beginner':
+      return 'BEG';
+    case 'advanced':
+      return 'ADV';
+    case 'open':
+      return 'OPEN';
+    default:
+      // Truncate to 4 characters and uppercase
+      return tag.toUpperCase().substring(0, tag.length > 4 ? 4 : tag.length);
+  }
+}
+
 /// Interactive circle-based RSVP component
 /// Clean circle design with 70px size and overlay icons for status indication
 class RSVPIconButton extends StatefulWidget {
@@ -401,7 +424,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                   ),
                   child: Text(
-                    widget.practice.tag!,
+                    truncateTag(widget.practice.tag!),
                     style: const TextStyle(
                       fontSize: 12,
                       color: Color(0xFF0284C7),
@@ -569,7 +592,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                   ),
                   child: Text(
-                    widget.practice.tag!,
+                    truncateTag(widget.practice.tag!),
                     style: const TextStyle(
                       fontSize: 12,
                       color: Color(0xFF0284C7),
@@ -774,7 +797,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                         border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                       ),
                       child: Text(
-                        widget.practice.tag!,
+                        truncateTag(widget.practice.tag!),
                         style: const TextStyle(
                           fontSize: 12,
                           color: Color(0xFF0284C7),
@@ -847,10 +870,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                               color: Color(0xFF6B7280),
                             ),
                             const SizedBox(width: 6),
-                            Expanded(
+                            // Only make the text itself clickable, not the entire expanded area
+                            IntrinsicWidth(
                               child: MouseRegion(
-                                cursor: widget.onLocationTap != null 
-                                    ? SystemMouseCursors.click 
+                                cursor: widget.onLocationTap != null
+                                    ? SystemMouseCursors.click
                                     : SystemMouseCursors.basic,
                                 child: GestureDetector(
                                   onTap: widget.onLocationTap,
@@ -858,11 +882,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                                     widget.practice.location,
                                     style: TextStyle(
                                       fontSize: 14,
-                                      color: widget.onLocationTap != null 
-                                          ? const Color(0xFF0284C7) 
+                                      color: widget.onLocationTap != null
+                                          ? const Color(0xFF0284C7)
                                           : const Color(0xFF6B7280),
-                                      decoration: widget.onLocationTap != null 
-                                          ? TextDecoration.underline 
+                                      decoration: widget.onLocationTap != null
+                                          ? TextDecoration.underline
                                           : null,
                                     ),
                                   ),
@@ -1237,11 +1261,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   String _getParticipationHeaderText(ParticipationStatus? currentParticipationStatus) {
     switch (currentParticipationStatus) {
       case ParticipationStatus.yes:
-        return 'You are going';
+        return 'Going';
       case ParticipationStatus.no:
         return 'Not going';
       case ParticipationStatus.maybe:
-        return 'Might attend';
+        return 'Maybe';
       case ParticipationStatus.blank:
         return 'Pending';
       case ParticipationStatus.attended:
@@ -1249,7 +1273,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.missed:
         return 'You did not attend';
       case null:
-        return 'Might attend';
+        return 'Maybe';
     }
   }
 

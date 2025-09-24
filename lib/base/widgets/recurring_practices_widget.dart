@@ -6,6 +6,7 @@ import '../../core/constants/app_constants.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/models/practice_recurrence.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'rsvp_components.dart';
 
 class RecurringPracticesWidget extends StatefulWidget {
   final List<PracticePattern> practices;
@@ -106,13 +107,13 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
           ),
           
           // Expanded Schedule Details
-          AnimatedContainer(
+          AnimatedSize(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeInOut,
-            height: widget.isExpanded ? null : 0,
             child: widget.isExpanded
                 ? Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       const SizedBox(height: 8),
                       ..._buildGroupedPractices(),
@@ -202,7 +203,7 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
                     border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
                   ),
                   child: Text(
-                    practice.tag!,
+                    truncateTag(practice.tag!),
                     style: const TextStyle(
                       fontSize: 10,
                       color: Color(0xFF0284C7),
