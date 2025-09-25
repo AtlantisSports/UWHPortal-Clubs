@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/services/guest_service.dart';
-import 'dropdown_utils.dart';
 
 class GuestManagementModal extends StatefulWidget {
   final PracticeGuestList initialGuests;
   final Function(PracticeGuestList) onGuestsChanged;
   final String practiceId;
-  
+
   const GuestManagementModal({
     super.key,
     required this.initialGuests,
@@ -28,18 +27,24 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   final Map<GuestType, bool> _expandedSections = {};
   final Map<GuestType, TextEditingController> _nameControllers = {};
   final Map<GuestType, bool> _waiverStates = {};
-  List<String> _selectedDependents = []; // For multiple dependent selections
+  final List<String> _selectedDependents = []; // For multiple dependent selections
+  final List<String> _availableDependents = [
+    'Bart Simpson',
+    'Lisa Simpson',
+    'Maggie Simpson',
+  ];
+
   final ScrollController _scrollController = ScrollController(); // Add scroll controller
-  
+
   // Toast state for validation feedback
   bool _showToast = false;
   String _toastMessage = '';
-  
+
   @override
   void initState() {
     super.initState();
     _guestList = widget.initialGuests;
-    
+
     // Initialize controllers for each guest type
     for (final type in GuestType.values) {
       _nameControllers[type] = TextEditingController();
@@ -47,7 +52,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       _expandedSections[type] = false;
     }
   }
-  
+
   @override
   void dispose() {
     _scrollController.dispose(); // Dispose scroll controller
@@ -62,129 +67,159 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     return Stack(
       children: [
         Container(
-          width: 345,
-          constraints: const BoxConstraints(maxHeight: 500),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-          ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Header
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 20, 16, 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Manage Guests',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                ),
-              ],
-            ),
-          ),
-          
-          // Content
-          Flexible(
-            child: SingleChildScrollView(
-              controller: _scrollController, // Add scroll controller
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Guest summary
-                  if (_guestList.totalGuests > 0) ...[
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.group, color: AppColors.primary, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Bringing ${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'}',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ],
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+          child: Column(
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Manage Guests',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close),
+                      color: AppColors.textSecondary,
+                    ),
                   ],
-                  
-                  // Guest type sections - show dependents at bottom
-                  for (final type in GuestType.values.where((t) => t != GuestType.dependent))
-                    _buildGuestTypeSection(type),
-                  // Dependents section at the bottom
-                  _buildGuestTypeSection(GuestType.dependent),
-                  
-                  // Bottom padding to ensure buttons are always accessible
-                  const SizedBox(height: 80),
-                ],
+                ),
               ),
-            ),
-          ),
-          
-          // Action buttons
-          Container(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+
+              // Divider
+              Divider(
+                height: 1,
+                color: Colors.grey[300],
+              ),
+
+              // Content - Expanded to fill space like filter modal
+              Expanded(
+                child: SingleChildScrollView(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Guest summary
+                      if (_guestList.totalGuests > 0) ...[
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.group, color: AppColors.primary, size: 16),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Bringing ${_guestList.totalGuests} guest${_guestList.totalGuests == 1 ? '' : 's'}',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Guest type sections - show dependents at bottom
+                      for (final type in GuestType.values.where((t) => t != GuestType.dependent))
+                        _buildGuestTypeSection(type),
+                      // Dependents section at the bottom
+                      _buildGuestTypeSection(GuestType.dependent),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: !_canComplete() ? () {
-                      // Show validation toast when button is disabled but user taps
-                      _validateAndShowDoneToast();
-                    } : null,
+              ),
+
+              // Bottom separator and actions styled like filter modal
+              Divider(
+                height: 1,
+                color: Colors.grey[300],
+                thickness: 1,
+              ),
+              const SizedBox(height: 8),
+
+              Row(
+                children: [
+                  // Cancel button
+                  Expanded(
                     child: ElevatedButton(
-                      onPressed: _canComplete() ? () {
-                        widget.onGuestsChanged(_guestList);
-                        Navigator.of(context).pop();
-                      } : null, // null = disabled styling
+                      onPressed: () => Navigator.of(context).pop(),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
-                        disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.4), // Disabled blue
-                        disabledForegroundColor: Colors.white.withValues(alpha: 0.7),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        elevation: 0,
                       ),
-                      child: const Text('Done'),
+                      child: const Text(
+                        'CANCEL',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
-                ),
-              ],
-            ),
+
+                  const SizedBox(width: 16),
+
+                  // Done button
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: !_canComplete() ? () {
+                        // Show validation toast when button is disabled but user taps
+                        _validateAndShowDoneToast();
+                      } : null,
+                      child: ElevatedButton(
+                        onPressed: _canComplete() ? () {
+                          widget.onGuestsChanged(_guestList);
+                          Navigator.of(context).pop();
+                        } : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: _canComplete() ? AppColors.primary : Colors.grey.shade400,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          'DONE',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _canComplete() ? Colors.white : Colors.grey.shade600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-        ],
-      ),
         ),
-        
+
         // Toast overlay (mobile-only) - positioned at top
         if (_showToast && MediaQuery.of(context).size.width <= 768)
           Positioned(
-            top: 20,
+            top: MediaQuery.of(context).padding.top + 12,
             left: 20,
             right: 20,
             child: Container(
@@ -214,17 +249,17 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       ],
     );
   }
-  
+
   Widget _buildGuestTypeSection(GuestType type) {
     final guests = _guestList.getGuestsByType(type);
     final isExpanded = _expandedSections[type] ?? false;
-    
+
     // Debug logging
     if (type == GuestType.dependent) {
       // TODO: Replace with proper logging
       // print('Building ${type.displayName} section with ${guests.length} guests: ${guests.map((g) => g.name).toList()}');
     }
-    
+
     return Column(
       children: [
         // Header with + button
@@ -297,7 +332,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
             ],
           ),
         ),
-        
+
         // Existing guests list
         if (guests.isNotEmpty)
           Container(
@@ -306,7 +341,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               children: guests.map((guest) => _buildGuestItem(guest)).toList(),
             ),
           ),
-        
+
         // Expanded form
         if (isExpanded)
           Container(
@@ -322,7 +357,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       ],
     );
   }
-  
+
   Widget _buildGuestItem(Guest guest) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
@@ -393,23 +428,43 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       ),
     );
   }
-  
+
   Widget _buildGuestForm(GuestType type) {
     final nameController = _nameControllers[type]!;
     final waiverSigned = _waiverStates[type] ?? false;
-    
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Name field - use dependent selector for dependents, text field for others
         if (type == GuestType.dependent)
-          DropdownUtils.createDependentSelector(
-            selectedDependents: _selectedDependents,
-            onDependentsChanged: (selected) {
-              setState(() {
-                _selectedDependents = selected;
-              });
-            },
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Dependents',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              ..._availableDependents.map((name) => CheckboxListTile(
+                    value: _selectedDependents.contains(name),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked ?? false) {
+                          if (!_selectedDependents.contains(name)) {
+                            _selectedDependents.add(name);
+                          }
+                        } else {
+                          _selectedDependents.remove(name);
+                        }
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(name),
+                  )),
+            ],
           )
         else
           TextField(
@@ -420,10 +475,14 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
             textCapitalization: TextCapitalization.words,
+            onChanged: (_) {
+              // Rebuild to re-evaluate _canAddGuest so Add button enables as soon as name + waiver are set
+              setState(() {});
+            },
           ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Waiver checkbox (not for club members)
         if (type != GuestType.clubMember)
           Row(
@@ -443,9 +502,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
               ),
             ],
           ),
-        
+
         const SizedBox(height: 12),
-        
+
         // Add button
         Row(
           children: [
@@ -483,35 +542,35 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       ],
     );
   }
-  
+
   void _toggleSection(GuestType type) {
     setState(() {
       final wasExpanded = _expandedSections[type] ?? false;
       _expandedSections[type] = !wasExpanded;
-      
+
       // Close other sections
       for (final otherType in GuestType.values) {
         if (otherType != type) {
           _expandedSections[otherType] = false;
         }
       }
-      
+
       // Auto-scroll to bottom when expanding (not when collapsing)
       if (!wasExpanded && _expandedSections[type]!) {
         _autoScrollToBottom();
       }
     });
   }
-  
+
   void _addGuest(GuestType type) {
     final nameController = _nameControllers[type]!;
-    
+
     if (type == GuestType.dependent) {
       // Handle multiple dependent selections
       if (_selectedDependents.isEmpty) return;
-      
+
       final waiverSigned = _waiverStates[type] ?? false;
-      
+
       // Add each selected dependent as a separate guest
       for (final dependentName in _selectedDependents) {
         final guestId = '${widget.practiceId}_${type.name}_${dependentName}_${DateTime.now().millisecondsSinceEpoch}';
@@ -524,7 +583,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         // TODO: Replace with proper logging
         // print('Added dependent guest: ${guest.name}, ID: ${guest.id}, Type: ${guest.type}');
       }
-      
+
       setState(() {
         _waiverStates[type] = false;
         _expandedSections[type] = false;
@@ -537,9 +596,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       // Handle single guest addition for other types
       final name = nameController.text.trim();
       if (name.isEmpty) return;
-      
+
       final guestId = '${widget.practiceId}_${type.name}_${DateTime.now().millisecondsSinceEpoch}';
-      
+
       Guest guest;
       switch (type) {
         case GuestType.newPlayer:
@@ -567,7 +626,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           // This case is handled above
           return;
       }
-      
+
       setState(() {
         _guestList = _guestList.addGuest(guest);
         nameController.clear();
@@ -576,13 +635,13 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       });
     }
   }
-  
+
   void _removeGuest(String guestId) {
     setState(() {
       _guestList = _guestList.removeGuest(guestId);
     });
   }
-  
+
   void _cancelForm(GuestType type) {
     setState(() {
       _nameControllers[type]!.clear();
@@ -620,8 +679,11 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     if (type == GuestType.dependent) {
       // For dependents, check if any are selected and waiver is signed
       return _selectedDependents.isNotEmpty && waiverSigned;
+    } else if (type == GuestType.clubMember) {
+      // Club members do not require a waiver toggle in the UI; only require a valid name
+      return guestService.isValidGuestName(nameController.text);
     } else {
-      // For other types, use the service validation
+      // For other types, require name + waiver
       return guestService.canAddGuest(
         name: nameController.text,
         waiverSigned: waiverSigned,
@@ -637,7 +699,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         _toastMessage = message;
         _showToast = true;
       });
-      
+
       // Hide toast after 3 seconds
       Future.delayed(const Duration(seconds: 3), () {
         if (mounted) {
@@ -695,7 +757,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         return;
       }
     }
-    
+
     // Check if any existing guests lack waivers using service
     final error = guestService.getGuestListValidationError(_guestList.guests);
     if (error != null) {
@@ -714,7 +776,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         return false;
       }
     }
-    
+
     // All existing guests must have waivers signed
     return _allGuestsHaveWaivers();
   }

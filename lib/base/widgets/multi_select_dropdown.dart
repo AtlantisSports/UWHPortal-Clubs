@@ -248,7 +248,7 @@ class _MultiSelectDropdownState extends State<MultiSelectDropdown> {
                                 setOverlayState(() {}); // Rebuild overlay
                               },
                               child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                                 child: Row(
                                   children: [
                                     Checkbox(
@@ -258,16 +258,18 @@ class _MultiSelectDropdownState extends State<MultiSelectDropdown> {
                                         setOverlayState(() {}); // Rebuild overlay
                                       },
                                       activeColor: const Color(0xFF0284C7),
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                      visualDensity: const VisualDensity(horizontal: -3, vertical: -3),
                                     ),
-                                    const SizedBox(width: 8),
+                                    const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(
                                         item,
                                         style: TextStyle(
                                           fontSize: 14,
                                           color: const Color(0xFF374151),
-                                          fontWeight: hasSpecialOption && index == 0 
-                                              ? FontWeight.w600 
+                                          fontWeight: hasSpecialOption && index == 0
+                                              ? FontWeight.w600
                                               : FontWeight.normal,
                                         ),
                                       ),

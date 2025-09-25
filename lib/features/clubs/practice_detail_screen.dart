@@ -94,8 +94,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
   Widget build(BuildContext context) {
     // Check if we're on mobile web (real mobile browser)
     final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
-                                  defaultTargetPlatform == TargetPlatform.android ||
-                                  MediaQuery.of(context).size.width < 600);
+                                  defaultTargetPlatform == TargetPlatform.android);
 
     final scaffoldContent = Stack(
         children: [
@@ -303,10 +302,10 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
             ), // Close Scaffold
           ), // Close DefaultTabController
         ), // Close PopScope
-          // Custom toast positioned over the content
+          // Custom toast positioned over the content (top of screen, over AppBar)
           if (_showToast)
             Positioned(
-              top: kToolbarHeight + 48, // Position to cover the tab bar area
+              top: MediaQuery.of(context).padding.top + 12,
               left: 16,
               right: 16,
               child: Material(

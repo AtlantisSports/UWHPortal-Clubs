@@ -20,6 +20,8 @@ import '../../base/widgets/rsvp_components.dart';
 import '../../base/widgets/calendar_widget.dart';
 import '../../base/widgets/practice_filter_modal.dart';
 import '../../base/widgets/recurring_practices_widget.dart';
+import '../../base/widgets/phone_aware_modal_utils.dart';
+
 import '../bulk_rsvp/bulk_rsvp_screen.dart';
 import 'practice_detail_screen.dart';
 
@@ -186,9 +188,17 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   }
 
   void _showPracticeFilterModal() {
-    setState(() {
-      _isShowingPracticeFilterModal = true;
-    });
+    PhoneAwareModalUtils.showPhoneAwareBottomSheet(
+      context: context,
+      child: PracticeFilterModal(
+        availableLevels: _getAvailableLevels(),
+        availableLocations: _getAvailableLocations(),
+        club: widget.club,
+        onFiltersChanged: () {
+          Navigator.of(context).pop();
+        },
+      ),
+    );
   }
 
   void _showCustomToast(String message, Color color, IconData icon) {
@@ -633,7 +643,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   Widget _buildModalOverlays() {
     return Stack(
       children: [
-        // Level Filter Modal
+        // Practice Filter Modal
         if (_isShowingPracticeFilterModal) ...[
           _buildModalBackdrop(() => setState(() => _isShowingPracticeFilterModal = false)),
           _buildPracticeFilterModal(),

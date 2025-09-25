@@ -296,7 +296,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           // Custom toast positioned over the tab area
           if (_showToast)
             Positioned(
-              top: kToolbarHeight + 48, // Position to cover the tab bar area
+              top: MediaQuery.of(context).padding.top + 12,
               left: 16,
               right: 16,
               child: Material(

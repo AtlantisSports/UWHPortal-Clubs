@@ -1168,7 +1168,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
   
   void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
-    PhoneAwareModalUtils.showPhoneAwareDialog(
+    PhoneAwareModalUtils.showPhoneAwareBottomSheet(
       context: context,
       child: GuestManagementModal(
         initialGuests: guestList,

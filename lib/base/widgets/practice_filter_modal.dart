@@ -49,7 +49,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
     setState(() {
       _showToast = true;
     });
-    
+
     // Hide toast after 3 seconds
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted) {
@@ -87,26 +87,15 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 400, // Fixed height to work well as bottom sheet
-      padding: const EdgeInsets.all(20),
+      // Removed fixed height so the sheet can expand further; constrained by the sheet utility
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Stack(
         children: [
           Column(
             children: [
-          // Modal handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8), // Reduced bottom padding by 50% (from 16 to 8)
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 8), // Reduced top whitespace by ~50%
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
@@ -126,57 +115,25 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
               ],
             ),
           ),
-          
+
           // Divider
           Divider(
             height: 1,
             color: Colors.grey[300],
           ),
-          
-          // Filter options - using Expanded to fill remaining space
-          Expanded(
+
+          // Filter options - allow content to size naturally up to max, then scroll
+          Flexible(fit: FlexFit.loose,
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(12), // Reduced from 16 to 12
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Two-column layout for Level and Location filters
-                  Row(
+                  IntrinsicHeight(child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Level column (left)
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            // Level header
-                            const Text(
-                              'Level',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            // Level checkboxes
-                            ...widget.availableLevels.map((level) => _buildLevelOption(level)),
-                          ],
-                        ),
-                      ),
-                      
-                      const SizedBox(width: 8), // Reduced spacing before separator
-                      
-                      // Vertical separator
-                      Container(
-                        width: 1,
-                        height: 250, // Extended height to go past lowest filter option
-                        color: Colors.grey[300],
-                      ),
-                      
-                      const SizedBox(width: 8), // Reduced spacing after separator
-                      
-                      // Location column (right)
+                      // Location column (left)
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,84 +153,119 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                           ],
                         ),
                       ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 8), // Reduced spacing by 50% (from 16 to 8)
-                  
-                  // Horizontal separator
-                  Divider(
-                    height: 1,
-                    color: Colors.grey[300],
-                    thickness: 1,
-                  ),
-                  
-                  const SizedBox(height: 16), // Spacing after separator
-                  
-                  // Button row with Reset and Apply side by side
-                  Row(
-                    children: [
-                      // Reset button (left side)
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: _resetFilters,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14), // Reduced from 16 to 14
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: const Text(
-                            'RESET FILTERS',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
+
+                      const SizedBox(width: 8), // Reduced spacing before separator
+
+                      // Vertical separator
+                      VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        color: Colors.grey[300],
                       ),
-                      
-                      const SizedBox(width: 16), // Spacing between buttons
-                      
-                      // Apply button (right side)
+
+                      const SizedBox(width: 8), // Reduced spacing after separator
+
+                      // Level column (right)
                       Expanded(
-                        child: ElevatedButton(
-                          onPressed: _hasMatchingPractices() ? _applyFilters : _showErrorToast,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _hasMatchingPractices() ? AppColors.primary : Colors.grey.shade400,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 14), // Reduced from 16 to 14
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // Level header
+                            const Text(
+                              'Level',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            'APPLY FILTERS',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: _hasMatchingPractices() ? Colors.white : Colors.grey.shade600,
-                            ),
-                          ),
+                            const SizedBox(height: 8),
+                            // Level checkboxes
+                            ...widget.availableLevels.map((level) => _buildLevelOption(level)),
+                          ],
                         ),
                       ),
                     ],
-                  ),
+                  )),
+
+
                 ],
               ),
             ),
           ),
+
+          const SizedBox(height: 4),
+
+          // Horizontal separator
+          Divider(
+            height: 1,
+            color: Colors.grey[300],
+            thickness: 1,
+          ),
+
+          const SizedBox(height: 8),
+
+          // Button row with Reset and Apply side by side (fixed outside scroll)
+          Row(
+            children: [
+              // Reset button (left side)
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _resetFilters,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: const Text(
+                    'RESET FILTERS',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 16),
+
+              // Apply button (right side)
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: _hasMatchingPractices() ? _applyFilters : _showErrorToast,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _hasMatchingPractices() ? AppColors.primary : Colors.grey.shade400,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    'APPLY FILTERS',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: _hasMatchingPractices() ? Colors.white : Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
           ],
         ),
-      
+
       // Custom toast overlay
       if (_showToast)
         Positioned(
-          top: 20,
+          top: MediaQuery.of(context).padding.top + 12,
           left: 16,
           right: 16,
           child: Container(
@@ -306,7 +298,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
 
   Widget _buildLevelOption(String level) {
     final isSelected = _tempSelectedLevels.contains(level);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12), // Reduced from 16 to 12
       child: Row(
@@ -330,6 +322,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
                   _tempSelectedLevels.remove(level);
                 }
               });
+
             },
             activeColor: AppColors.primary,
             shape: RoundedRectangleBorder(
@@ -343,7 +336,7 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
 
   Widget _buildLocationOption(String location) {
     final isSelected = _tempSelectedLocations.contains(location);
-    
+
     return Container(
       margin: const EdgeInsets.only(bottom: 12), // Reduced from 16 to 12
       child: Row(

@@ -30,8 +30,7 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
   Widget build(BuildContext context) {
     // Match platform handling used by other screens
     final isMobileWeb = kIsWeb && (defaultTargetPlatform == TargetPlatform.iOS ||
-                                   defaultTargetPlatform == TargetPlatform.android ||
-                                   MediaQuery.of(context).size.width < 600);
+                                   defaultTargetPlatform == TargetPlatform.android);
 
     final scaffoldContent = PopScope(
       canPop: true, // Allow system back button to work normally

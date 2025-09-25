@@ -1254,6 +1254,43 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 ],
               ),
 
+
+            // Guest list below checkbox (match RSVP cards display)
+            if (_bulkChoice == BulkChoice.yes && _bulkBringGuests && _bulkGuestList.totalGuests > 0) ...[
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: Colors.grey[200]!),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ..._bulkGuestList.guests.map((guest) => Container(
+                          margin: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              const SizedBox(width: 16), // Indent guest names
+                              Expanded(
+                                child: Text(
+                                  guest.name,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    color: Color(0xFF374151),
+                                  ),
+                                ),
+                              ),
+                              GuestTypeTag(guestType: guest.type),
+                            ],
+                          ),
+                        )),
+                  ],
+                ),
+              ),
+            ],
+
             const SizedBox(height: 8),
 
             // Bottom actions: Cancel and Apply (match Bulk RSVP style)
@@ -1374,7 +1411,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   void _showBulkGuestModal() {
-    PhoneAwareModalUtils.showPhoneAwareDialog(
+    PhoneAwareModalUtils.showPhoneAwareBottomSheet(
       context: context,
       child: GuestManagementModal(
         initialGuests: _bulkGuestList,
@@ -1504,9 +1541,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.all(Radius.circular(20)), // Round all corners
+        decoration: BoxDecoration(
+          color: Color.alphaBlend(
+            AppColors.primary.withValues(alpha: 0.06),
+            Theme.of(context).colorScheme.surface,
+          ),
+          borderRadius: const BorderRadius.all(Radius.circular(20)), // Round all corners
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

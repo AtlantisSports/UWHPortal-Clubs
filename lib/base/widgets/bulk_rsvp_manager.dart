@@ -349,10 +349,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             ),
           ),
         ),
-        // Custom Toast
+        // Custom Toast (top of visible screen, just below AppBar)
         if (_showToast)
           Positioned(
-            top: kToolbarHeight + 48,
+            top: MediaQuery.of(context).padding.top + 12,
             left: 16,
             right: 16,
             child: Material(
@@ -834,19 +834,30 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             ),
           ),
           const SizedBox(height: 16),
-          DropdownUtils.createNoneFilterDropdown(
-            label: 'Dependents',
-            items: DependentConstants.availableDependents,
-            selectedItems: _selectedDependents,
-            onSelectionChanged: (selected) {
-              setState(() {
-                _selectedDependents = selected;
-                // Automatically set _includeDependents based on selection
-                _includeDependents = selected.isNotEmpty && !selected.contains('None selected');
-              });
-            },
-            noneOptionText: 'None selected',
-            placeholder: 'Select dependents for bulk actions',
+          // Checkbox list of dependents (no dropdown)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              ...DependentConstants.availableDependents.map((name) => CheckboxListTile(
+                    value: _selectedDependents.contains(name),
+                    onChanged: (checked) {
+                      setState(() {
+                        if (checked ?? false) {
+                          if (!_selectedDependents.contains(name)) {
+                            _selectedDependents.add(name);
+                          }
+                        } else {
+                          _selectedDependents.remove(name);
+                        }
+                        _includeDependents = _selectedDependents.isNotEmpty;
+                      });
+                    },
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    title: Text(name),
+                  )),
+            ],
           ),
         ],
       ),
@@ -1255,20 +1266,19 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   /// Show helpful toast when user clicks inactive Apply button
   void _showInactiveApplyMessage() {
     String message;
-    
-    if (_selectedPracticeIds.isEmpty && _selectedRSVPChoice == null) {
-      message = 'Please select practices and choose YES or NO to apply bulk RSVP';
-    } else if (_selectedPracticeIds.isEmpty) {
-      message = 'Please select at least one practice to apply bulk RSVP';
+
+    if (_selectedRSVPChoice == null && _selectedPracticeIds.isEmpty) {
+      message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
     } else if (_selectedRSVPChoice == null) {
-      message = 'Please choose YES or NO to apply bulk RSVP';
+      message = 'Please choose an RSVP option to apply Bulk RSVP';
     } else {
-      message = 'Unable to apply bulk RSVP at this time';
+      // Practices not selected but RSVP chosen — use unified message
+      message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
     }
-    
+
     _showCustomToast(
       message,
-      const Color(0xFF0284C7), // Blue color as requested
+      const Color(0xFF0284C7), // Blue color
       Icons.info_outline,
     );
   }
@@ -1413,8 +1423,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         
         _showCustomToast(
           message,
-          AppColors.success, // Green for success
-          Icons.check,
+          _selectedRSVPChoice == ParticipationStatus.yes ? AppColors.success : AppColors.error,
+          _selectedRSVPChoice == ParticipationStatus.yes ? Icons.check : Icons.cancel,
         );
         
         // Reset the form after successful operation but keep window open
@@ -1424,7 +1434,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _selectedTimeframe = 'only_announced';
           _customStartDate = null;
           _customEndDate = null;
-          _selectedDependents = ['None selected']; // Reset to "None selected" state
+          _selectedDependents = []; // Reset to empty selection
           _includeDependents = false; // Reset include dependents checkbox
           _selectedLocations.clear(); // Clear location filter
           _selectedLevels.clear(); // Clear level filter
