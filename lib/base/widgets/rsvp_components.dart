@@ -194,43 +194,49 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
 class RSVPStatusDisplay extends StatelessWidget {
   final ParticipationStatus status;
   final double size;
-  
+  final bool showText;
+
   const RSVPStatusDisplay({
     super.key,
     required this.status,
     this.size = 24.0,
+    this.showText = true,
   });
-  
+
   @override
   Widget build(BuildContext context) {
+    final iconWidget = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: status.color,
+          width: 2,
+        ),
+        color: status == ParticipationStatus.blank
+          ? Colors.transparent
+          : status.color.withValues(alpha: 0.1),
+      ),
+      child: status == ParticipationStatus.blank
+          ? null
+          : Icon(
+              status == ParticipationStatus.maybe
+                  ? Icons.question_mark  // Plain question mark for maybe option
+                  : status.overlayIcon,
+              size: status == ParticipationStatus.maybe
+                  ? size * 0.7  // Smaller question mark
+                  : (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
+              color: status.color,
+            ),
+    );
+
+    if (!showText) return iconWidget;
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: status.color,
-              width: 2,
-            ),
-            color: status == ParticipationStatus.blank 
-              ? Colors.transparent 
-              : status.color.withValues(alpha: 0.1),
-          ),
-          child: status == ParticipationStatus.blank
-              ? null
-              : Icon(
-                  status == ParticipationStatus.maybe
-                      ? Icons.question_mark  // Plain question mark for maybe option
-                      : status.overlayIcon,
-                  size: status == ParticipationStatus.maybe 
-                      ? size * 0.7  // Smaller question mark
-                      : (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
-                  color: status.color,
-                ),
-        ),
+        iconWidget,
         const SizedBox(width: 8),
         Text(
           status.displayText,

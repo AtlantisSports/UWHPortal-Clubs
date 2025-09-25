@@ -11,7 +11,7 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/providers/navigation_provider.dart';
-import '../../base/widgets/phone_frame.dart';
+
 import '../../base/widgets/rsvp_components.dart';
 import 'club_detail_screen.dart';
 
@@ -114,12 +114,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
               // Navigate to Club Details for hierarchical navigation
               Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
-                  builder: (context) => PhoneFrameWrapper(
-                    onBackPressed: () => Navigator.of(context).pop(),
-                    child: ClubDetailScreen(
-                      club: widget.club,
-                      currentUserId: widget.currentUserId,
-                    ),
+                  builder: (context) => ClubDetailScreen(
+                    club: widget.club,
+                    currentUserId: widget.currentUserId,
                   ),
                 ),
               );
@@ -363,10 +360,12 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> {
       // For mobile web, return scaffold directly without phone frame
       return scaffoldContent;
     } else {
-      // For desktop/browser, use phone frame simulation
-      return PhoneFrameWrapper(
-        onBackPressed: () => Navigator.of(context).pop(),
-        child: scaffoldContent,
+      // For desktop/browser, constrain width to match phone width
+      return Center(
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 393),
+          child: scaffoldContent,
+        ),
       );
     }
   }

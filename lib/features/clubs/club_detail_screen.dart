@@ -783,6 +783,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                   onPracticeSelected: _handlePracticeSelected,
                   participationProvider: participationProvider,
                   onShowLevelFilter: _showPracticeFilterModal,
+                  onAutoScrollTabBarToTop: _autoScrollToTabsPosition,
                 );
               },
             ),

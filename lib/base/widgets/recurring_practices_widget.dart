@@ -237,9 +237,9 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
                 children: [
                   Expanded(
                     child: Text(
-                      isDescriptionExpanded 
-                          ? practice.description 
-                          : '${practice.description.substring(0, practice.description.length.clamp(0, 45))}...',
+                      isDescriptionExpanded
+                          ? practice.description
+                          : '${practice.description.substring(0, practice.description.length.clamp(0, 40))}...',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary.withValues(alpha: 0.8),
@@ -338,7 +338,7 @@ class _RecurringPracticesWidgetState extends State<RecurringPracticesWidget> {
   }
 
   bool _shouldTruncateDescription(String description) {
-    return description.length > 45;
+    return description.length > 40;
   }
 
   /// Format next occurrence for display
