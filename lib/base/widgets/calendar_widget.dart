@@ -82,6 +82,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   bool _selectionMode = false;
   final Set<String> _selectedPracticeIds = <String>{};
 
+  // Tracks if the per-date practice picker dialog is currently open
+  bool _isPracticePickerOpen = false;
+
   // Bulk controls state
   BulkChoice _bulkChoice = BulkChoice.none;
   bool _bulkBringGuests = false; // UI affordance; final bringGuest depends on merged guest list
@@ -90,6 +93,62 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   String _toastMessage = '';
   Color _toastColor = AppColors.info;
   IconData? _toastIcon;
+  OverlayEntry? _toastOverlay;
+
+  void _showTopScreenToast(String message, Color color, IconData icon) {
+    // Remove any existing toast overlay
+    _toastOverlay?.remove();
+    _toastOverlay = null;
+
+    final overlay = Overlay.of(context);
+
+    _toastOverlay = OverlayEntry(
+      builder: (context) {
+        final top = MediaQuery.of(context).padding.top + 12;
+        return Positioned(
+          top: top,
+          left: 16,
+          right: 16,
+          child: Material(
+            elevation: 6,
+            borderRadius: BorderRadius.circular(8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(icon, color: Colors.white, size: 20),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    overlay.insert(_toastOverlay!);
+
+    // Auto-remove after 3 seconds
+    Timer(const Duration(seconds: 3), () {
+      _toastOverlay?.remove();
+      _toastOverlay = null;
+    });
+  }
+
 
   void _showCustomToast(String message, Color color, IconData icon) {
     setState(() {
@@ -199,8 +258,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         );
       },
     );
-    final overlay = Overlay.of(context, rootOverlay: true);
-    overlay.insert(_selectionOverlay!);
+    final overlayState = Navigator.of(context).overlay;
+    overlayState?.insert(_selectionOverlay!);
   }
 
   void _removeSelectionOverlay() {
@@ -804,6 +863,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     // Load with no option selected initially
     final tempSelected = <String>{};
     // Per-row description expansion state within the picker
+    // Mark that the per-date practice picker is open so we can close it from the top overlay
+    if (mounted) {
+      setState(() {
+        _isPracticePickerOpen = true;
+      });
+    }
+
     final Map<String, bool> expandedDescriptions = <String, bool>{};
 
 
@@ -851,8 +917,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           final bool isSelected = tempSelected.contains(p.id);
                           final bool isExpanded = expandedDescriptions[p.id] ?? false;
                           final String fullDesc = p.description;
-                          final String firstLine = fullDesc.split('\n').first;
-                          final String preview = firstLine.length > 120 ? '${firstLine.substring(0, 120)}…' : firstLine;
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
                             margin: const EdgeInsets.symmetric(vertical: 2),
@@ -933,7 +997,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                         const SizedBox(width: 8),
                                         Expanded(
                                           child: Text(
-                                            isExpanded ? fullDesc : preview,
+                                            fullDesc,
+                                            maxLines: isExpanded ? null : 1,
+                                            overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                                             style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
                                           ),
                                         ),
@@ -961,8 +1027,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           final ps = provider?.getParticipationStatus(p.id) ?? ParticipationStatus.blank;
                           final bool isExpanded = expandedDescriptions[p.id] ?? false;
                           final String fullDesc = p.description;
-                          final String firstLine = fullDesc.split('\n').first;
-                          final String preview = firstLine.length > 120 ? '${firstLine.substring(0, 120)}…' : firstLine;
                           return Opacity(
                             opacity: 0.6,
                             child: Container(
@@ -1023,7 +1087,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                           const SizedBox(width: 8),
                                           Expanded(
                                             child: Text(
-                                              isExpanded ? fullDesc : preview,
+                                              fullDesc,
+                                              maxLines: isExpanded ? null : 1,
+                                              overflow: isExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
                                               style: const TextStyle(fontSize: 13, color: Color(0xFF374151)),
                                             ),
                                           ),
@@ -1072,7 +1138,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           );
         },
       ),
-    );
+    ).whenComplete(() {
+      if (mounted) {
+        setState(() {
+          _isPracticePickerOpen = false;
+        });
+      }
+    });
   }
 
   Widget _buildTopSelectionBar() {
@@ -1105,43 +1177,44 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             ),
             const SizedBox(height: 8),
 
-            // Yes / No / CLEAR ALL row (equally spaced and centered)
+            // Center YES/NO in leftover space, with CLEAR ALL snug on the right
             Row(
               children: [
+                // Left: expanded area where the two buttons are centered as a pair
                 Expanded(
                   child: Center(
-                    child: _buildOverlayRSVPButton(ParticipationStatus.yes, yesSelected),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildOverlayRSVPButton(ParticipationStatus.yes, yesSelected),
+                        const SizedBox(width: 24),
+                        _buildOverlayRSVPButton(ParticipationStatus.no, noSelected),
+                      ],
+                    ),
                   ),
                 ),
-                Expanded(
-                  child: Center(
-                    child: _buildOverlayRSVPButton(ParticipationStatus.no, noSelected),
+                const SizedBox(width: 12),
+                // Right: CLEAR ALL button with intrinsic width
+                OutlinedButton(
+                  onPressed: () {
+                    setState(() {
+                      _selectedPracticeIds.clear();
+                      _bulkChoice = BulkChoice.none;
+                      _bulkBringGuests = false;
+                      _bulkGuestList = const PracticeGuestList();
+                    });
+                    _updateSelectionOverlay();
+                  },
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE5E7EB)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                   ),
-                ),
-                Expanded(
-                  child: Center(
-                    child: OutlinedButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedPracticeIds.clear();
-                          _bulkChoice = BulkChoice.none;
-                          _bulkBringGuests = false;
-                          _bulkGuestList = const PracticeGuestList();
-                        });
-                        _updateSelectionOverlay();
-                      },
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(color: Color(0xFFE5E7EB)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                      ),
-                      child: const Text(
-                        'CLEAR ALL',
-                        style: TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  child: const Text(
+                    'CLEAR ALL',
+                    style: TextStyle(
+                      color: Color(0xFF6B7280),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
@@ -1188,7 +1261,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               children: [
                 Expanded(
                   child: OutlinedButton(
-                    onPressed: _exitSelectionMode,
+                    onPressed: () {
+                      // If the per-date practice picker is open, close it first
+                      if (_isPracticePickerOpen) {
+                        Navigator.of(context).maybePop();
+                      }
+                      _exitSelectionMode();
+                    },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       side: const BorderSide(color: Color(0xFFE5E7EB)),
@@ -1210,7 +1289,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         ? null
                         : () {
                             _showCustomToast(
-                              'Choose Yes or No to apply RSVP',
+                              'Please choose an RSVP option to apply',
                               AppColors.primary,
                               Icons.info_outline,
                             );
@@ -1312,7 +1391,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   Future<void> _applyBulk() async {
     if (_bulkChoice == BulkChoice.none) {
       _showCustomToast(
-        'Choose Yes or No to apply RSVP',
+        'Please choose an RSVP option to apply',
         AppColors.primary,
         Icons.info_outline,
       );
@@ -1376,7 +1455,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       if (!mounted) return;
 
 
-      _showCustomToast(
+      _showTopScreenToast(
         '${status == ParticipationStatus.yes ? 'Yes' : 'No'} applied to ${practiceIds.length} practice(s)',
         status == ParticipationStatus.yes ? AppColors.success : AppColors.error,
         status == ParticipationStatus.yes ? Icons.check_circle : Icons.cancel,

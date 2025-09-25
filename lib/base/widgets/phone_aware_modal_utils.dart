@@ -26,6 +26,7 @@ class PhoneAwareModalUtils {
       barrierDismissible: barrierDismissible,
       barrierLabel: 'Modal',
       barrierColor: Colors.transparent, // We handle backdrop ourselves
+      useRootNavigator: false,
       pageBuilder: (context, animation, secondaryAnimation) {
         return MediaQuery.removePadding(
           context: context,
@@ -94,6 +95,7 @@ class PhoneAwareModalUtils {
       barrierDismissible: barrierDismissible,
       barrierLabel: 'Bottom Sheet',
       barrierColor: Colors.transparent,
+      useRootNavigator: false,
       pageBuilder: (context, animation, secondaryAnimation) {
         return MediaQuery.removePadding(
           context: context,
