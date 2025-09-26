@@ -18,26 +18,20 @@ import '../../base/widgets/guest_management_modal.dart';
 import 'dart:async';
 
 
-enum PracticeStatus {
-  attended,
-  notAttended,
-  rsvpYes,
-  rsvpMaybe,
-  rsvpNo,
-  noRsvp,
-}
 enum BulkChoice { none, yes, maybe, no }
 
 
 /// Extension to provide information about whether a practice passes level filters
 class FilteredPracticeStatus {
   final String practiceId; // Link indicator to a specific practice
-  final PracticeStatus status;
+  final ParticipationStatus participationStatus;
+  final bool isAttendanceMode; // true → render as attendance (filled); false → RSVP (outline)
   final bool passesFilter;
 
   const FilteredPracticeStatus({
     required this.practiceId,
-    required this.status,
+    required this.participationStatus,
+    required this.isAttendanceMode,
     required this.passesFilter,
   });
 }
@@ -93,6 +87,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   String _toastMessage = '';
   Color _toastColor = AppColors.info;
   IconData? _toastIcon;
+  bool _bulkConditional = false; // Conditional Yes for bulk
+  int? _bulkConditionalThreshold; // Bulk threshold
+
   OverlayEntry? _toastOverlay;
 
   void _showTopScreenToast(String message, Color color, IconData icon, {bool persistent = false}) {
@@ -601,80 +598,191 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   Widget _buildSingleIndicator(FilteredPracticeStatus filteredStatus, double size) {
-    // If this specific practice is selected, show solid purple with no icon
+    final passesFilter = filteredStatus.passesFilter;
+    final opacity = passesFilter ? 1.0 : 0.25; // 75% fading (25% opacity)
+
+    // Selected overlay: solid purple circle (no icon), respects filter fading
     if (_selectedPracticeIds.contains(filteredStatus.practiceId)) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: const BoxDecoration(
-          shape: BoxShape.circle,
-          color: Color(0xFF7C3AED), // Solid purple
+      return Opacity(
+        opacity: opacity,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.selection,
+          ),
         ),
       );
     }
 
-    final status = filteredStatus.status;
-    final passesFilter = filteredStatus.passesFilter;
+    final ps = filteredStatus.participationStatus;
+    final isAttendance = filteredStatus.isAttendanceMode;
 
     Color color;
     IconData? icon;
-    bool filled = false;
+    bool filled = isAttendance;
     double borderWidth = size * 0.08; // Scale border thickness with circle size
 
-    switch (status) {
-      case PracticeStatus.attended:
-        color = AppColors.primary; // System blue
+    if (isAttendance) {
+      // Attendance visuals (past practices): solid primary with check/close
+      color = AppColors.primary;
+      if (ps == ParticipationStatus.attended) {
         icon = Icons.check;
-        filled = true; // Solid fill for past practices
-        break;
-      case PracticeStatus.notAttended:
-        color = AppColors.primary; // System blue
+      } else if (ps == ParticipationStatus.missed) {
         icon = Icons.close;
-        filled = true; // Solid fill for past practices
-        break;
-      case PracticeStatus.rsvpYes:
-        color = AppColors.success; // Green (matching RSVP button)
-        icon = Icons.check;
-        filled = false; // Outline only for future practices
-        break;
-      case PracticeStatus.rsvpMaybe:
-        color = const Color(0xFFD97706); // Orange (matching RSVP button)
-        icon = Icons.question_mark; // Match RSVP component exactly
-        filled = false; // Outline only for future practices
-        break;
-      case PracticeStatus.rsvpNo:
-        color = AppColors.error; // Red (matching RSVP button)
-        icon = Icons.close;
-        filled = false; // Outline only for future practices
-        break;
-      case PracticeStatus.noRsvp:
-        color = Colors.grey[400]!;
+      } else {
         icon = null;
-        filled = false; // Outline only, no icon
-        break;
+      }
+    } else {
+      // RSVP visuals (future or non-attendance view): outline with RSVP color
+      switch (ps) {
+        case ParticipationStatus.yes:
+          color = AppColors.success;
+          icon = Icons.check;
+          break;
+        case ParticipationStatus.maybe:
+          color = AppColors.maybe;
+          icon = Icons.question_mark;
+          break;
+        case ParticipationStatus.no:
+          color = AppColors.error;
+          icon = Icons.close;
+          break;
+        case ParticipationStatus.blank:
+          color = const Color(0xFF6B7280); // Gray border, no icon
+          icon = null;
+          break;
+        case ParticipationStatus.attended:
+        case ParticipationStatus.missed:
+          // Shouldn't normally appear in RSVP mode; treat as blank
+          color = const Color(0xFF6B7280);
+          icon = null;
+          break;
+      }
     }
 
-    // Apply fading for practices that don't pass the filter
-    final opacity = passesFilter ? 1.0 : 0.25; // 75% fading (25% opacity)
+    final baseCircle = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: filled ? color : Colors.transparent,
+        border: Border.all(color: color, width: borderWidth),
+        shape: BoxShape.circle,
+      ),
+      child: icon != null
+          ? Icon(
+              icon,
+              size: size * 0.6,
+              color: filled ? Colors.white : color, // White for filled, color for outline
+            )
+          : null,
+    );
+
+    Widget child = baseCircle;
+
+    // Add Conditional Yes badge in RSVP mode for YES status
+    if (!isAttendance && ps == ParticipationStatus.yes) {
+      child = Consumer<ParticipationProvider>(
+        builder: (context, provider, _) {
+          final pid = filteredStatus.practiceId;
+          if (!provider.getConditionalYes(pid)) {
+            return baseCircle;
+          }
+          final threshold = provider.getConditionalThreshold(pid);
+          if (threshold == null) return baseCircle;
+
+          // Find practice by ID (if not found, skip badge)
+          Practice? practice;
+          try {
+            practice = widget.club.upcomingPractices.firstWhere((p) => p.id == pid);
+          } catch (_) {
+            practice = null;
+          }
+          if (practice == null) return baseCircle;
+          final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
+          final badgeColor = satisfied ? AppColors.success : AppColors.primary;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              baseCircle,
+              Positioned(
+                right: -1,
+                top: -1,
+                child: Container(
+                  width: size * 0.6,
+                  height: size * 0.6,
+                  decoration: BoxDecoration(
+                    color: badgeColor,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '$threshold',
+                      style: TextStyle(
+                        fontSize: size * 0.35,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+    }
 
     return Opacity(
       opacity: opacity,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: filled ? color : Colors.transparent,
-          border: Border.all(color: color, width: borderWidth),
-          shape: BoxShape.circle,
-        ),
-        child: icon != null
-            ? Icon(
-                icon,
-                size: size * 0.6,
-                color: filled ? Colors.white : color, // White for filled, color for outline
-              )
-            : null,
-      ),
+      child: child,
+    );
+  }
+
+  /// Small status icon with Conditional Yes numeric badge when applicable (for lists/modals)
+  Widget _rsvpIconWithCondBadge(Practice p, ParticipationStatus ps, double size) {
+    final base = RSVPStatusDisplay(status: ps, size: size, showText: false);
+    if (ps != ParticipationStatus.yes) return base;
+
+    return Consumer<ParticipationProvider>(
+      builder: (context, provider, _) {
+        if (!provider.getConditionalYes(p.id)) return base;
+        final threshold = provider.getConditionalThreshold(p.id);
+        if (threshold == null) return base;
+        final satisfied = provider.isCurrentUserConditionalSatisfied(p);
+        final badgeColor = satisfied ? AppColors.success : AppColors.primary;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            base,
+            Positioned(
+              right: -2,
+              top: -2,
+              child: Container(
+                width: size * 0.6,
+                height: size * 0.6,
+                decoration: BoxDecoration(
+                  color: badgeColor,
+                  borderRadius: BorderRadius.circular(3),
+                ),
+                child: Center(
+                  child: Text(
+                    '$threshold',
+                    style: TextStyle(
+                      fontSize: size * 0.35,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -749,42 +857,41 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
               final transitionTime = practice.dateTime.add(const Duration(minutes: 30));
               final hasTransitioned = now.isAfter(transitionTime);
 
-              PracticeStatus status;
+              bool isAttendanceMode;
+              ParticipationStatus visualStatus;
               if (hasTransitioned) {
-                // Practice has been running for 30+ minutes, show attendance status
+                // Practice has been running for 30+ minutes, show attendance status when available
                 switch (participationStatus) {
                   case ParticipationStatus.attended:
-                    status = PracticeStatus.attended;
-                    break;
                   case ParticipationStatus.missed:
-                    status = PracticeStatus.notAttended;
+                    isAttendanceMode = true;
+                    visualStatus = participationStatus;
                     break;
                   default:
                     // For practices that should show attendance but don't have status, show as no RSVP
-                    status = PracticeStatus.noRsvp;
+                    isAttendanceMode = false;
+                    visualStatus = ParticipationStatus.blank;
                     break;
                 }
               } else {
                 // Practice hasn't transitioned yet, show RSVP status
+                isAttendanceMode = false;
                 switch (participationStatus) {
                   case ParticipationStatus.yes:
-                    status = PracticeStatus.rsvpYes;
-                    break;
                   case ParticipationStatus.maybe:
-                    status = PracticeStatus.rsvpMaybe;
-                    break;
                   case ParticipationStatus.no:
-                    status = PracticeStatus.rsvpNo;
+                    visualStatus = participationStatus;
                     break;
                   default:
-                    status = PracticeStatus.noRsvp;
+                    visualStatus = ParticipationStatus.blank;
                     break;
                 }
               }
 
               practiceStatuses.add(FilteredPracticeStatus(
                 practiceId: practice.id,
-                status: status,
+                participationStatus: visualStatus,
+                isAttendanceMode: isAttendanceMode,
                 passesFilter: passesLevelFilter,
               ));
             }
@@ -795,37 +902,31 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           for (final practice in realPracticesForDay) {
             final passesLevelFilter = filterProvider.shouldShowPractice(practice);
 
-            PracticeStatus status;
+            bool isAttendanceMode = false;
+            ParticipationStatus visualStatus;
             if (participationProvider != null) {
               final participationStatus = participationProvider.getParticipationStatus(practice.id);
-
               switch (participationStatus) {
                 case ParticipationStatus.yes:
-                  status = PracticeStatus.rsvpYes;
-                  break;
                 case ParticipationStatus.maybe:
-                  status = PracticeStatus.rsvpMaybe;
-                  break;
                 case ParticipationStatus.no:
-                  status = PracticeStatus.rsvpNo;
-                  break;
                 case ParticipationStatus.blank:
-                  status = PracticeStatus.noRsvp;
+                  visualStatus = participationStatus;
                   break;
                 case ParticipationStatus.attended:
-                  status = PracticeStatus.attended;
-                  break;
                 case ParticipationStatus.missed:
-                  status = PracticeStatus.notAttended;
+                  // For future practices, attendance states shouldn't render; treat as blank RSVP
+                  visualStatus = ParticipationStatus.blank;
                   break;
               }
             } else {
-              status = PracticeStatus.noRsvp;
+              visualStatus = ParticipationStatus.blank;
             }
 
             practiceStatuses.add(FilteredPracticeStatus(
               practiceId: practice.id,
-              status: status,
+              participationStatus: visualStatus,
+              isAttendanceMode: isAttendanceMode,
               passesFilter: passesLevelFilter,
             ));
           }
@@ -984,7 +1085,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                                       color: Color(0xFF7C3AED),
                                                     ),
                                                   )
-                                                : RSVPStatusDisplay(status: ps, size: 24, showText: false),
+                                                : _rsvpIconWithCondBadge(p, ps, 24),
                                           ),
 
                                         ),
@@ -1078,7 +1179,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                       SizedBox(
                                         width: 28,
                                         child: Center(
-                                          child: RSVPStatusDisplay(status: ps, size: 24, showText: false),
+                                          child: _rsvpIconWithCondBadge(p, ps, 24),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -1258,6 +1359,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                       _bulkChoice = BulkChoice.none;
                       _bulkBringGuests = false;
                       _bulkGuestList = const PracticeGuestList();
+                      _bulkConditional = false;
+                      _bulkConditionalThreshold = null;
                     });
                     _updateSelectionOverlay();
                   },
@@ -1279,6 +1382,77 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             ),
 
             const SizedBox(height: 8),
+
+            // Conditional Yes row: only when Yes is selected
+            if (_bulkChoice == BulkChoice.yes)
+              Row(
+                children: [
+                  Checkbox(
+                    value: _bulkConditional,
+                    onChanged: (v) async {
+                      final newVal = v ?? false;
+                      if (newVal) {
+                        setState(() {
+                          _bulkConditional = true;
+                        });
+                        _updateSelectionOverlay();
+                        final selected = await _showBulkConditionsModal(initial: _bulkConditionalThreshold);
+                        if (!mounted) return;
+                        if (selected != null) {
+                          setState(() {
+                            _bulkConditionalThreshold = selected;
+                          });
+                          _updateSelectionOverlay();
+                        } else {
+                          setState(() {
+                            _bulkConditional = false;
+                            _bulkConditionalThreshold = null;
+                          });
+                          _updateSelectionOverlay();
+                        }
+                      } else {
+                        setState(() {
+                          _bulkConditional = false;
+                          _bulkConditionalThreshold = null;
+                        });
+                        _updateSelectionOverlay();
+                      }
+                    },
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const Text('Conditional Yes'),
+                  if (_bulkConditional && _bulkConditionalThreshold != null) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.primary, width: 1),
+                      ),
+                      child: Text(
+                        '≥ $_bulkConditionalThreshold',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                      ),
+                    ),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () async {
+                        final selected = await _showBulkConditionsModal(initial: _bulkConditionalThreshold);
+                        if (!mounted) return;
+                        setState(() {
+                          if (selected != null) {
+                            _bulkConditional = true;
+                            _bulkConditionalThreshold = selected;
+                          }
+                        });
+                        _updateSelectionOverlay();
+                      },
+                      child: const Text('Edit'),
+                    ),
+                  ],
+                ],
+              ),
 
             // Guests row: only when Yes is selected
             if (_bulkChoice == BulkChoice.yes)
@@ -1408,6 +1582,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         ),
                       ),
                     ),
+
                   ),
                 ),
               ],
@@ -1454,6 +1629,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
+
             color: isSelected ? color : const Color(0xFFE5E7EB),
             width: isSelected ? 3 : 1,
           ),
@@ -1519,6 +1695,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('No practices selected'), duration: Duration(seconds: 2)),
       );
+
       return;
     }
 
@@ -1533,9 +1710,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       }
       final projected = currentMaybe + newMaybes;
       if (projected > 10) {
-        final toRemove = projected - 10;
         _showTopScreenToast(
-          'Only 10 Maybe RSVPs are allowed, they are really not that useful and are basically equivalent to not providing an RSVP at all. Remove $toRemove to meet the max.',
+          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
           const Color(0xFFF59E0B),
           Icons.help_outline,
           persistent: true,
@@ -1578,6 +1754,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
     // Apply participation status in bulk
     try {
+      // Apply participation status in bulk first
       await provider.bulkUpdateParticipation(
         BulkParticipationRequest(
           practiceIds: practiceIds,
@@ -1587,8 +1764,26 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         ),
       );
 
-      if (!mounted) return;
+      // Apply Conditional Yes settings if YES selected
+      if (status == ParticipationStatus.yes) {
+        if (_bulkConditional && _bulkConditionalThreshold == null) {
+          _showCustomToast(
+            'Pick a threshold for Conditional Yes',
+            AppColors.primary,
+            Icons.info_outline,
+          );
+          return;
+        }
+        for (final id in practiceIds) {
+          if (_bulkConditional) {
+            provider.setConditionalYes(id, true, threshold: _bulkConditionalThreshold ?? 6);
+          } else {
+            provider.setConditionalYes(id, false);
+          }
+        }
+      }
 
+      if (!mounted) return;
 
       IconData icon;
       Color color;
@@ -1662,6 +1857,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       context: context,
       child: Container(
         decoration: const BoxDecoration(
+
           color: Colors.white,
           borderRadius: BorderRadius.all(Radius.circular(20)), // Round all corners
         ),
@@ -1797,4 +1993,51 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       child: const ParticipationStatusLegendModal(),
     );
   }
+  Future<int?> _showBulkConditionsModal({int? initial}) async {
+    int temp = initial ?? 6;
+    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
+      context: context,
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'I will attend so long as at least this many (including myself) will attend',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                DropdownButton<int>(
+                  value: temp,
+                  items: const [6, 8, 10, 12]
+                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => temp = v ?? temp),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(null),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(temp),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
 }

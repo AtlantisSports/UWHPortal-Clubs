@@ -24,6 +24,10 @@ class ParticipationProvider with ChangeNotifier {
   // Key: practiceId, Value: ParticipationStatus
   final Map<String, ParticipationStatus> _participationStatusMap = {};
 
+  // Conditional Yes: per-practice toggle and threshold (provider memory; can be hydrated from Practice when present)
+  final Map<String, bool> _conditionalYesMap = {}; // practiceId -> checked
+  final Map<String, int> _conditionalThresholdMap = {}; // practiceId -> threshold
+
   // Map to track guest lists for each practice
   // Key: practiceId, Value: PracticeGuestList
   final Map<String, PracticeGuestList> _practiceGuestsMap = {};
@@ -45,6 +49,20 @@ class ParticipationProvider with ChangeNotifier {
   /// Get participation status for a specific practice
   ParticipationStatus getParticipationStatus(String practiceId) {
     return _participationStatusMap[practiceId] ?? ParticipationStatus.blank;
+  }
+
+  /// Conditional Yes state
+  bool getConditionalYes(String practiceId) => _conditionalYesMap[practiceId] ?? false;
+  int? getConditionalThreshold(String practiceId) => _conditionalThresholdMap[practiceId];
+  void setConditionalYes(String practiceId, bool checked, {int? threshold}) {
+    _conditionalYesMap[practiceId] = checked;
+    if (checked && threshold != null) {
+      _conditionalThresholdMap[practiceId] = threshold;
+    }
+    if (!checked) {
+      // Keep last threshold in memory for convenience, but could be cleared if desired
+    }
+    notifyListeners();
   }
 
   /// Get guest list for a specific practice
@@ -79,6 +97,13 @@ class ParticipationProvider with ChangeNotifier {
       // Don't notify listeners here as this is initialization
     }
 
+    // Hydrate Conditional Yes from practice model when present
+    final t = practice.conditionalYesThresholds[currentUserId];
+    if (t != null) {
+      _conditionalYesMap[practice.id] = true;
+      _conditionalThresholdMap[practice.id] = t;
+    }
+
     // Initialize mock guest data for past practices
     await _initializeMockGuestData(practice);
   }
@@ -91,6 +116,14 @@ class ParticipationProvider with ChangeNotifier {
       final status = practice.getParticipationStatus(currentUserId);
       if (_participationStatusMap[practice.id] != status) {
         _participationStatusMap[practice.id] = status;
+        hasChanges = true;
+      }
+
+      // Hydrate Conditional Yes
+      final t = practice.conditionalYesThresholds[currentUserId];
+      if (t != null) {
+        _conditionalYesMap[practice.id] = true;
+        _conditionalThresholdMap[practice.id] = t;
         hasChanges = true;
       }
 
@@ -259,9 +292,135 @@ class ParticipationProvider with ChangeNotifier {
   /// Clear all participation data (useful for user logout, etc.)
   void clearAll() {
     _participationStatusMap.clear();
+    _conditionalYesMap.clear();
+    _conditionalThresholdMap.clear();
     _loadingStates.clear();
     _error = null;
     notifyListeners();
+  }
+
+  /// Compute Effective Yes count using fixed-point satisfaction of Conditional Yes groups.
+  ///
+  /// Rules:
+  /// - Start with hard Yes from other users (excludes current user if they have Conditional Yes enabled).
+  /// - Each Conditional Yes group contributes their own attendance if satisfied.
+  /// - A group is satisfied if its threshold <= (current effective + that group's contribution)
+  ///   which allows self-satisfying groups.
+  /// - Other users are assumed to contribute 1 (we do not know their guest counts here).
+  /// - Current user contributes 1 + their guest count if they have Conditional Yes enabled.
+  int computeEffectiveYesCount(Practice practice) {
+    final String uid = currentUserId;
+
+    // Base hard-yes from others only
+    int effective = 0;
+    practice.participationResponses.forEach((userId, status) {
+      if (userId != uid && status == ParticipationStatus.yes) {
+        effective++;
+      }
+    });
+
+    // Build pending conditional groups (others from practice model; current user from provider state)
+    final pending = <_CondGroup>[];
+
+    // Others (assume contribution of 1 each)
+    practice.conditionalYesThresholds.forEach((userId, threshold) {
+      if (userId != uid) {
+        pending.add(_CondGroup(threshold: threshold, contribution: 1, isCurrentUser: false));
+      }
+    });
+
+    // Current user group (if enabled)
+    final bool myChecked = getConditionalYes(practice.id);
+    final int? myThreshold = getConditionalThreshold(practice.id);
+    if (myChecked && myThreshold != null) {
+      final int myGuests = getPracticeGuests(practice.id).totalGuests;
+      pending.add(_CondGroup(threshold: myThreshold, contribution: 1 + myGuests, isCurrentUser: true));
+    } else {
+      // If not using Conditional Yes, and current user is a hard Yes in the model, count them.
+      final myStatus = practice.getParticipationStatus(uid);
+      if (myStatus == ParticipationStatus.yes) effective++;
+    }
+
+    // Fixed-point satisfaction loop
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      final remaining = <_CondGroup>[];
+      for (final g in pending) {
+        if (g.threshold <= (effective + g.contribution)) {
+          effective += g.contribution;
+          changed = true;
+        } else {
+          remaining.add(g);
+        }
+      }
+      if (remaining.length == pending.length) {
+        // No progress; break to avoid infinite loop
+        break;
+      }
+      pending
+        ..clear()
+        ..addAll(remaining);
+    }
+
+    return effective;
+  }
+
+  /// Determine whether the current user's Conditional Yes (if enabled) is satisfied
+  /// under the same fixed-point rules used by computeEffectiveYesCount.
+  bool isCurrentUserConditionalSatisfied(Practice practice) {
+    final String uid = currentUserId;
+
+    final bool myChecked = getConditionalYes(practice.id);
+    final int? myThreshold = getConditionalThreshold(practice.id);
+    if (!myChecked || myThreshold == null) return false;
+
+    // Base hard-yes from others only
+    int effective = 0;
+    practice.participationResponses.forEach((userId, status) {
+      if (userId != uid && status == ParticipationStatus.yes) {
+        effective++;
+      }
+    });
+
+    // Build pending conditional groups including current user
+    final pending = <_CondGroup>[];
+
+    // Others (assume contribution of 1 each)
+    practice.conditionalYesThresholds.forEach((userId, threshold) {
+      if (userId != uid) {
+        pending.add(_CondGroup(threshold: threshold, contribution: 1, isCurrentUser: false));
+      }
+    });
+
+    // Current user group with their guests
+    final int myGuests = getPracticeGuests(practice.id).totalGuests;
+    pending.add(_CondGroup(threshold: myThreshold, contribution: 1 + myGuests, isCurrentUser: true));
+
+    // Fixed-point loop, tracking when current user's group satisfies
+    bool mySatisfied = false;
+    bool changed = true;
+    while (changed) {
+      changed = false;
+      final remaining = <_CondGroup>[];
+      for (final g in pending) {
+        if (g.threshold <= (effective + g.contribution)) {
+          effective += g.contribution;
+          if (g.isCurrentUser) mySatisfied = true;
+          changed = true;
+        } else {
+          remaining.add(g);
+        }
+      }
+      if (remaining.length == pending.length) {
+        break;
+      }
+      pending
+        ..clear()
+        ..addAll(remaining);
+    }
+
+    return mySatisfied;
   }
 
   /// Private helper methods
@@ -288,4 +447,11 @@ class ParticipationProvider with ChangeNotifier {
 
   /// Note: Filter management has been moved to PracticeFilterProvider
   /// This keeps ParticipationProvider focused on participation status only
+}
+
+class _CondGroup {
+  final int threshold;
+  final int contribution;
+  final bool isCurrentUser;
+  const _CondGroup({required this.threshold, required this.contribution, required this.isCurrentUser});
 }

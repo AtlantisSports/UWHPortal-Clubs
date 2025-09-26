@@ -404,6 +404,9 @@ class PracticeStatusCard extends StatefulWidget {
 }
 
 class _PracticeStatusCardState extends State<PracticeStatusCard> {
+  // Conditional Yes threshold options
+  final List<int> _condThresholdOptions = const [6, 8, 10, 12];
+
   @override
   Widget build(BuildContext context) {
     if (widget.mode == PracticeStatusCardMode.readOnly) {
@@ -956,6 +959,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 ],
               ),
 
+              // Conditions section (hidden unless Yes selected)
+              if (currentParticipationStatus == ParticipationStatus.yes) ...[
+                const SizedBox(height: 12),
+                _buildConditionsSection(widget.practice.id),
+              ],
+
               // Bring a guest section (only show if user selected "Yes")
               if (currentParticipationStatus == ParticipationStatus.yes) ...[
                 const SizedBox(height: 12),
@@ -1205,6 +1214,118 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     );
   }
 
+  Widget _buildConditionsSection(String practiceId) {
+    final participationProvider = Provider.of<ParticipationProvider>(context, listen: true);
+    final checked = participationProvider.getConditionalYes(practiceId);
+    final threshold = participationProvider.getConditionalThreshold(practiceId) ?? _condThresholdOptions.first;
+
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Checkbox(
+                value: checked,
+                onChanged: (value) async {
+                  final newChecked = value ?? false;
+                  if (newChecked) {
+                    // Open modal to pick threshold, default to lowest or previous
+                    final selected = await _showConditionsModal(practiceId, initial: threshold);
+                    if (!mounted) return;
+                    if (selected != null) {
+                      participationProvider.setConditionalYes(practiceId, true, threshold: selected);
+                    } else {
+                      // User cancelled; keep unchecked
+                      participationProvider.setConditionalYes(practiceId, false);
+                    }
+                  } else {
+                    participationProvider.setConditionalYes(practiceId, false);
+                  }
+                },
+                activeColor: const Color(0xFF0284C7),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              const SizedBox(width: 4),
+              const Text(
+                'Conditional Yes',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                  color: Color(0xFF374151),
+                ),
+              ),
+              if (checked) ...[
+                const SizedBox(width: 8),
+                Text(
+                  'at least $threshold',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B7280),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<int?> _showConditionsModal(String practiceId, {required int initial}) async {
+    int temp = initial;
+    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
+      context: context,
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'I will attend so long as at least this many (including myself) will attend',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                DropdownButton<int>(
+                  value: temp,
+                  items: _condThresholdOptions
+                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => temp = v ?? temp),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(null),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(temp),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
     PhoneAwareModalUtils.showPhoneAwareBottomSheet(
       context: context,
@@ -1224,6 +1345,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
 
+    // Conditional Yes satisfaction using centralized fixed-point logic
+    final bool condSatisfied = status == ParticipationStatus.yes
+        ? participationProvider.isCurrentUserConditionalSatisfied(widget.practice)
+        : false;
+
     return GestureDetector(
       onTap: () async {
         // Only change if clicking a different option
@@ -1233,7 +1359,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             if (participationProvider.totalMaybeCount >= 10) {
               showTopToast(
                 context,
-                'Only 10 Maybe RSVPs are allowed, they are really not that useful and are basically equivalent to not providing an RSVP at all',
+                'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
                 const Color(0xFFF59E0B),
                 Icons.help_outline,
                 persistent: true,
@@ -1275,26 +1401,52 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           ),
           color: isSelected ? fadedBg : Colors.white,
         ),
-        child: Center(
-          child: Container(
-            width: 35, // Increased from 32 to 35 (32 * 1.1 = 35.2, rounded to 35)
-            height: 35, // Increased from 32 to 35 (32 * 1.1 = 35.2, rounded to 35)
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: color,
-                width: isSelected ? 4 : 2, // Thicker border when selected
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Center(
+              child: Container(
+                width: 35,
+                height: 35,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: color,
+                    width: isSelected ? 4 : 2,
+                  ),
+                  color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+                ),
+                child: Icon(
+                  _getOverlayIcon(status),
+                  size: status == ParticipationStatus.maybe ? 20.8 : 25.7,
+                  color: color,
+                ),
               ),
-              color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent, // Light background when selected
             ),
-            child: Icon(
-              _getOverlayIcon(status),
-              size: status == ParticipationStatus.maybe
-                  ? 20.8 // Increased by 10% (18.954 * 1.1 = 20.8)
-                  : 25.7, // Increased by 10% (23.4 * 1.1 = 25.7)
-              color: color,
-            ),
-          ),
+            if (status == ParticipationStatus.yes && isSelected && (participationProvider.getConditionalYes(widget.practice.id)))
+              Positioned(
+                right: 2,
+                top: 2,
+                child: Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: condSatisfied ? AppColors.success : AppColors.primary,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Center(
+                    child: Text(
+                      '${participationProvider.getConditionalThreshold(widget.practice.id) ?? _condThresholdOptions.first}',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
       ),
     );

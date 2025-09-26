@@ -26,53 +26,58 @@ import '../../core/constants/app_constants.dart';
 class BulkRSVPManager extends StatefulWidget {
   final Club club;
   final VoidCallback? onCancel;
-  
+
   const BulkRSVPManager({
     super.key,
     required this.club,
     this.onCancel,
   });
-  
+
   @override
   State<BulkRSVPManager> createState() => _BulkRSVPManagerState();
 }
 
 class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   final ScheduleService _scheduleService = ServiceLocator.scheduleService;
-  
+
   // Filter state
   Set<String> _selectedLocations = <String>{}; // Changed to Set for multi-select
   Set<String> _selectedLevels = <String>{}; // Changed to Set for multi-select
-  
+
   // Selection state
   final Set<String> _selectedPracticeIds = <String>{};
-  
+
   // New participation interface state - Only YES or NO for bulk RSVP
   ParticipationStatus? _selectedRSVPChoice; // YES or NO selection only
   String _selectedTimeframe = 'only_announced'; // 'only_announced', 'custom', 'all_future'
   DateTime? _customStartDate;
   DateTime? _customEndDate;
-  
+
   // Dependent selection state
   List<String> _selectedDependents = [];
-  
+
+
+  // Conditional Yes state for bulk YES
+  bool _conditionalYesEnabled = false;
+  int? _conditionalYesThreshold;
+
   // UI state
   bool _isLoading = false;
   final Map<String, bool> _expandedDescriptions = <String, bool>{};
-  
+
   // Dependent state - Simpson family mock data
   bool _includeDependents = false;
-  
+
   // Toast state
   bool _showToast = false;
   String _toastMessage = '';
   Color _toastColor = Colors.green;
   IconData? _toastIcon;
-  
+
   // Available options (populated from data)
   List<String> _availableLocations = [];
   List<String> _availableLevels = [];
-  
+
   @override
   void initState() {
     super.initState();
@@ -80,32 +85,32 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     _initializeRSVPProvider();
     _verifyPracticeDataConsistency();
   }
-  
+
   void _verifyPracticeDataConsistency() {
     final recurringPractices = _getRepresentativePractices();
-    
+
     // Log practice lists for debugging
     PracticeDataConsistencyVerifier.logPracticeList(
-      recurringPractices, 
+      recurringPractices,
       'Bulk RSVP Representative Practices'
     );
-    
+
     // Verify each practice has valid pattern ID
     for (final practice in recurringPractices) {
       if (!PracticeDataConsistencyVerifier.hasValidPatternId(practice)) {
         debugPrint('WARNING: Invalid pattern ID for practice: ${practice.title} (${practice.id})');
       }
     }
-    
+
     debugPrint('Bulk RSVP initialized with ${recurringPractices.length} practice patterns');
   }
-  
+
   void _initializeFilters() {
     // Initialize available locations and levels from club practices
     _updateAvailableLocations();
     _updateAvailableLevels();
   }
-  
+
   void _initializeRSVPProvider() {
     // Initialize participation provider with current club practices
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -113,17 +118,17 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       // We'll work with the existing structure
     });
   }
-  
+
   void _updateAvailableLocations() {
     final clubPractices = _getClubPractices();
     final locations = clubPractices.map((p) => p.location).toSet().toList();
     locations.sort();
-    
+
     setState(() {
       _availableLocations = locations;
     });
   }
-  
+
   void _updateAvailableLevels() {
     final clubPractices = _getClubPractices();
     final levels = clubPractices
@@ -133,7 +138,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         .toSet()
         .toList();
     levels.sort();
-    
+
     setState(() {
       _availableLevels = levels;
     });
@@ -143,19 +148,19 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     // Return representative practices for bulk RSVP (one per pattern)
     return _getRepresentativePractices();
   }
-  
+
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
     // Use practice patterns instead of recurring practices to avoid date issues
     final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
-    
+
     // Convert practice patterns to Practice objects for bulk RSVP display
     // Generate representative practice instances for the current week
     return practicePatterns.map((pattern) {
       // Generate a practice instance for display purposes only
       final nextOccurrenceDate = _getNextOccurrenceDate(pattern);
       final practiceData = pattern.generatePracticeData(nextOccurrenceDate);
-      
+
       // Convert the Map to a Practice object
       return Practice(
         id: practiceData['id'] as String,
@@ -177,12 +182,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return a.dateTime.hour.compareTo(b.dateTime.hour);
       });
   }
-  
+
   /// Get the next occurrence date for a practice pattern
   DateTime _getNextOccurrenceDate(PracticePattern pattern) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    
+
     // Find the next occurrence of this pattern
     for (int i = 0; i < 14; i++) { // Look ahead 2 weeks
       final testDate = today.add(Duration(days: i));
@@ -196,7 +201,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         );
       }
     }
-    
+
     // Fallback: just use a date with the correct weekday
     final targetWeekday = pattern.day.weekdayNumber;
     final daysToAdd = (targetWeekday - now.weekday) % 7;
@@ -209,7 +214,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       pattern.startTime.minute,
     );
   }
-  
+
   List<Practice> _getFilteredPractices() {
     final practices = _getClubPractices();
 
@@ -230,7 +235,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       cancelText: 'Cancel',
       isDestructive: true,
     );
-    
+
     if (confirmed) {
       await _clearAllFutureRSVPs();
     }
@@ -272,27 +277,27 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   /// Clear all future RSVPs for user, new player guests, and dependents
   Future<void> _clearAllFutureRSVPs() async {
     setState(() => _isLoading = true);
-    
+
     try {
       final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
       final today = DateTime.now();
-      
+
       // Get all club practices from today forward
       final allPractices = _getClubPractices();
       final futurePractices = allPractices.where((practice) {
-        return practice.dateTime.isAfter(today) || 
+        return practice.dateTime.isAfter(today) ||
                practice.dateTime.day == today.day;
       }).toList();
-      
+
       // Clear RSVPs for each future practice
       for (final practice in futurePractices) {
         // Clear user's own RSVP
         await participationProvider.updateParticipationStatus(
-          widget.club.id, 
-          practice.id, 
+          widget.club.id,
+          practice.id,
           ParticipationStatus.blank
         );
-        
+
         // Clear new player guests and dependents (preserve known Visitors/Club members)
         final currentGuests = participationProvider.getPracticeGuests(practice.id);
         final filteredGuests = currentGuests.guests.where((guest) {
@@ -300,16 +305,16 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           // Remove new player guests and dependents
           return guest.type == GuestType.visitor || guest.type == GuestType.clubMember;
         }).toList();
-        
+
         participationProvider.updatePracticeGuests(practice.id, filteredGuests);
       }
-      
+
       _showCustomToast(
         'All future RSVPs cleared successfully',
         Colors.green,
         Icons.check_circle,
       );
-      
+
     } catch (error) {
       _showCustomToast(
         'Failed to clear RSVPs. Please try again.',
@@ -320,11 +325,11 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       setState(() => _isLoading = false);
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     final filteredPractices = _getFilteredPractices();
-    
+
     return Stack(
       children: [
         Container(
@@ -336,13 +341,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               children: [
                 // Filter Section
                 _buildFilterSection(),
-                
+
                 // Practice List
                 _buildPracticeList(filteredPractices),
-                
+
                 // Dependent Selection Section
                 _buildDependentSelectionSection(),
-                
+
                 // Bottom Action Bar
                 _buildBottomActionBar(filteredPractices),
               ],
@@ -386,7 +391,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ],
     );
   }
-  
+
   Widget _buildFilterSection() {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -442,26 +447,26 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Dynamic filter row based on available options
           _buildDynamicFilterRow(),
-          
+
           const SizedBox(height: 4),
         ],
       ),
     );
   }
-  
+
   Widget _buildDynamicFilterRow() {
     List<Widget> filters = [];
-    
+
     // Show location filter only if there are multiple locations
     if (_availableLocations.length > 1) {
       filters.add(Expanded(child: _buildLocationFilter()));
     }
-    
+
     // Show level filter only if there are multiple levels
     if (_availableLevels.length > 1) {
       if (filters.isNotEmpty) {
@@ -469,10 +474,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
       filters.add(Expanded(child: _buildLevelFilter()));
     }
-    
+
     return Row(children: filters);
   }
-  
+
   Widget _buildLocationFilter() {
     return DropdownUtils.createLocationFilter(
       selectedLocations: _selectedLocations.toList(),
@@ -484,7 +489,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       customLocations: _availableLocations,
     );
   }
-  
+
   Widget _buildLevelFilter() {
     return DropdownUtils.createLevelFilter(
       selectedLevels: _selectedLevels.toList(),
@@ -496,7 +501,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       customLevels: _availableLevels,
     );
   }
-  
+
   Widget _buildPracticeList(List<Practice> filteredPractices) {
     if (filteredPractices.isEmpty) {
       return const Center(
@@ -529,35 +534,35 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         ),
       );
     }
-    
+
     return Consumer<ParticipationProvider>(
       builder: (context, participationProvider, child) {
         return _buildConsolidatedPracticeSelector(filteredPractices, participationProvider);
       },
     );
   }
-  
+
   Widget _buildConsolidatedPracticeSelector(List<Practice> filteredPractices, ParticipationProvider participationProvider) {
     // Get practice patterns for recurrence information
     final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
     final patternMap = {for (var pattern in practicePatterns) pattern.id: pattern};
-    
+
     // Separate weekly and non-weekly practices
     final weeklyPractices = <Practice>[];
     final nonWeeklyPractices = <Practice>[];
-    
+
     for (final practice in filteredPractices) {
       final pattern = patternMap[practice.patternId ?? practice.id];
-      final isWeekly = pattern?.recurrence.type == RecurrenceType.weekly && 
+      final isWeekly = pattern?.recurrence.type == RecurrenceType.weekly &&
                       pattern?.recurrence.interval == 1;
-      
+
       if (isWeekly) {
         weeklyPractices.add(practice);
       } else {
         nonWeeklyPractices.add(practice);
       }
     }
-    
+
     return Container(
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -585,10 +590,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                   ),
                 ),
               ],
-              
+
               // Weekly practices
               ...weeklyPractices.map((practice) => _buildWeeklyPracticeItem(practice, patternMap)),
-              
+
               // Horizontal divider
               if (weeklyPractices.isNotEmpty && nonWeeklyPractices.isNotEmpty) ...[
                 const Padding(
@@ -599,7 +604,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                   ),
                 ),
               ],
-              
+
               // Non-weekly practices
               ...nonWeeklyPractices.map((practice) => _buildNonWeeklyPracticeItem(practice, patternMap)),
             ],
@@ -610,7 +615,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   /// Build a weekly practice item (current format)
   Widget _buildWeeklyPracticeItem(Practice practice, Map<String, PracticePattern> patternMap) {
     final isSelected = _selectedPracticeIds.contains(practice.id);
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -680,7 +685,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ],
             ),
             // Practice description (similar to club card)
-            if (practice.description.isNotEmpty) 
+            if (practice.description.isNotEmpty)
               _buildPracticeDescription(practice),
           ],
         ),
@@ -692,7 +697,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   Widget _buildNonWeeklyPracticeItem(Practice practice, Map<String, PracticePattern> patternMap) {
     final isSelected = _selectedPracticeIds.contains(practice.id);
     final pattern = patternMap[practice.patternId ?? practice.id];
-    
+
     return InkWell(
       onTap: () {
         setState(() {
@@ -780,14 +785,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ],
             ),
             // Practice description (similar to club card)
-            if (practice.description.isNotEmpty) 
+            if (practice.description.isNotEmpty)
               _buildPracticeDescription(practice),
           ],
         ),
       ),
     );
   }
-  
+
   Widget _buildDependentSelectionSection() {
     return Container(
       margin: const EdgeInsets.all(16),
@@ -863,7 +868,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   Widget _buildBottomActionBar(List<Practice> filteredPractices) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -898,7 +903,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ),
           ),
-          
+
           // Timeframe and RSVP Selection in horizontal layout
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -908,9 +913,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                 flex: 3,
                 child: _buildTimeframeSelection(),
               ),
-              
+
               const SizedBox(width: 12),
-              
+
               // YES/NO RSVP Buttons (right side)
               Expanded(
                 flex: 2,
@@ -943,7 +948,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ],
           ),
-          
+
           // Affected practices count (shown as soon as practices are selected)
           if (_selectedPracticeIds.isNotEmpty)
             Padding(
@@ -959,9 +964,74 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                 ),
               ),
             ),
-          
+
+          // Conditional Yes control at bottom (only show when YES is selected)
+          if (_selectedRSVPChoice == ParticipationStatus.yes)
+            Row(
+              children: [
+                Checkbox(
+                  value: _conditionalYesEnabled,
+                  onChanged: (v) async {
+                    final newVal = v ?? false;
+                    if (newVal) {
+                      setState(() {
+                        _conditionalYesEnabled = true;
+                      });
+                      final selected = await _showConditionalYesModal(initial: _conditionalYesThreshold);
+                      if (!mounted) return;
+                      if (selected != null) {
+                        setState(() {
+                          _conditionalYesThreshold = selected;
+                        });
+                      } else {
+                        setState(() {
+                          _conditionalYesEnabled = false;
+                          _conditionalYesThreshold = null;
+                        });
+                      }
+                    } else {
+                      setState(() {
+                        _conditionalYesEnabled = false;
+                        _conditionalYesThreshold = null;
+                      });
+                    }
+                  },
+                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                const Text('Conditional Yes'),
+                if (_conditionalYesEnabled && _conditionalYesThreshold != null) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: AppColors.primary, width: 1),
+                    ),
+                    child: Text(
+                      '\u2265 $_conditionalYesThreshold',
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton(
+                    onPressed: () async {
+                      final selected = await _showConditionalYesModal(initial: _conditionalYesThreshold);
+                      if (!mounted) return;
+                      setState(() {
+                        if (selected != null) {
+                          _conditionalYesThreshold = selected;
+                        }
+                      });
+                    },
+                    child: const Text('Edit'),
+                  ),
+                ],
+              ],
+            ),
+
           const SizedBox(height: 16),
-          
+
           // Cancel/Apply Buttons
           Row(
             children: [
@@ -1026,7 +1096,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   Widget _buildPracticeRSVPButton({
     required ParticipationStatus status,
     required bool isSelected,
@@ -1034,7 +1104,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }) {
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
-    
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -1070,7 +1140,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   Color _getFadedBackground(ParticipationStatus status) {
     switch (status) {
       case ParticipationStatus.yes:
@@ -1081,7 +1151,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return const Color(0xFFF3F4F6);
     }
   }
-  
+
   IconData _getOverlayIcon(ParticipationStatus status) {
     switch (status) {
       case ParticipationStatus.yes:
@@ -1092,7 +1162,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return Icons.radio_button_unchecked;
     }
   }
-  
+
   Widget _buildTimeframeSelection() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1103,12 +1173,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           title: 'Announced',
           tooltip: 'Only confirmed practices',
         ),
-        
-        // Custom date range option  
+
+        // Custom date range option
         _buildCustomRadioOption(
           value: 'custom',
-          title: (_customStartDate != null && _customEndDate != null) 
-              ? _getCustomDateRangeText() 
+          title: (_customStartDate != null && _customEndDate != null)
+              ? _getCustomDateRangeText()
               : 'Custom',
           tooltip: 'Custom date range',
           trailing: (_customStartDate != null && _customEndDate != null)
@@ -1122,7 +1192,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                 )
               : null,
         ),
-        
+
         // All future option
         _buildCustomRadioOption(
           value: 'all_future',
@@ -1132,20 +1202,20 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ],
     );
   }
-  
+
   Widget _buildCustomRadioOption({
     required String value,
     required String title,
     Widget? trailing,
     String? tooltip,
   }) {
-    
+
     return GestureDetector(
       onTap: () {
         setState(() {
           _selectedTimeframe = value;
         });
-        
+
         if (value == 'custom') {
           // Show date picker immediately when custom is selected
           _showCustomDatePicker();
@@ -1161,13 +1231,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: _selectedTimeframe == value 
-                      ? const Color(0xFF0284C7) 
+                  color: _selectedTimeframe == value
+                      ? const Color(0xFF0284C7)
                       : const Color(0xFFD1D5DB),
                   width: 2,
                 ),
-                color: _selectedTimeframe == value 
-                    ? const Color(0xFF0284C7) 
+                color: _selectedTimeframe == value
+                    ? const Color(0xFF0284C7)
                     : Colors.transparent,
               ),
               child: _selectedTimeframe == value
@@ -1185,6 +1255,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             ),
             if (tooltip != null) ...[
               const SizedBox(width: 6),
+
+
               _TooltipWidget(
                 message: tooltip,
                 child: const Icon(
@@ -1203,24 +1275,24 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   String _getCustomDateRangeText() {
     if (_customStartDate == null || _customEndDate == null) {
       return 'Select dates';
     }
-    
+
     return _formatDateRange(_customStartDate!, _customEndDate!);
   }
-  
+
   String _formatDateRange(DateTime start, DateTime end) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     final startMonth = months[start.month - 1];
     final endMonth = months[end.month - 1];
     final startDay = start.day;
     final endDay = end.day;
-    
+
     // Check if years are different
     if (start.year != end.year) {
       final startYear = start.year.toString().substring(2); // Last 2 digits
@@ -1231,7 +1303,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       return "$startMonth $startDay - $endMonth $endDay";
     }
   }
-  
+
   void _showCustomDatePicker() async {
     await PhoneAwareModalUtils.showPhoneAwareDialog<Map<String, DateTime>>(
       context: context,
@@ -1255,7 +1327,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   bool _canApply() {
     return rsvpService.canApplyBulkRSVP(
       selectedPracticeIds: _selectedPracticeIds.toList(),
@@ -1282,31 +1354,31 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       Icons.info_outline,
     );
   }
-  
+
   /// Get practice IDs based on selected practices and timeframe filters
   List<String> _getTargetPracticeIds() {
     // Start with manually selected representative practices
     if (_selectedPracticeIds.isEmpty) {
       return [];
     }
-    
+
     final representativePractices = _getRepresentativePractices();
     final allCalendarPractices = widget.club.upcomingPractices; // All actual instances
     final Set<String> targetPracticeIds = {};
-    
+
     // For each selected representative practice, find matching calendar instances
     for (final selectedId in _selectedPracticeIds) {
       final selectedRepresentative = representativePractices.firstWhere(
         (p) => p.id == selectedId,
         orElse: () => throw Exception('Selected representative practice not found: $selectedId'),
       );
-      
+
       // Find all calendar practices that match this pattern
       // Match by patternId directly - this is the robust identifier
       final matchingPractices = allCalendarPractices.where((p) {
         return p.patternId == selectedRepresentative.patternId;
       }).toList();
-      
+
       // Apply timeframe filtering using service
       final timeframePractices = rsvpService.filterPracticesByTimeframe(
         practices: matchingPractices,
@@ -1315,31 +1387,31 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         customEndDate: _customEndDate,
         announcedCutoff: AppConstants.mockAnnouncedCutoff,
       );
-      
+
       // Apply future-only filter to timeframe results
       final today = DateTime.now();
       final futurePractices = timeframePractices.where((p) {
         return p.dateTime.isAfter(today);
       }).toList();
-      
+
       // Add the IDs to our target set
       for (final practice in futurePractices) {
         targetPracticeIds.add(practice.id);
       }
     }
-    
+
     return targetPracticeIds.toList();
   }
-  
+
   /// Get text describing how many practices will be affected
   String _getAffectedPracticesText() {
     if (_selectedPracticeIds.isEmpty) {
       return 'Select practices to see affected count';
     }
-    
+
     final targetIds = _getTargetPracticeIds();
     final count = targetIds.length;
-    
+
     if (count == 0) {
       return 'No future practices match the selected timeframe';
     } else if (count == 1) {
@@ -1357,29 +1429,29 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
     }
   }
-  
+
   bool _hasUserInput() {
-    return _selectedPracticeIds.isNotEmpty || 
-           _selectedRSVPChoice != null || 
+    return _selectedPracticeIds.isNotEmpty ||
+           _selectedRSVPChoice != null ||
            _selectedTimeframe != 'only_announced' ||
            _selectedLocations.isNotEmpty ||
            _selectedLevels.isNotEmpty;
   }
-  
+
   void _applyBulkRSVP() async {
     if (!_canApply()) return;
-    
+
     // Show loading state
     setState(() {
       _isLoading = true;
     });
-    
+
     try {
       final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-      
+
       // Get practice IDs based on selected timeframe and filters
       final targetPracticeIds = _getTargetPracticeIds();
-      
+
       // If we're including dependents and RSVPing YES, store guest data
       if (_includeDependents && _selectedRSVPChoice == ParticipationStatus.yes && _selectedDependents.isNotEmpty) {
         // Convert dependent names to guest objects for storage
@@ -1389,7 +1461,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             name: dependentName,
           );
         }).toList();
-        
+
         // Store guest data for all target practices
         for (final practiceId in targetPracticeIds) {
           participationProvider.updatePracticeGuests(practiceId, guestList);
@@ -1402,31 +1474,44 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           participationProvider.updateBringGuestState(practiceId, false);
         }
       }
-      
+
       // Execute the bulk update through participation provider
       // Note: We'll simulate the bulk operation since ParticipationProvider may not have bulkUpdateRSVP
       for (final practiceId in targetPracticeIds) {
         await participationProvider.updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
+        // Apply Conditional Yes state per practice based on selection
+        if (_selectedRSVPChoice == ParticipationStatus.yes) {
+          if (_conditionalYesEnabled && _conditionalYesThreshold != null) {
+            participationProvider.setConditionalYes(practiceId, true, threshold: _conditionalYesThreshold);
+          } else {
+            participationProvider.setConditionalYes(practiceId, false);
+          }
+        } else {
+          // Clear Conditional Yes when applying NO
+          participationProvider.setConditionalYes(practiceId, false);
+        }
       }
-      
+
       // Show success result to user
       if (mounted) {
         final successCount = targetPracticeIds.length;
         String message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
-        
+
+
+
         // If we included dependents, add dependent count to message
         if (_includeDependents && _selectedDependents.isNotEmpty) {
           final dependentCount = _selectedDependents.length;
           final dependentText = dependentCount == 1 ? '1 dependent' : '$dependentCount dependents';
           message = '$message + $dependentText';
         }
-        
+
         _showCustomToast(
           message,
           _selectedRSVPChoice == ParticipationStatus.yes ? AppColors.success : AppColors.error,
           _selectedRSVPChoice == ParticipationStatus.yes ? Icons.check : Icons.cancel,
         );
-        
+
         // Reset the form after successful operation but keep window open
         setState(() {
           _selectedPracticeIds.clear();
@@ -1438,6 +1523,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _includeDependents = false; // Reset include dependents checkbox
           _selectedLocations.clear(); // Clear location filter
           _selectedLevels.clear(); // Clear level filter
+          _conditionalYesEnabled = false;
+          _conditionalYesThreshold = null;
         });
       }
     } catch (error) {
@@ -1452,7 +1539,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
     }
   }
-  
+
   void _showCustomToast(String message, Color color, IconData icon) {
     setState(() {
       _toastMessage = message;
@@ -1460,7 +1547,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       _toastIcon = icon;
       _showToast = true;
     });
-    
+
     // Hide toast after 4 seconds
     Timer(const Duration(seconds: 4), () {
       if (mounted) {
@@ -1470,7 +1557,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
     });
   }
-  
+
   void _showErrorDialog(String message) {
     showDialog(
       context: context,
@@ -1486,7 +1573,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ),
     );
   }
-  
+
   // Helper methods
   String _getDayNameForPractice(Practice practice) {
     // For recurring practices, extract day from practice ID - same logic as recurring practices widget
@@ -1498,6 +1585,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         case 'tuesday':
           return 'Tue';
         case 'wednesday':
+
+
           return 'Wed';
         case 'thursday':
           return 'Thu';
@@ -1512,14 +1601,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           return TimeUtils.formatShortDayName(practice.dateTime.weekday);
       }
     }
-    
+
     // For regular practices, use the actual date
     return TimeUtils.formatShortDayName(practice.dateTime.weekday);
   }
-  
+
   String _truncateLevel(String level) {
     if (level.isEmpty) return '';
-    
+
     // Special mappings for common levels to fit in 4 characters
     switch (level.toLowerCase()) {
       case 'high-level':
@@ -1538,12 +1627,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return level.toUpperCase().substring(0, level.length > 4 ? 4 : level.length);
     }
   }
-  
+
   /// Build practice description with truncation (similar to club card)
   Widget _buildPracticeDescription(Practice practice) {
     final isDescriptionExpanded = _expandedDescriptions[practice.id] ?? false;
     final shouldTruncateDescription = _shouldTruncateDescription(practice.description);
-    
+
     return Padding(
       padding: const EdgeInsets.only(left: 46, top: 4, right: 16, bottom: 4), // Align with text above (checkbox + spacing)
       child: Row(
@@ -1592,18 +1681,66 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   /// Returns truncated description with ellipsis
   String _getTruncatedDescription(String description) {
     if (description.length <= 40) return description;
-    
+
     // Find a good break point (prefer word boundaries)
     String truncated = description.substring(0, 37);
     int lastSpace = truncated.lastIndexOf(' ');
-    
+
     // If we can break at a word boundary and it's not too short, do so
     if (lastSpace > 25) {
       truncated = truncated.substring(0, lastSpace);
     }
-    
+
     return '$truncated...';
   }
+
+  Future<int?> _showConditionalYesModal({int? initial}) async {
+    int temp = initial ?? 6;
+    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
+      context: context,
+      child: StatefulBuilder(
+        builder: (context, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'I will attend so long as at least this many (including myself) will attend',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 12),
+                DropdownButton<int>(
+                  value: temp,
+                  items: const [6, 8, 10, 12]
+                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
+                      .toList(),
+                  onChanged: (v) => setModalState(() => temp = v ?? temp),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(null),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 8),
+                    ElevatedButton(
+                      onPressed: () => Navigator.of(context).pop(temp),
+                      child: const Text('Save'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
 }
 
 /// Custom Date Range Modal
@@ -1611,13 +1748,13 @@ class _CustomDateRangeModal extends StatefulWidget {
   final DateTime? initialStartDate;
   final DateTime? initialEndDate;
   final Function(Map<String, DateTime>?)? onResult;
-  
+
   const _CustomDateRangeModal({
     this.initialStartDate,
     this.initialEndDate,
     this.onResult,
   });
-  
+
   @override
   State<_CustomDateRangeModal> createState() => _CustomDateRangeModalState();
 }
@@ -1627,28 +1764,30 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
   late TextEditingController _endDateController;
   DateTime? _startDate;
   DateTime? _endDate;
-  
+
+
+
   @override
   void initState() {
     super.initState();
     _startDate = widget.initialStartDate ?? DateTime.now();
     _endDate = widget.initialEndDate ?? DateTime.now().add(const Duration(days: 7));
-    
+
     _startDateController = TextEditingController(text: _formatDateForInput(_startDate!));
     _endDateController = TextEditingController(text: _formatDateForInput(_endDate!));
   }
-  
+
   @override
   void dispose() {
     _startDateController.dispose();
     _endDateController.dispose();
     super.dispose();
   }
-  
+
   String _formatDateForInput(DateTime date) {
     return '${date.month.toString().padLeft(2, '0')}/${date.day.toString().padLeft(2, '0')}/${date.year}';
   }
-  
+
   DateTime? _parseDate(String dateString) {
     try {
       final parts = dateString.split('/');
@@ -1663,7 +1802,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
     }
     return null;
   }
-  
+
   Future<void> _pickDate(bool isStart) async {
     final initialDate = isStart ? _startDate : _endDate;
     // Use showPhoneModal (Navigator-backed) so inner OK/Cancel only closes the date picker,
@@ -1677,7 +1816,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
         title: isStart ? 'Select Start Date' : 'Select End Date',
       ),
     );
-    
+
     if (pickedDate != null) {
       setState(() {
         if (isStart) {
@@ -1690,29 +1829,29 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
       });
     }
   }
-  
+
   void _validateAndSubmit() {
     // Parse dates from text fields if they were manually edited
     final startFromText = _parseDate(_startDateController.text);
     final endFromText = _parseDate(_endDateController.text);
-    
+
     final finalStartDate = startFromText ?? _startDate;
     final finalEndDate = endFromText ?? _endDate;
-    
+
     if (finalStartDate == null || finalEndDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter valid dates')),
       );
       return;
     }
-    
+
     if (finalStartDate.isAfter(finalEndDate)) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Start date must be before end date')),
       );
       return;
     }
-    
+
     // Submit with result
     if (widget.onResult != null) {
       widget.onResult!({
@@ -1722,7 +1861,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
     }
     Navigator.of(context).pop();
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1762,7 +1901,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
             ],
           ),
           const SizedBox(height: 20),
-          
+
           // Content area with scrolling
           Expanded(
             child: SingleChildScrollView(
@@ -1816,7 +1955,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  
+
                   // End Date
                   const Text(
                     'End Date',
@@ -1868,7 +2007,7 @@ class _CustomDateRangeModalState extends State<_CustomDateRangeModal> {
             ),
           ),
           const SizedBox(height: 20),
-          
+
           // Action Buttons
           Row(
             children: [
@@ -2011,7 +2150,7 @@ class _LocationSelectionModalState extends State<_LocationSelectionModal> {
               itemBuilder: (context, index) {
                 final location = widget.availableLocations[index];
                 final isSelected = _tempSelection.contains(location);
-                
+
                 return CheckboxListTile(
                   title: Text(
                     location,
@@ -2176,7 +2315,7 @@ class _LevelSelectionModalState extends State<_LevelSelectionModal> {
               itemBuilder: (context, index) {
                 final level = widget.availableLevels[index];
                 final isSelected = _tempSelection.contains(level);
-                
+
                 return CheckboxListTile(
                   title: Text(
                     level,
@@ -2260,27 +2399,27 @@ class _CustomDatePickerModal extends StatefulWidget {
   final DateTime firstDate;
   final DateTime lastDate;
   final String title;
-  
+
   const _CustomDatePickerModal({
     required this.initialDate,
     required this.firstDate,
     required this.lastDate,
     required this.title,
   });
-  
+
   @override
   State<_CustomDatePickerModal> createState() => _CustomDatePickerModalState();
 }
 
 class _CustomDatePickerModalState extends State<_CustomDatePickerModal> {
   late DateTime _selectedDate;
-  
+
   @override
   void initState() {
     super.initState();
     _selectedDate = widget.initialDate;
   }
-  
+
   @override
   Widget build(BuildContext context) {
     // Use Flutter's DatePickerDialog for reliable selection visuals (blue filled
@@ -2328,24 +2467,24 @@ class _CustomDatePickerModalState extends State<_CustomDatePickerModal> {
 class _TooltipWidget extends StatefulWidget {
   final String message;
   final Widget child;
-  
+
   const _TooltipWidget({
     required this.message,
     required this.child,
   });
-  
+
   @override
   State<_TooltipWidget> createState() => _TooltipWidgetState();
 }
 
 class _TooltipWidgetState extends State<_TooltipWidget> {
   bool _isVisible = false;
-  
+
   void _showTooltip() {
     setState(() {
       _isVisible = true;
     });
-    
+
     // Auto-hide after 3 seconds
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
@@ -2355,13 +2494,13 @@ class _TooltipWidgetState extends State<_TooltipWidget> {
       }
     });
   }
-  
+
   void _hideTooltip() {
     setState(() {
       _isVisible = false;
     });
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -2428,16 +2567,16 @@ class _TooltipArrowPainter extends CustomPainter {
     final paint = Paint()
       ..color = const Color(0xFF374151) // Same dark gray as tooltip
       ..style = PaintingStyle.fill;
-    
+
     final path = Path()
       ..moveTo(size.width / 2, size.height) // Bottom center (tip of arrow)
       ..lineTo(0, 0) // Top left
       ..lineTo(size.width, 0) // Top right
       ..close();
-    
+
     canvas.drawPath(path, paint);
   }
-  
+
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

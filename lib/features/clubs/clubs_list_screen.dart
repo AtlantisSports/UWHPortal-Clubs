@@ -106,7 +106,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
           participationProvider.getParticipationStatus(practiceId) != ParticipationStatus.maybe &&
           participationProvider.totalMaybeCount >= 10) {
         _showCustomToast(
-          'Only 10 Maybe RSVPs are allowed, they are really not that useful and are basically equivalent to not providing an RSVP at all',
+          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
           const Color(0xFFF59E0B),
           Icons.help_outline,
           persistent: true,

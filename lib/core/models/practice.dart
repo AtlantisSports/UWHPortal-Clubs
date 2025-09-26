@@ -86,7 +86,7 @@ extension ParticipationStatusExtension on ParticipationStatus {
       case ParticipationStatus.yes:
         return AppColors.success; // Green
       case ParticipationStatus.maybe:
-        return const Color(0xFFF59E0B); // Yellow
+        return AppColors.maybe; // Yellow
       case ParticipationStatus.no:
         return AppColors.error; // Red
       case ParticipationStatus.attended:
@@ -190,10 +190,12 @@ class Practice extends BaseModel {
   final int maxParticipants;
   final List<String> participants;
   final Map<String, ParticipationStatus> participationResponses;
+  // Per-user conditional-yes threshold (presence implies user selected Conditional Yes)
+  final Map<String, int> conditionalYesThresholds;
   final bool isRecurring;
   final String? recurringPattern;
   final String? tag; // Practice level/type tag (e.g., "Open", "High-Level", "Intermediate")
-  
+
   Practice({
     required super.id,
     required this.clubId,
@@ -207,13 +209,14 @@ class Practice extends BaseModel {
     this.maxParticipants = 20,
     this.participants = const [],
     this.participationResponses = const {},
+    this.conditionalYesThresholds = const {},
     this.isRecurring = false,
     this.recurringPattern,
     this.tag,
     super.createdAt,
     super.updatedAt,
   });
-  
+
   /// Get participation status for a specific user
   ParticipationStatus getParticipationStatus(String userId) {
     return participationResponses[userId] ?? ParticipationStatus.blank;
@@ -338,6 +341,7 @@ class Practice extends BaseModel {
       'maxParticipants': maxParticipants,
       'participants': participants,
       'participationResponses': participationResponses.map((key, value) => MapEntry(key, value.name)),
+      'conditionalYesThresholds': conditionalYesThresholds,
       'isRecurring': isRecurring,
       'recurringPattern': recurringPattern,
     };
@@ -362,13 +366,16 @@ class Practice extends BaseModel {
           orElse: () => ParticipationStatus.blank,
         )),
       ) ?? {},
+      conditionalYesThresholds: (json['conditionalYesThresholds'] as Map<String, dynamic>?)?.map(
+        (key, value) => MapEntry(key, (value as num).toInt()),
+      ) ?? {},
       isRecurring: json['isRecurring'] as bool? ?? false,
       recurringPattern: json['recurringPattern'] as String?,
-      createdAt: json['createdAt'] != null 
+      createdAt: json['createdAt'] != null
         ? DateTime.parse(json['createdAt'] as String)
         : null,
       updatedAt: json['updatedAt'] != null
-        ? DateTime.parse(json['updatedAt'] as String) 
+        ? DateTime.parse(json['updatedAt'] as String)
         : null,
     );
   }
@@ -386,6 +393,7 @@ class Practice extends BaseModel {
     int? maxParticipants,
     List<String>? participants,
     Map<String, ParticipationStatus>? participationResponses,
+    Map<String, int>? conditionalYesThresholds,
     bool? isRecurring,
     String? recurringPattern,
     String? tag,
@@ -403,6 +411,7 @@ class Practice extends BaseModel {
       maxParticipants: maxParticipants ?? this.maxParticipants,
       participants: participants ?? this.participants,
       participationResponses: participationResponses ?? this.participationResponses,
+      conditionalYesThresholds: conditionalYesThresholds ?? this.conditionalYesThresholds,
       isRecurring: isRecurring ?? this.isRecurring,
       recurringPattern: recurringPattern ?? this.recurringPattern,
       tag: tag ?? this.tag,

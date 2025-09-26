@@ -972,7 +972,10 @@ class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
     return Material(
       color: Colors.white,
       elevation: overlapsContent ? 2 : 0,
-      child: tabBar,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8.0),
+        child: tabBar,
+      ),
     );
   }
 

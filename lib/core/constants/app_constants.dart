@@ -63,6 +63,10 @@ class AppColors {
   static const Color error = Color(0xFFF44336);
   static const Color info = Color(0xFF2196F3);
 
+  // RSVP visual colors (centralized)
+  static const Color maybe = Color(0xFFF59E0B);      // Tailwind Amber 500
+  static const Color selection = Color(0xFF7C3AED);  // Tailwind Violet 600
+
   // Club/Event specific colors
   static const Color eventActive = Color(0xFF4CAF50);
   static const Color eventUpcoming = Color(0xFF2196F3);
