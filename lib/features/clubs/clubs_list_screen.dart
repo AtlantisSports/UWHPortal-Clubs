@@ -20,7 +20,7 @@ import 'clubs_provider.dart';
 
 class ClubsListScreen extends StatefulWidget {
   const ClubsListScreen({super.key});
-  
+
   @override
   State<ClubsListScreen> createState() => _ClubsListScreenState();
 }
@@ -30,33 +30,35 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   String get _currentUserId => ServiceLocator.userService.currentUserId;
   final ScheduleService _scheduleService = ServiceLocator.scheduleService;
   final ScrollController _scrollController = ScrollController();
-  
+
   // Global keys for measuring card heights dynamically
   final List<GlobalKey> _cardKeys = [];
-  
+
   // Internal navigation state
   Club? _selectedClub;
   bool _showingClubDetail = false;
-  
+
   // Toast state
   bool _showToast = false;
   String _toastMessage = '';
   Color _toastColor = Colors.green;
   IconData? _toastIcon;
   String? _toastText;
-  
+  bool _toastPersistent = false;
+
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ClubsProvider>().loadClubs();
-      
+
       // Register clubs tab handler for reset functionality
       final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
       navigationProvider.registerTabBackHandler(3, _resetToClubsList);
     });
   }
-  
+
   @override
   void dispose() {
     // Unregister tab handler when widget is disposed
@@ -65,7 +67,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     _scrollController.dispose();
     super.dispose();
   }
-  
+
   bool _resetToClubsList() {
     // Only reset if we're actually showing club detail
     if (_showingClubDetail) {
@@ -80,11 +82,11 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       return false; // No internal navigation to handle
     }
   }
-  
+
   void _handleRSVPChange(String practiceId, ParticipationStatus newStatus) {
     // Use centralized participation provider
     final participationProvider = context.read<ParticipationProvider>();
-    
+
     // Find the club that has this practice
     final clubsProvider = context.read<ClubsProvider>();
     String? clubId;
@@ -97,17 +99,29 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       }
       if (clubId != null) break;
     }
-    
+
     if (clubId != null) {
+      // Enforce Maybe limit (max 10) for list-card quick RSVP
+      if (newStatus == ParticipationStatus.maybe &&
+          participationProvider.getParticipationStatus(practiceId) != ParticipationStatus.maybe &&
+          participationProvider.totalMaybeCount >= 10) {
+        _showCustomToast(
+          'Only 10 Maybe RSVPs are allowed, they are really not that useful and are basically equivalent to not providing an RSVP at all',
+          const Color(0xFFF59E0B),
+          Icons.help_outline,
+          persistent: true,
+        );
+        return;
+      }
       participationProvider.updateParticipationStatus(clubId, practiceId, newStatus);
     }
-    
+
     // Show confirmation message
     if (mounted) {
       // Prepare toast content based on participation status
       String message = 'RSVP updated to: ${newStatus.displayText}';
       Color toastColor = newStatus.color;
-      
+
       if (newStatus == ParticipationStatus.maybe) {
         _showCustomToast(message, toastColor, Icons.help);
       } else {
@@ -116,23 +130,26 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     }
   }
 
-  void _showCustomToast(String message, Color color, IconData icon) {
+  void _showCustomToast(String message, Color color, IconData icon, {bool persistent = false}) {
     setState(() {
       _toastMessage = message;
       _toastColor = color;
       _toastIcon = icon;
       _toastText = null;
+      _toastPersistent = persistent;
       _showToast = true;
     });
-    
-    // Hide toast after 4 seconds
-    Timer(Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-      }
-    });
+
+    // Auto-hide only if not persistent
+    if (!persistent) {
+      Timer(const Duration(seconds: 4), () {
+        if (mounted) {
+          setState(() {
+            _showToast = false;
+          });
+        }
+      });
+    }
   }
 
   void _onClubTap(Club club) {
@@ -141,7 +158,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       _showingClubDetail = true;
     });
   }
-  
+
   void _onPracticeInfoTap(Club club, Practice practice) {
     // Navigate directly to Practice Detail Screen instead of Club Detail
     Navigator.of(context).push(
@@ -157,25 +174,25 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       ),
     );
   }
-  
+
   void _navigateBackToList() {
     setState(() {
       _selectedClub = null;
       _showingClubDetail = false;
     });
   }
-  
+
   /// Get the next upcoming practice for a club
   Practice? _getNextPractice(Club club) {
     if (club.upcomingPractices.isEmpty) return null;
-    
+
     final now = DateTime.now();
     final upcomingPractices = club.upcomingPractices
         .where((practice) => practice.dateTime.isAfter(now))
         .toList();
-    
+
     if (upcomingPractices.isEmpty) return null;
-    
+
     // Sort by date and return the earliest
     upcomingPractices.sort((a, b) => a.dateTime.compareTo(b.dateTime));
     return upcomingPractices.first;
@@ -189,30 +206,30 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   /// Auto-scroll to ensure expanded dropdown content is visible
   void _ensureCardVisible(int cardIndex) {
     if (!_scrollController.hasClients) return;
-    
+
     // Use addPostFrameCallback to ensure the expansion animation completes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      
+
       // Safety check for card keys list bounds
       if (cardIndex >= _cardKeys.length) {
         return;
       }
-      
+
       // Find the actual card widget using its global key
       final GlobalKey cardKey = _cardKeys[cardIndex];
       final BuildContext? cardContext = cardKey.currentContext;
-      
+
       if (cardContext == null) {
         return;
       }
-      
+
       final RenderBox? cardRenderBox = cardContext.findRenderObject() as RenderBox?;
-      
+
       if (cardRenderBox == null) {
         return;
       }
-      
+
       // Simple approach: use Scrollable.ensureVisible which handles all the math
       Scrollable.ensureVisible(
         cardContext,
@@ -222,7 +239,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       );
     });
   }
-  
+
   /// Open map for practice location
   void _openMapForPractice(Practice practice) {
     // TODO: Implement map opening functionality
@@ -246,7 +263,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         onBackPressed: _navigateBackToList,
       );
     }
-    
+
     // Show clubs list
     return DefaultTabController(
       length: 2,
@@ -330,13 +347,27 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                       // Only add spacing if we have an icon or non-empty text
                       if ((_toastIcon != null) || (_toastText != null && _toastText!.isNotEmpty))
                         const SizedBox(width: 8),
-                      Text(
-                        _toastMessage,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w500,
+                      Expanded(
+                        child: Text(
+                          _toastMessage,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
+                      if (_toastPersistent)
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                          onPressed: () {
+                            setState(() {
+                              _showToast = false;
+                              _toastPersistent = false;
+                            });
+                          },
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
                     ],
                   ),
                 ),
@@ -346,7 +377,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       ),
     );
   }
-  
+
   Widget _buildClubsTab() {
     return Consumer<ClubsProvider>(
       builder: (context, clubsProvider, child) {
@@ -356,7 +387,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
             _cardKeys.add(GlobalKey());
           }
         }
-        
+
         return Column(
           children: [
             // Clubs list
@@ -372,10 +403,10 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
                           itemBuilder: (context, index) {
                             final club = clubsProvider.clubs[index];
                             final nextPractice = _getNextPractice(club);
-                            final currentParticipationStatus = nextPractice != null 
+                            final currentParticipationStatus = nextPractice != null
                                 ? nextPractice.getParticipationStatus(_currentUserId)
                                 : ParticipationStatus.blank;
-                            
+
                             return ClubCard(
                               key: index < _cardKeys.length ? _cardKeys[index] : null,
                               name: club.name,
@@ -407,7 +438,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       },
     );
   }
-  
+
   Widget _buildFindClubTab() {
     return Column(
       children: [
@@ -441,7 +472,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
             ],
           ),
         ),
-        
+
         // Find club placeholder
         Expanded(
           child: _buildFindClubPlaceholder(),
@@ -449,7 +480,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
       ],
     );
   }
-  
+
   Widget _buildFindClubPlaceholder() {
     return Center(
       child: Column(

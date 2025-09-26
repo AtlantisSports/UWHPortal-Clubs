@@ -889,7 +889,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
             child: Padding(
               padding: EdgeInsets.only(bottom: 16.0),
               child: Text(
-                'Select Timeframe and RSVP:',
+                'Select Timeframe and RSVP option:',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -1272,8 +1272,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     } else if (_selectedRSVPChoice == null) {
       message = 'Please choose an RSVP option to apply Bulk RSVP';
     } else {
-      // Practices not selected but RSVP chosen — use unified message
-      message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
+      // RSVP chosen but no practices selected
+      message = 'Please select at least 1 practice to apply Bulk RSVP';
     }
 
     _showCustomToast(

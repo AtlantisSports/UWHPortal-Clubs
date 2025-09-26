@@ -277,31 +277,52 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
         // Club header section with image/icon - added padding to match event details
         Padding(
           padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 2.0, bottom: 0.0), // No bottom padding
-          child: Container(
-            width: double.infinity,
-            height: 200.0, // Mobile height
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12.0), // Add rounded corners like event page
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.primary,
-                  AppColors.primaryDark,
-                ],
-              ),
-            ),
-            clipBehavior: Clip.hardEdge, // Ensure image respects border radius
-            child: widget.club.logoUrl != null
-                ? Image.network(
-                    widget.club.logoUrl!,
-                    fit: BoxFit.cover,
-                  )
-                : Icon(
-                    Icons.group,
-                    size: 80, // Mobile size
-                    color: Colors.white54,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final double maxWidth = constraints.maxWidth.isFinite ? constraints.maxWidth : MediaQuery.of(context).size.width;
+              const double maxHeight = 100.0; // cap height
+              const double aspect = 1.91; // width : height
+              final double targetWidth = maxWidth < aspect * maxHeight ? maxWidth : aspect * maxHeight;
+              final double targetHeight = targetWidth / aspect; // enforce exact 1.91:1
+              return SizedBox(
+                width: double.infinity,
+                child: Center(
+                  child: SizedBox(
+                    width: targetWidth,
+                    height: targetHeight,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12.0),
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            AppColors.primary,
+                            AppColors.primaryDark,
+                          ],
+                        ),
+                      ),
+                      clipBehavior: Clip.hardEdge,
+                      child: widget.club.logoUrl != null
+                          ? Center(
+                              child: Image.network(
+                                widget.club.logoUrl!,
+                                fit: BoxFit.contain,
+                                alignment: Alignment.center,
+                              ),
+                            )
+                          : Center(
+                              child: Icon(
+                                Icons.group,
+                                size: 56,
+                                color: Colors.white54,
+                              ),
+                            ),
+                    ),
                   ),
+                ),
+              );
+            },
           ),
         ),
 

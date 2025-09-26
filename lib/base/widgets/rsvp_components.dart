@@ -10,6 +10,44 @@ import '../../core/utils/time_utils.dart';
 import 'guest_management_modal.dart';
 import 'phone_aware_modal_utils.dart';
 
+
+// Local top-of-screen toast helper for components used outside calendar/list screens
+void showTopToast(BuildContext context, String message, Color color, IconData icon, {bool persistent = false}) {
+  final overlay = Overlay.of(context);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (ctx) => Positioned(
+      top: MediaQuery.of(ctx).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
+          child: Row(children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
+            if (persistent)
+              IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 20),
+                onPressed: () => entry.remove(),
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+          ]),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  if (!persistent) {
+    Future.delayed(const Duration(seconds: 3), () => entry.remove());
+  }
+}
+
 /// Truncate tag to 4 characters (exact same as bulk RSVP)
 String truncateTag(String tag) {
   if (tag.isEmpty) return '';
@@ -40,7 +78,7 @@ class RSVPIconButton extends StatefulWidget {
   final Function(ParticipationStatus) onStatusChanged;
   final double size;
   final bool enabled;
-  
+
   const RSVPIconButton({
     super.key,
     required this.status,
@@ -48,7 +86,7 @@ class RSVPIconButton extends StatefulWidget {
     this.size = 70.0, // Default 70px circle for optimal touch targets
     this.enabled = true,
   });
-  
+
   @override
   State<RSVPIconButton> createState() => _RSVPIconButtonState();
 }
@@ -57,7 +95,7 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  
+
   @override
   void initState() {
     super.initState();
@@ -73,21 +111,21 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
       curve: Curves.easeInOut,
     ));
   }
-  
+
   @override
   void dispose() {
     _animationController.dispose();
     super.dispose();
   }
-  
+
   void _onTap() {
     if (!widget.enabled) return;
-    
+
     // Play animation
     _animationController.forward().then((_) {
       _animationController.reverse();
     });
-    
+
     // Cycle through participation statuses: blank → yes → maybe → no → blank
     ParticipationStatus nextStatus;
     switch (widget.status) {
@@ -109,15 +147,15 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
         nextStatus = widget.status;
         break;
     }
-    
+
     widget.onStatusChanged(nextStatus);
   }
-  
+
   Widget _buildStatusContent() {
     if (widget.status == ParticipationStatus.blank) {
       return const SizedBox.shrink();
     }
-    
+
     if (widget.status == ParticipationStatus.maybe) {
       // Try plain question mark icon first (option 3)
       return Icon(
@@ -126,13 +164,13 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
         color: widget.status.color,
       );
     }
-    
+
     // Use icons for yes/no only
     return Icon(
       widget.status.overlayIcon,
       size: widget.size * 0.52, // Increased by 30% (0.4 * 1.3 = 0.52)
-      color: widget.enabled 
-        ? widget.status.color 
+      color: widget.enabled
+        ? widget.status.color
         : Colors.grey,
     );
   }
@@ -151,8 +189,8 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
               height: widget.size,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: widget.enabled 
-                  ? Colors.transparent 
+                color: widget.enabled
+                  ? Colors.transparent
                   : Colors.grey.withValues(alpha: 0.3),
               ),
               child: Stack(
@@ -165,15 +203,15 @@ class _RSVPIconButtonState extends State<RSVPIconButton>
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: widget.status == ParticipationStatus.maybe 
+                        color: widget.status == ParticipationStatus.maybe
                           ? widget.status.color  // Same as other options
-                          : (widget.enabled 
-                            ? widget.status.color 
+                          : (widget.enabled
+                            ? widget.status.color
                             : Colors.grey),
                         width: widget.status == ParticipationStatus.blank ? 2 : 4, // Thicker when selected
                       ),
-                      color: widget.status == ParticipationStatus.blank 
-                        ? Colors.transparent 
+                      color: widget.status == ParticipationStatus.blank
+                        ? Colors.transparent
                         : widget.status.color.withValues(alpha: 0.1), // Light background when selected
                     ),
                     child: Center(
@@ -255,13 +293,13 @@ class RSVPStatusDisplay extends StatelessWidget {
 class RSVPSummary extends StatelessWidget {
   final Map<ParticipationStatus, int> counts;
   final int totalInvited;
-  
+
   const RSVPSummary({
     super.key,
     required this.counts,
     required this.totalInvited,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -282,7 +320,7 @@ class RSVPSummary extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildStatusCount(ParticipationStatus status, int count) {
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -311,7 +349,7 @@ class RSVPSummary extends StatelessWidget {
       ],
     );
   }
-  
+
   String _getStatusLabel(ParticipationStatus status) {
     switch (status) {
       case ParticipationStatus.yes:
@@ -346,7 +384,7 @@ class PracticeStatusCard extends StatefulWidget {
   final VoidCallback? onTap; // For READ_ONLY mode card tap
   final ParticipationProvider? participationProvider; // For READ_ONLY mode
   final bool showAttendanceStatus; // For READ_ONLY mode
-  
+
   const PracticeStatusCard({
     super.key,
     required this.practice,
@@ -360,7 +398,7 @@ class PracticeStatusCard extends StatefulWidget {
     this.participationProvider,
     this.showAttendanceStatus = true,
   });
-  
+
   @override
   State<PracticeStatusCard> createState() => _PracticeStatusCardState();
 }
@@ -383,7 +421,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
 
   Widget _buildReadOnlyFutureCard() {
     final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
-    
+
     Widget cardContent = Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
       decoration: BoxDecoration(
@@ -443,7 +481,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             ],
           ),
           const SizedBox(height: 6),
-          
+
           // Practice details - same layout as RSVP card
           Row(
             children: [
@@ -470,7 +508,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    
+
                     // Time
                     Row(
                       children: [
@@ -493,7 +531,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    
+
                     // Location
                     Row(
                       children: [
@@ -505,8 +543,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: MouseRegion(
-                            cursor: widget.onLocationTap != null 
-                                ? SystemMouseCursors.click 
+                            cursor: widget.onLocationTap != null
+                                ? SystemMouseCursors.click
                                 : SystemMouseCursors.basic,
                             child: GestureDetector(
                               onTap: widget.onLocationTap,
@@ -514,11 +552,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                                 widget.practice.location,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: widget.onLocationTap != null 
-                                      ? const Color(0xFF0284C7) 
+                                  color: widget.onLocationTap != null
+                                      ? const Color(0xFF0284C7)
                                       : const Color(0xFF6B7280),
-                                  decoration: widget.onLocationTap != null 
-                                      ? TextDecoration.underline 
+                                  decoration: widget.onLocationTap != null
+                                      ? TextDecoration.underline
                                       : null,
                                 ),
                               ),
@@ -530,13 +568,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   ],
                 ),
               ),
-              
+
               // Status display (single disabled button showing current status)
               if (widget.showAttendanceStatus && userStatus != null)
                 _buildReadOnlyStatusDisplay(userStatus),
             ],
           ),
-          
+
           // Guest section for read-only mode (if user is going and has guests)
           if (userStatus == ParticipationStatus.yes) ...[
             const SizedBox(height: 12),
@@ -554,13 +592,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         child: cardContent,
       );
     }
-    
+
     return cardContent;
   }
 
   Widget _buildReadOnlyPastCard() {
     final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
-    
+
     Widget cardContent = Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
       decoration: BoxDecoration(
@@ -611,7 +649,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             ],
           ),
           const SizedBox(height: 6),
-          
+
           // Practice details - same layout as RSVP card
           Row(
             children: [
@@ -638,7 +676,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    
+
                     // Time
                     Row(
                       children: [
@@ -661,7 +699,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ),
                     const SizedBox(height: 2),
-                    
+
                     // Location
                     Row(
                       children: [
@@ -673,8 +711,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                         const SizedBox(width: 6),
                         Expanded(
                           child: MouseRegion(
-                            cursor: widget.onLocationTap != null 
-                                ? SystemMouseCursors.click 
+                            cursor: widget.onLocationTap != null
+                                ? SystemMouseCursors.click
                                 : SystemMouseCursors.basic,
                             child: GestureDetector(
                               onTap: widget.onLocationTap,
@@ -682,11 +720,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                                 widget.practice.location,
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: widget.onLocationTap != null 
-                                      ? const Color(0xFF0284C7) 
+                                  color: widget.onLocationTap != null
+                                      ? const Color(0xFF0284C7)
                                       : const Color(0xFF6B7280),
-                                  decoration: widget.onLocationTap != null 
-                                      ? TextDecoration.underline 
+                                  decoration: widget.onLocationTap != null
+                                      ? TextDecoration.underline
                                       : null,
                                 ),
                               ),
@@ -698,13 +736,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   ],
                 ),
               ),
-              
+
               // Status display (single disabled button showing current status)
               if (widget.showAttendanceStatus && userStatus != null)
                 _buildReadOnlyStatusDisplay(userStatus),
             ],
           ),
-          
+
           // Guest section for read-only mode (show if attended or going and guests exist)
           if (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.attended) ...[
             const SizedBox(height: 12),
@@ -722,7 +760,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         child: cardContent,
       );
     }
-    
+
     return cardContent;
   }
 
@@ -734,7 +772,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         // Get guest data from provider
         final guestList = participationProvider.getPracticeGuests(widget.practice.id);
         final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
-        
+
         return Container(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
           decoration: BoxDecoration(
@@ -816,7 +854,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 ],
               ),
               const SizedBox(height: 6),
-              
+
               // Practice details
               Row(
                 children: [
@@ -843,7 +881,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        
+
                         // Time
                         Row(
                           children: [
@@ -866,7 +904,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                           ],
                         ),
                         const SizedBox(height: 2),
-                        
+
                         // Location
                         Row(
                           children: [
@@ -904,7 +942,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ],
                     ),
                   ),
-                  
+
                   // RSVP buttons
                   Row(
                     children: [
@@ -917,7 +955,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   ),
                 ],
               ),
-              
+
               // Bring a guest section (only show if user selected "Yes")
               if (currentParticipationStatus == ParticipationStatus.yes) ...[
                 const SizedBox(height: 12),
@@ -934,7 +972,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     // Use exact same layout as RSVP buttons but with system blue color scheme
     final isBlank = status == ParticipationStatus.blank;
     final isAttendanceStatus = status == ParticipationStatus.attended || status == ParticipationStatus.missed;
-    
+
     return Container(
       width: 53, // Same as RSVP buttons
       height: 53, // Same as RSVP buttons
@@ -947,7 +985,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         color: isBlank ? Colors.grey.withValues(alpha: 0.1) : AppColors.primary.withValues(alpha: 0.1),
       ),
       child: Center(
-        child: isAttendanceStatus 
+        child: isAttendanceStatus
           ? Container(
               width: 35,
               height: 35,
@@ -972,7 +1010,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   width: 2.8,
                 ),
               ),
-              child: isBlank 
+              child: isBlank
                 ? null
                 : Icon(
                     _getOverlayIcon(status),
@@ -986,13 +1024,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
 
   Widget _buildReadOnlyGuestSection() {
     if (widget.participationProvider == null) return const SizedBox.shrink();
-    
+
     final guestList = widget.participationProvider!.getPracticeGuests(widget.practice.id);
 
     // For read-only past practices, show guests if they exist regardless of bringGuest state
     // This displays historical data - what actually happened
     if (guestList.totalGuests == 0) return const SizedBox.shrink();
-    
+
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
@@ -1078,7 +1116,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 onChanged: (value) {
                   final newBringGuest = value ?? false;
                   participationProvider.updateBringGuestState(widget.practice.id, newBringGuest);
-                  
+
                   if (!newBringGuest) {
                     // Clear guests if not bringing any
                     participationProvider.updatePracticeGuests(widget.practice.id, []);
@@ -1139,7 +1177,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ],
             ],
           ),
-          
+
           // Guest list display (only show if guests exist)
           if (bringGuest && guestList.totalGuests > 0) ...[
             const SizedBox(height: 8),
@@ -1166,7 +1204,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       ),
     );
   }
-  
+
   void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
     PhoneAwareModalUtils.showPhoneAwareBottomSheet(
       context: context,
@@ -1180,22 +1218,35 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       ),
     );
   }
-  
+
   Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
     final isSelected = currentParticipationStatus == status;
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
-    
+
     return GestureDetector(
       onTap: () async {
         // Only change if clicking a different option
         if (currentParticipationStatus != status) {
+          // Enforce Maybe limit (max 10) for individual RSVP cards
+          if (status == ParticipationStatus.maybe && currentParticipationStatus != ParticipationStatus.maybe) {
+            if (participationProvider.totalMaybeCount >= 10) {
+              showTopToast(
+                context,
+                'Only 10 Maybe RSVPs are allowed, they are really not that useful and are basically equivalent to not providing an RSVP at all',
+                const Color(0xFFF59E0B),
+                Icons.help_outline,
+                persistent: true,
+              );
+              return;
+            }
+          }
           try {
             // Use ParticipationProvider for centralized state management
             if (widget.clubId != null) {
               await participationProvider.updateParticipationStatus(widget.clubId!, widget.practice.id, status);
             }
-            
+
             // Call legacy callback if provided for backward compatibility
             widget.onParticipationChanged?.call(status);
           } catch (error) {
@@ -1238,7 +1289,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             ),
             child: Icon(
               _getOverlayIcon(status),
-              size: status == ParticipationStatus.maybe 
+              size: status == ParticipationStatus.maybe
                   ? 20.8 // Increased by 10% (18.954 * 1.1 = 20.8)
                   : 25.7, // Increased by 10% (23.4 * 1.1 = 25.7)
               color: color,
@@ -1301,7 +1352,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         return const Color(0xFFF59E0B); // Yellow (for default case)
     }
   }
-  
+
   IconData _getOverlayIcon(ParticipationStatus status) {
     switch (status) {
       case ParticipationStatus.yes:
@@ -1318,41 +1369,41 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         return Icons.cancel;
     }
   }
-  
+
   String _formatDate(DateTime dateTime) {
     final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
                    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    
+
     return '${weekdays[dateTime.weekday - 1]}, ${months[dateTime.month - 1]} ${dateTime.day}';
   }
-  
+
   String _formatTime(DateTime dateTime) {
     final startHour = dateTime.hour;
     final startMinute = dateTime.minute;
     final startPeriod = startHour >= 12 ? 'PM' : 'AM';
     final startDisplayHour = startHour > 12 ? startHour - 12 : (startHour == 0 ? 12 : startHour);
-    
+
     // Calculate end time using practice duration
     final endTime = dateTime.add(widget.practice.duration);
     final endHour = endTime.hour;
     final endMinute = endTime.minute;
     final endPeriod = endHour >= 12 ? 'PM' : 'AM';
     final endDisplayHour = endHour > 12 ? endHour - 12 : (endHour == 0 ? 12 : endHour);
-    
+
     // Format time without trailing zeros
     String formatTimeComponent(int hour, int minute, bool includePeriod, String period) {
       final minuteStr = minute == 0 ? '' : ':${minute.toString().padLeft(2, '0')}';
       final periodStr = includePeriod ? ' $period' : '';
       return '$hour$minuteStr$periodStr';
     }
-    
+
     // Check if we span from morning to afternoon/evening (AM to PM)
     final spansAmPm = startPeriod != endPeriod;
-    
+
     final startTimeStr = formatTimeComponent(startDisplayHour, startMinute, spansAmPm, startPeriod);
     final endTimeStr = formatTimeComponent(endDisplayHour, endMinute, true, endPeriod);
-    
+
     return '$startTimeStr - $endTimeStr';
   }
 }
@@ -1436,7 +1487,7 @@ class ParticipationStatusLegendModal extends StatelessWidget {
                   ),
 
                   const SizedBox(height: 16),
-          
+
                   // Legend items (simple rows without containers)
                   _buildSimpleLegendItem(
                     Icons.check_circle_outline,
@@ -1539,7 +1590,7 @@ class SelectablePracticeCard extends StatelessWidget {
   final Function(String practiceId, bool selected) onSelectionChanged;
   final VoidCallback? onTap;
   final bool showRSVPSummary;
-  
+
   const SelectablePracticeCard({
     super.key,
     required this.practice,
@@ -1549,19 +1600,19 @@ class SelectablePracticeCard extends StatelessWidget {
     this.onTap,
     this.showRSVPSummary = true,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     final userRSVPStatus = practice.getParticipationStatus(currentUserId);
     final rsvpCounts = practice.getParticipationCounts();
     final isUpcoming = practice.isUpcoming;
-    
+
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: isSelected ? 4 : 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: isSelected 
+        side: isSelected
           ? const BorderSide(color: Color(0xFF0284C7), width: 2)
           : BorderSide.none,
       ),
@@ -1596,7 +1647,7 @@ class SelectablePracticeCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 8),
-                    
+
                     // Practice title and date
                     Expanded(
                       child: Column(
@@ -1621,7 +1672,7 @@ class SelectablePracticeCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    
+
                     // Current RSVP status display (small)
                     if (isUpcoming)
                       RSVPStatusDisplay(
@@ -1630,9 +1681,9 @@ class SelectablePracticeCard extends StatelessWidget {
                       ),
                   ],
                 ),
-                
+
                 const SizedBox(height: 12),
-                
+
                 // Location and description
                 Row(
                   children: [
@@ -1653,7 +1704,7 @@ class SelectablePracticeCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                
+
                 if (practice.description.isNotEmpty) ...[
                   const SizedBox(height: 8),
                   Text(
@@ -1666,7 +1717,7 @@ class SelectablePracticeCard extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
-                
+
                 // RSVP Summary
                 if (showRSVPSummary) ...[
                   const SizedBox(height: 12),
@@ -1690,7 +1741,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
   final Function(ParticipationStatus) onBulkRSVP;
   final VoidCallback onClearSelection;
   final bool isLoading;
-  
+
   const BulkRSVPActionPanel({
     super.key,
     required this.selectedCount,
@@ -1698,11 +1749,11 @@ class BulkRSVPActionPanel extends StatelessWidget {
     required this.onClearSelection,
     this.isLoading = false,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     if (selectedCount == 0) return const SizedBox.shrink();
-    
+
     return Container(
       width: 393, // Phone boundary constraint
       margin: const EdgeInsets.all(16),
@@ -1746,9 +1797,9 @@ class BulkRSVPActionPanel extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 12),
-          
+
           // Bulk RSVP action buttons
           Row(
             children: [
@@ -1775,7 +1826,7 @@ class BulkRSVPActionPanel extends StatelessWidget {
       ),
     );
   }
-  
+
   Widget _buildActionButton(ParticipationStatus status, String label, IconData icon, bool isLoading) {
     return ElevatedButton(
       onPressed: isLoading ? null : () => onBulkRSVP(status),
@@ -1824,7 +1875,7 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
   final VoidCallback onConfirm;
   final VoidCallback onCancel;
   final bool isLoading;
-  
+
   const BulkRSVPConfirmationModal({
     super.key,
     required this.practices,
@@ -1833,7 +1884,7 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
     required this.onCancel,
     this.isLoading = false,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -1901,9 +1952,9 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
               ),
             ],
           ),
-          
+
           const SizedBox(height: 16),
-          
+
           // Practice list preview
           Text(
             'Practices to update (${practices.length}):',
@@ -1913,9 +1964,9 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
               color: Color(0xFF374151),
             ),
           ),
-          
+
           const SizedBox(height: 8),
-          
+
           // Compact scrollable practice list
           Flexible(
             child: Container(
@@ -1969,9 +2020,9 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
               ),
             ),
           ),
-          
+
           const SizedBox(height: 16), // Reduced spacing
-          
+
           // Action buttons
           Row(
             children: [
@@ -2038,12 +2089,12 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
 /// Widget for displaying guest type tags with practice tag styling
 class GuestTypeTag extends StatelessWidget {
   final GuestType guestType;
-  
+
   const GuestTypeTag({
     super.key,
     required this.guestType,
   });
-  
+
   @override
   Widget build(BuildContext context) {
     return Container(

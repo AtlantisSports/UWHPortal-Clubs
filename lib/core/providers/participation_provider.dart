@@ -46,22 +46,31 @@ class ParticipationProvider with ChangeNotifier {
   ParticipationStatus getParticipationStatus(String practiceId) {
     return _participationStatusMap[practiceId] ?? ParticipationStatus.blank;
   }
-  
+
   /// Get guest list for a specific practice
   PracticeGuestList getPracticeGuests(String practiceId) {
     return _practiceGuestsMap[practiceId] ?? const PracticeGuestList();
   }
-  
+
   /// Get "bring guest" checkbox state for a specific practice
   bool getBringGuestState(String practiceId) {
     return _bringGuestMap[practiceId] ?? false;
   }
-  
+
   /// Check if a specific practice is loading
   bool isLoading(String practiceId) {
     return _loadingStates[practiceId] ?? false;
   }
-  
+
+  /// Total count of practices currently marked as Maybe for the user (upcoming set)
+  int get totalMaybeCount {
+    int count = 0;
+    for (final status in _participationStatusMap.values) {
+      if (status == ParticipationStatus.maybe) count++;
+    }
+    return count;
+  }
+
   /// Initialize participation status from a practice object
   Future<void> initializePracticeParticipation(Practice practice) async {
     final status = practice.getParticipationStatus(currentUserId);
@@ -69,26 +78,26 @@ class ParticipationProvider with ChangeNotifier {
       _participationStatusMap[practice.id] = status;
       // Don't notify listeners here as this is initialization
     }
-    
+
     // Initialize mock guest data for past practices
     await _initializeMockGuestData(practice);
   }
-  
+
   /// Initialize participation statuses from a list of practices
   Future<void> initializePracticesParticipation(List<Practice> practices) async {
     bool hasChanges = false;
-    
+
     for (final practice in practices) {
       final status = practice.getParticipationStatus(currentUserId);
       if (_participationStatusMap[practice.id] != status) {
         _participationStatusMap[practice.id] = status;
         hasChanges = true;
       }
-      
+
       // Initialize mock guest data for past practices
       await _initializeMockGuestData(practice);
     }
-    
+
     if (hasChanges) {
       notifyListeners();
     }
@@ -100,7 +109,7 @@ class ParticipationProvider with ChangeNotifier {
     if (_practiceGuestsMap.containsKey(practice.id)) {
       return;
     }
-    
+
     // Only initialize guest data for recent past practices (within last 30 days)
     // to avoid performance issues with processing years of data
     final now = DateTime.now();
@@ -108,11 +117,11 @@ class ParticipationProvider with ChangeNotifier {
     if (practice.dateTime.isBefore(thirtyDaysAgo)) {
       return; // Skip old practices
     }
-    
+
     try {
       // Get guest data through UserService instead of direct MockDataService access
       final guestData = await _userService.getPracticeGuests(practice.id, practice.dateTime);
-      
+
       // Only set if there are guests to avoid unnecessary empty entries
       if (guestData.totalGuests > 0) {
         _practiceGuestsMap[practice.id] = guestData;
@@ -126,8 +135,8 @@ class ParticipationProvider with ChangeNotifier {
 
   /// Update participation status for a practice with time-based validation
   Future<void> updateParticipationStatus(
-    String clubId, 
-    String practiceId, 
+    String clubId,
+    String practiceId,
     ParticipationStatus newStatus, {
     bool isAdmin = false,
   }) async {
@@ -141,22 +150,22 @@ class ParticipationProvider with ChangeNotifier {
         (p) => p.id == practiceId,
         orElse: () => throw Exception('Practice not found'),
       );
-      
+
       // Check if the status change is allowed
       final availableStatuses = practice.getAvailableStatuses(isAdmin: isAdmin);
       if (!availableStatuses.contains(newStatus)) {
         throw Exception('Status change not allowed at this time');
       }
-      
+
       // Update the repository
       await _clubsRepository.updateParticipationStatus(clubId, practiceId, newStatus);
-      
+
       // Update local state
       _participationStatusMap[practiceId] = newStatus;
-      
+
       // Notify all listeners that this practice participation has changed
       notifyListeners();
-      
+
     } catch (error) {
       final errorMessage = AppErrorHandler.getErrorMessage(error);
       _setError(errorMessage);
@@ -165,25 +174,25 @@ class ParticipationProvider with ChangeNotifier {
       _setLoading(practiceId, false);
     }
   }
-  
+
   /// Update guest list for a practice
   void updatePracticeGuests(String practiceId, List<Guest> guests) {
     _practiceGuestsMap[practiceId] = PracticeGuestList(guests: guests);
     notifyListeners();
   }
-  
+
   /// Update "bring guest" checkbox state for a practice
   void updateBringGuestState(String practiceId, bool bringGuest) {
     _bringGuestMap[practiceId] = bringGuest;
-    
+
     // Clear guest list if not bringing guests
     if (!bringGuest) {
       _practiceGuestsMap[practiceId] = const PracticeGuestList();
     }
-    
+
     notifyListeners();
   }
-  
+
   /// Bulk update participation status for multiple practices
   /// Note: Consider moving to separate BulkOperationsProvider for better separation
   Future<BulkParticipationResult> bulkUpdateParticipation(BulkParticipationRequest request) async {
@@ -236,7 +245,7 @@ class ParticipationProvider with ChangeNotifier {
         (p) => p.id == practiceId,
         orElse: () => throw Exception('Practice not found'),
       );
-      
+
       final status = practice.getParticipationStatus(currentUserId);
       if (_participationStatusMap[practiceId] != status) {
         _participationStatusMap[practiceId] = status;
@@ -246,7 +255,7 @@ class ParticipationProvider with ChangeNotifier {
       AppErrorHandler.handleError(error);
     }
   }
-  
+
   /// Clear all participation data (useful for user logout, etc.)
   void clearAll() {
     _participationStatusMap.clear();
@@ -254,7 +263,7 @@ class ParticipationProvider with ChangeNotifier {
     _error = null;
     notifyListeners();
   }
-  
+
   /// Private helper methods
   void _setLoading(String practiceId, bool loading) {
     _loadingStates[practiceId] = loading;
