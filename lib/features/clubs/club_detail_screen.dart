@@ -406,13 +406,25 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       mode: PracticeStatusCardMode.clickable,
                       clubId: widget.club.id,
                       onParticipationChanged: (status) {
-                        // Show toast when RSVP changes
-                        String message = 'RSVP updated to: ${status.displayText}';
-                        Color toastColor = status.color;
-                        if (status == ParticipationStatus.maybe) {
-                          _showCustomToast(message, toastColor, Icons.help);
+                        // Build toast message reflecting Conditional Yes state
+                        final Color toastColor = status.color;
+                        if (status == ParticipationStatus.yes) {
+                          final cond = participationProvider.getConditionalYes(nextPractice.id);
+                          if (cond) {
+                            final th = participationProvider.getConditionalThreshold(nextPractice.id) ?? 6;
+                            final satisfied = participationProvider.isCurrentUserConditionalSatisfied(nextPractice);
+                            final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
+                            _showCustomToast(msg, toastColor, status.overlayIcon);
+                            return;
+                          }
+                          final msg = 'RSVP updated to: ${status.displayText}';
+                          _showCustomToast(msg, toastColor, status.overlayIcon);
+                        } else if (status == ParticipationStatus.maybe) {
+                          final msg = 'RSVP updated to: ${status.displayText}';
+                          _showCustomToast(msg, toastColor, Icons.help);
                         } else {
-                          _showCustomToast(message, toastColor, status.overlayIcon);
+                          final msg = 'RSVP updated to: ${status.displayText}';
+                          _showCustomToast(msg, toastColor, status.overlayIcon);
                         }
                       },
                       onLocationTap: _handleLocationTap,

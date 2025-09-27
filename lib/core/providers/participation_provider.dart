@@ -2,7 +2,8 @@
 /// Handles participation status and guest management for practices
 library;
 
-import 'package:flutter/foundation.dart';
+import 'dart:async';
+import 'package:flutter/widgets.dart';
 import '../models/practice.dart';
 import '../models/guest.dart';
 import '../utils/error_handler.dart';
@@ -10,7 +11,7 @@ import '../services/user_service.dart';
 import '../../features/clubs/clubs_repository.dart';
 import '../di/service_locator.dart';
 
-class ParticipationProvider with ChangeNotifier {
+class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
   final ClubsRepository _clubsRepository;
   final UserService _userService;
 
@@ -18,7 +19,10 @@ class ParticipationProvider with ChangeNotifier {
     ClubsRepository? clubsRepository,
     UserService? userService,
   }) : _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository,
-        _userService = userService ?? ServiceLocator.userService;
+        _userService = userService ?? ServiceLocator.userService {
+    // Observe app lifecycle to commit pending YES on background/close
+    WidgetsBinding.instance.addObserver(this);
+  }
 
   // Map to track participation status for each practice
   // Key: practiceId, Value: ParticipationStatus
@@ -34,6 +38,164 @@ class ParticipationProvider with ChangeNotifier {
 
   // Map to track "bring guest" checkbox state for each practice
   // Key: practiceId, Value: bool
+  // Pending YES countdown state
+  final Map<String, DateTime> _pendingYesStarts = {}; // practiceId -> start time
+  final Map<String, DateTime> _pendingYesDeadlines = {}; // practiceId -> deadline
+  final Map<String, Timer> _pendingYesTimers = {}; // practiceId -> deadline commit timer
+  final Map<String, Timer> _pendingYesTickers = {}; // practiceId -> periodic tick timer for progress
+  final Map<String, String> _pendingYesClubIds = {}; // practiceId -> clubId for commit
+
+  // Pause/resume support
+  final Set<String> _pendingYesPaused = {};
+  final Map<String, Duration> _pendingYesRemaining = {}; // remaining time at pause
+  final Map<String, double> _pendingYesProgressCache = {}; // frozen progress when paused
+
+  bool isPendingYes(String practiceId) => _pendingYesDeadlines.containsKey(practiceId);
+
+  /// Returns progress [0..1] of the pending YES countdown for a practice.
+  double pendingYesProgress(String practiceId) {
+    if (_pendingYesPaused.contains(practiceId)) {
+      return _pendingYesProgressCache[practiceId] ?? 0.0;
+    }
+    final start = _pendingYesStarts[practiceId];
+    final end = _pendingYesDeadlines[practiceId];
+    if (start == null || end == null) return 0.0;
+    final totalMs = end.difference(start).inMilliseconds;
+    if (totalMs <= 0) return 1.0;
+    final elapsedMs = DateTime.now().difference(start).inMilliseconds;
+    final v = elapsedMs / totalMs;
+    if (v < 0) return 0.0;
+    if (v > 1) return 1.0;
+    return v;
+  }
+
+  void startPendingYes(String clubId, String practiceId, {Duration duration = const Duration(seconds: 10)}) {
+    // If already pending, do nothing (repeated taps should not reset the countdown)
+    final existing = _pendingYesDeadlines[practiceId];
+    if (existing != null && existing.isAfter(DateTime.now())) {
+      return;
+    }
+    cancelPendingYes(practiceId);
+    _pendingYesClubIds[practiceId] = clubId;
+    final now = DateTime.now();
+    _pendingYesStarts[practiceId] = now;
+    _pendingYesDeadlines[practiceId] = now.add(duration);
+
+    // Start a timer to auto-commit YES at deadline
+    _pendingYesTimers[practiceId] = Timer(duration, () {
+      final cId = _pendingYesClubIds[practiceId];
+      if (cId != null) {
+        unawaited(commitPendingYes(cId, practiceId));
+      } else {
+        cancelPendingYes(practiceId);
+      }
+    });
+
+    // Start a periodic ticker to update progress every 100ms
+    _pendingYesTickers[practiceId] = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      if (!_pendingYesDeadlines.containsKey(practiceId)) {
+        t.cancel();
+        _pendingYesTickers.remove(practiceId);
+        return;
+      }
+      if (_pendingYesPaused.contains(practiceId)) {
+        // Do not tick while paused
+        return;
+      }
+      notifyListeners();
+    });
+
+    notifyListeners();
+  }
+
+  void pausePendingYes(String practiceId) {
+    if (!_pendingYesDeadlines.containsKey(practiceId)) return;
+    if (_pendingYesPaused.contains(practiceId)) return;
+    final start = _pendingYesStarts[practiceId];
+    final end = _pendingYesDeadlines[practiceId];
+    if (start == null || end == null) return;
+    final totalMs = end.difference(start).inMilliseconds;
+    final elapsedMs = DateTime.now().difference(start).inMilliseconds;
+    final remainingMs = (totalMs - elapsedMs).clamp(0, totalMs);
+    _pendingYesRemaining[practiceId] = Duration(milliseconds: remainingMs);
+    _pendingYesProgressCache[practiceId] = pendingYesProgress(practiceId);
+    _pendingYesPaused.add(practiceId);
+    _pendingYesTimers.remove(practiceId)?.cancel();
+    _pendingYesTickers.remove(practiceId)?.cancel();
+    notifyListeners();
+  }
+
+  void resumePendingYes(String practiceId) {
+    if (!_pendingYesPaused.remove(practiceId)) return;
+    final rem = _pendingYesRemaining.remove(practiceId) ?? Duration.zero;
+    final clubId = _pendingYesClubIds[practiceId];
+
+    final now = DateTime.now();
+    _pendingYesStarts[practiceId] = now;
+    _pendingYesDeadlines[practiceId] = now.add(rem);
+
+    if (rem <= Duration.zero) {
+      if (clubId != null) {
+        unawaited(commitPendingYes(clubId, practiceId));
+      } else {
+        cancelPendingYes(practiceId);
+      }
+      return;
+    }
+
+    _pendingYesTimers[practiceId] = Timer(rem, () {
+      final cId = _pendingYesClubIds[practiceId];
+      if (cId != null) {
+        unawaited(commitPendingYes(cId, practiceId));
+      } else {
+        cancelPendingYes(practiceId);
+      }
+    });
+
+    _pendingYesTickers[practiceId] = Timer.periodic(const Duration(milliseconds: 100), (t) {
+      if (!_pendingYesDeadlines.containsKey(practiceId)) {
+        t.cancel();
+        _pendingYesTickers.remove(practiceId);
+        return;
+      }
+      if (_pendingYesPaused.contains(practiceId)) return;
+      notifyListeners();
+    });
+
+    notifyListeners();
+  }
+
+  void cancelPendingYes(String practiceId) {
+    _pendingYesTimers.remove(practiceId)?.cancel();
+    _pendingYesTickers.remove(practiceId)?.cancel();
+    _pendingYesStarts.remove(practiceId);
+    _pendingYesDeadlines.remove(practiceId);
+    _pendingYesClubIds.remove(practiceId);
+    _pendingYesPaused.remove(practiceId);
+    _pendingYesRemaining.remove(practiceId);
+    _pendingYesProgressCache.remove(practiceId);
+    notifyListeners();
+  }
+
+  Future<void> commitPendingYes(String clubId, String practiceId) async {
+    // Clear pending state first to avoid duplicate commits
+    _pendingYesTimers.remove(practiceId)?.cancel();
+    _pendingYesTickers.remove(practiceId)?.cancel();
+    _pendingYesStarts.remove(practiceId);
+    _pendingYesDeadlines.remove(practiceId);
+    _pendingYesClubIds.remove(practiceId);
+    _pendingYesPaused.remove(practiceId);
+    _pendingYesRemaining.remove(practiceId);
+    _pendingYesProgressCache.remove(practiceId);
+    notifyListeners();
+
+    try {
+      await updateParticipationStatus(clubId, practiceId, ParticipationStatus.yes);
+    } catch (_) {
+      // Errors are already handled in updateParticipationStatus
+    }
+  }
+
   final Map<String, bool> _bringGuestMap = {};
 
   // Map to track loading states for each practice
@@ -329,16 +491,17 @@ class ParticipationProvider with ChangeNotifier {
       }
     });
 
-    // Current user group (if enabled)
+    // Current user group (if enabled and not pending YES)
     final bool myChecked = getConditionalYes(practice.id);
     final int? myThreshold = getConditionalThreshold(practice.id);
-    if (myChecked && myThreshold != null) {
+    final bool myPending = isPendingYes(practice.id);
+    if (!myPending && myChecked && myThreshold != null) {
       final int myGuests = getPracticeGuests(practice.id).totalGuests;
       pending.add(_CondGroup(threshold: myThreshold, contribution: 1 + myGuests, isCurrentUser: true));
     } else {
-      // If not using Conditional Yes, and current user is a hard Yes in the model, count them.
+      // If not using Conditional Yes (or currently pending), and current user is a hard Yes in the model, count them only when not pending.
       final myStatus = practice.getParticipationStatus(uid);
-      if (myStatus == ParticipationStatus.yes) effective++;
+      if (!myPending && myStatus == ParticipationStatus.yes) effective++;
     }
 
     // Fixed-point satisfaction loop
@@ -370,6 +533,9 @@ class ParticipationProvider with ChangeNotifier {
   /// under the same fixed-point rules used by computeEffectiveYesCount.
   bool isCurrentUserConditionalSatisfied(Practice practice) {
     final String uid = currentUserId;
+
+    // Pending YES means not yet effective or conditional
+    if (isPendingYes(practice.id)) return false;
 
     final bool myChecked = getConditionalYes(practice.id);
     final int? myThreshold = getConditionalThreshold(practice.id);
@@ -447,6 +613,28 @@ class ParticipationProvider with ChangeNotifier {
 
   /// Note: Filter management has been moved to PracticeFilterProvider
   /// This keeps ParticipationProvider focused on participation status only
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      // Commit all pending YES immediately when app is backgrounded/closing
+      final pending = Map<String, String>.from(_pendingYesClubIds);
+      for (final entry in pending.entries) {
+        unawaited(commitPendingYes(entry.value, entry.key));
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Cancel timers and remove observer
+    for (final t in _pendingYesTimers.values) {
+      t.cancel();
+    }
+    _pendingYesTimers.clear();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
 }
 
 class _CondGroup {

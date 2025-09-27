@@ -194,6 +194,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       _bulkChoice = BulkChoice.none;
       _bulkBringGuests = false;
       _bulkGuestList = const PracticeGuestList();
+      // Also reset Conditional Yes state each new session
+      _bulkConditional = false;
+      _bulkConditionalThreshold = null;
     });
     _insertSelectionOverlay();
     // Smooth auto-scroll so the tab bar is at the top
@@ -619,6 +622,31 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     final ps = filteredStatus.participationStatus;
     final isAttendance = filteredStatus.isAttendanceMode;
 
+
+    // Pending YES countdown: show full-size blue spinner replacing the circle
+    if (!isAttendance) {
+      final pending = Provider.of<ParticipationProvider>(context, listen: true)
+          .isPendingYes(filteredStatus.practiceId);
+      if (pending) {
+        final stroke = (size * 0.15).clamp(1.5, 3.0);
+        final provider = Provider.of<ParticipationProvider>(context, listen: true);
+        final progress = provider.pendingYesProgress(filteredStatus.practiceId);
+        return Opacity(
+          opacity: opacity,
+          child: SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              strokeWidth: stroke,
+              color: AppColors.primary,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              value: progress,
+            ),
+          ),
+        );
+      }
+    }
+
     Color color;
     IconData? icon;
     bool filled = isAttendance;
@@ -744,13 +772,31 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   /// Small status icon with Conditional Yes numeric badge when applicable (for lists/modals)
   Widget _rsvpIconWithCondBadge(Practice p, ParticipationStatus ps, double size) {
     final base = RSVPStatusDisplay(status: ps, size: size, showText: false);
-    if (ps != ParticipationStatus.yes) return base;
 
     return Consumer<ParticipationProvider>(
       builder: (context, provider, _) {
+        // Pending YES countdown: show spinner regardless of current status
+        if (provider.isPendingYes(p.id)) {
+          final stroke = (size * 0.15).clamp(1.5, 3.0);
+          final progress = provider.pendingYesProgress(p.id);
+          return SizedBox(
+            width: size,
+            height: size,
+            child: CircularProgressIndicator(
+              strokeWidth: stroke,
+              color: AppColors.primary,
+              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+              value: progress,
+            ),
+          );
+        }
+
+        if (ps != ParticipationStatus.yes) return base;
+
         if (!provider.getConditionalYes(p.id)) return base;
         final threshold = provider.getConditionalThreshold(p.id);
         if (threshold == null) return base;
+
         final satisfied = provider.isCurrentUserConditionalSatisfied(p);
         final badgeColor = satisfied ? AppColors.success : AppColors.primary;
 
@@ -1710,8 +1756,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       }
       final projected = currentMaybe + newMaybes;
       if (projected > 10) {
+        final overBy = projected - 10;
         _showTopScreenToast(
-          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
+          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers. Remove $overBy ${overBy == 1 ? 'practice' : 'practices'} to apply Maybe RSVPs.',
           const Color(0xFFF59E0B),
           Icons.help_outline,
           persistent: true,
@@ -1808,6 +1855,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       if (status == ParticipationStatus.maybe) {
         final count = practiceIds.length;
         message = 'Maybe applied to ${count == 1 ? '1 practice' : '$count practices'}';
+      } else if (status == ParticipationStatus.yes && _bulkConditional && _bulkConditionalThreshold != null) {
+        final n = _bulkConditionalThreshold!;
+        final x = practiceIds.length;
+        message = 'Yes if $n+ applied for $x practices';
       } else {
         message = '$label applied to ${practiceIds.length} practice(s)';
       }

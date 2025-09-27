@@ -1495,7 +1495,12 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       // Show success result to user
       if (mounted) {
         final successCount = targetPracticeIds.length;
-        String message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
+        String message;
+        if (_selectedRSVPChoice == ParticipationStatus.yes && _conditionalYesEnabled && _conditionalYesThreshold != null) {
+          message = 'Yes if $_conditionalYesThreshold+ applied for $successCount practices';
+        } else {
+          message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
+        }
 
 
 

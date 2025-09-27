@@ -404,6 +404,7 @@ class PracticeStatusCard extends StatefulWidget {
 }
 
 class _PracticeStatusCardState extends State<PracticeStatusCard> {
+  bool _wasPendingYes = false;
   // Conditional Yes threshold options
   final List<int> _condThresholdOptions = const [6, 8, 10, 12];
 
@@ -776,6 +777,15 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         final guestList = participationProvider.getPracticeGuests(widget.practice.id);
         final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
 
+        // Defer YES toast until after pending window completes and commit occurs
+        final isPending = participationProvider.isPendingYes(widget.practice.id);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_wasPendingYes && !isPending && participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.yes) {
+            showTopToast(context, 'RSVP updated to: Yes', ParticipationStatus.yes.color, Icons.check);
+          }
+          _wasPendingYes = isPending;
+        });
+
         return Container(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
           decoration: BoxDecoration(
@@ -817,6 +827,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                               ),
                             ),
                           ),
+
                         ),
                       ],
                     ],
@@ -959,14 +970,14 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 ],
               ),
 
-              // Conditions section (hidden unless Yes selected)
-              if (currentParticipationStatus == ParticipationStatus.yes) ...[
+              // Conditions section (hidden unless Yes selected or pending YES)
+              if (currentParticipationStatus == ParticipationStatus.yes || participationProvider.isPendingYes(widget.practice.id)) ...[
                 const SizedBox(height: 12),
                 _buildConditionsSection(widget.practice.id),
               ],
 
-              // Bring a guest section (only show if user selected "Yes")
-              if (currentParticipationStatus == ParticipationStatus.yes) ...[
+              // Bring a guest section (only show if user selected "Yes" or pending YES)
+              if (currentParticipationStatus == ParticipationStatus.yes || participationProvider.isPendingYes(widget.practice.id)) ...[
                 const SizedBox(height: 12),
                 _buildGuestSection(participationProvider, bringGuest, guestList),
               ],
@@ -1132,8 +1143,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   } else {
                     // Automatically open guest modal when checkbox is checked
                     // Use a small delay to ensure the UI state is updated first
-                    Future.delayed(const Duration(milliseconds: 100), () {
-                      _showGuestManagementModal(participationProvider, guestList);
+                    Future.delayed(const Duration(milliseconds: 100), () async {
+                      final wasPending = participationProvider.isPendingYes(widget.practice.id);
+                      if (wasPending) participationProvider.pausePendingYes(widget.practice.id);
+                      await _showGuestManagementModal(participationProvider, guestList);
+                      if (wasPending && participationProvider.isPendingYes(widget.practice.id)) {
+                        participationProvider.resumePendingYes(widget.practice.id);
+                      }
                     });
                   }
                 },
@@ -1165,7 +1181,14 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 MouseRegion(
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
-                    onTap: () => _showGuestManagementModal(participationProvider, guestList),
+                    onTap: () async {
+                      final wasPending = participationProvider.isPendingYes(widget.practice.id);
+                      if (wasPending) participationProvider.pausePendingYes(widget.practice.id);
+                      await _showGuestManagementModal(participationProvider, guestList);
+                      if (wasPending && participationProvider.isPendingYes(widget.practice.id)) {
+                        participationProvider.resumePendingYes(widget.practice.id);
+                      }
+                    },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
@@ -1236,17 +1259,32 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 onChanged: (value) async {
                   final newChecked = value ?? false;
                   if (newChecked) {
+                    // Pause pending countdown while the modal is open
+                    final wasPending = participationProvider.isPendingYes(practiceId);
+                    if (wasPending) {
+                      participationProvider.pausePendingYes(practiceId);
+                    }
+
                     // Open modal to pick threshold, default to lowest or previous
                     final selected = await _showConditionsModal(practiceId, initial: threshold);
                     if (!mounted) return;
                     if (selected != null) {
+                      // Switching to Conditional Yes cancels any pending YES countdown
+                      participationProvider.cancelPendingYes(practiceId);
                       participationProvider.setConditionalYes(practiceId, true, threshold: selected);
                     } else {
-                      // User cancelled; keep unchecked
+                      // User cancelled; keep unchecked, resume countdown if it was pending
                       participationProvider.setConditionalYes(practiceId, false);
+                      if (wasPending && participationProvider.isPendingYes(practiceId)) {
+                        participationProvider.resumePendingYes(practiceId);
+                      }
                     }
                   } else {
+                    // Unchecking Conditional Yes restarts a pending YES countdown
                     participationProvider.setConditionalYes(practiceId, false);
+                    if (widget.clubId != null) {
+                      participationProvider.startPendingYes(widget.clubId!, practiceId);
+                    }
                   }
                 },
                 activeColor: const Color(0xFF0284C7),
@@ -1326,8 +1364,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     );
   }
 
-  void _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
-    PhoneAwareModalUtils.showPhoneAwareBottomSheet(
+  Future<void> _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
+    return PhoneAwareModalUtils.showPhoneAwareBottomSheet<void>(
       context: context,
       child: GuestManagementModal(
         initialGuests: guestList,
@@ -1341,7 +1379,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
-    final isSelected = currentParticipationStatus == status;
+    final bool isPendingYes = status == ParticipationStatus.yes && participationProvider.isPendingYes(widget.practice.id);
+    final isSelected = currentParticipationStatus == status || isPendingYes;
     final color = status.color;
     final fadedBg = _getFadedBackground(status);
 
@@ -1352,43 +1391,48 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
 
     return GestureDetector(
       onTap: () async {
-        // Only change if clicking a different option
-        if (currentParticipationStatus != status) {
-          // Enforce Maybe limit (max 10) for individual RSVP cards
-          if (status == ParticipationStatus.maybe && currentParticipationStatus != ParticipationStatus.maybe) {
-            if (participationProvider.totalMaybeCount >= 10) {
-              showTopToast(
-                context,
-                'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
-                const Color(0xFFF59E0B),
-                Icons.help_outline,
-                persistent: true,
-              );
-              return;
-            }
-          }
-          try {
-            // Use ParticipationProvider for centralized state management
-            if (widget.clubId != null) {
-              await participationProvider.updateParticipationStatus(widget.clubId!, widget.practice.id, status);
+        try {
+          if (widget.clubId == null) return;
+
+          if (status == ParticipationStatus.yes) {
+            // Always (re)start 10s pending YES countdown on tapping YES
+            participationProvider.startPendingYes(widget.clubId!, widget.practice.id);
+          } else if (currentParticipationStatus != status) {
+            // Enforce Maybe limit (max 10) for individual RSVP cards
+            if (status == ParticipationStatus.maybe && currentParticipationStatus != ParticipationStatus.maybe) {
+              if (participationProvider.totalMaybeCount >= 10) {
+                showTopToast(
+                  context,
+                  'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
+                  const Color(0xFFF59E0B),
+                  Icons.help_outline,
+                  persistent: true,
+                );
+                return;
+              }
             }
 
-            // Call legacy callback if provided for backward compatibility
+            // Cancel any pending YES and commit the chosen status immediately
+            participationProvider.cancelPendingYes(widget.practice.id);
+            await participationProvider.updateParticipationStatus(widget.clubId!, widget.practice.id, status);
+          }
+
+          // Call legacy callback if provided for backward compatibility
+          if (status != ParticipationStatus.yes) {
             widget.onParticipationChanged?.call(status);
-          } catch (error) {
-            // Show error toast if RSVP update fails
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Failed to update RSVP. Please try again.'),
-                  backgroundColor: Colors.red,
-                  duration: Duration(seconds: 3),
-                ),
-              );
-            }
+          }
+        } catch (error) {
+          // Show error toast if RSVP update fails
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Failed to update RSVP. Please try again.'),
+                backgroundColor: Colors.red,
+                duration: Duration(seconds: 3),
+              ),
+            );
           }
         }
-        // If already selected, do nothing (no toast, no change)
       },
       child: Container(
         width: 53, // Increased from 48 to 53 (48 * 1.1 = 52.8, rounded to 53)
@@ -1405,25 +1449,38 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           clipBehavior: Clip.none,
           children: [
             Center(
-              child: Container(
-                width: 35,
-                height: 35,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: color,
-                    width: isSelected ? 4 : 2,
-                  ),
-                  color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
-                ),
-                child: Icon(
-                  _getOverlayIcon(status),
-                  size: status == ParticipationStatus.maybe ? 20.8 : 25.7,
-                  color: color,
-                ),
-              ),
+              child: (
+                status == ParticipationStatus.yes && isPendingYes
+              )
+                  ? SizedBox(
+                      width: 35,
+                      height: 35,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3.0,
+                        color: AppColors.primary,
+                        backgroundColor: AppColors.primary.withValues(alpha: 0.15),
+                        value: participationProvider.pendingYesProgress(widget.practice.id),
+                      ),
+                    )
+                  : Container(
+                      width: 35,
+                      height: 35,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: color,
+                          width: isSelected ? 4 : 2,
+                        ),
+                        color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
+                      ),
+                      child: Icon(
+                        _getOverlayIcon(status),
+                        size: status == ParticipationStatus.maybe ? 20.8 : 25.7,
+                        color: color,
+                      ),
+                    ),
             ),
-            if (status == ParticipationStatus.yes && isSelected && (participationProvider.getConditionalYes(widget.practice.id)))
+            if (status == ParticipationStatus.yes && isSelected && !isPendingYes && (participationProvider.getConditionalYes(widget.practice.id)))
               Positioned(
                 right: 2,
                 top: 2,
@@ -1470,6 +1527,14 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   String _getParticipationHeaderText(ParticipationStatus? currentParticipationStatus) {
     switch (currentParticipationStatus) {
       case ParticipationStatus.yes:
+        // If Conditional Yes is enabled, show conditional label
+        final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+        final cond = participationProvider.getConditionalYes(widget.practice.id);
+        if (cond) {
+          final th = participationProvider.getConditionalThreshold(widget.practice.id) ?? 6;
+          final satisfied = participationProvider.isCurrentUserConditionalSatisfied(widget.practice);
+          return satisfied ? '$th+ you are going!' : 'Going if $th+';
+        }
         return 'Going';
       case ParticipationStatus.no:
         return 'Not going';
