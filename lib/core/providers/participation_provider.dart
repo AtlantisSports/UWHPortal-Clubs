@@ -227,6 +227,13 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
     notifyListeners();
   }
 
+  /// Clear Conditional Yes state and its threshold for a practice
+  void clearConditionalYes(String practiceId) {
+    _conditionalYesMap[practiceId] = false;
+    _conditionalThresholdMap.remove(practiceId);
+    notifyListeners();
+  }
+
   /// Get guest list for a specific practice
   PracticeGuestList getPracticeGuests(String practiceId) {
     return _practiceGuestsMap[practiceId] ?? const PracticeGuestList();

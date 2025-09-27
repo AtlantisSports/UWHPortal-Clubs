@@ -280,22 +280,23 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
     try {
       final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-      final today = DateTime.now();
 
-      // Get all club practices from today forward
-      final allPractices = _getClubPractices();
-      final futurePractices = allPractices.where((practice) {
-        return practice.dateTime.isAfter(today) ||
-               practice.dateTime.day == today.day;
-      }).toList();
+      // Use actual practice instances for this club and only those with RSVP window still open
+      final allInstances = widget.club.upcomingPractices;
+      final eligiblePractices = allInstances.where((p) => p.isRSVPWindowOpen).toList();
 
-      // Clear RSVPs for each future practice
-      for (final practice in futurePractices) {
+      for (final practice in eligiblePractices) {
+        // Cancel any pending YES countdown
+        participationProvider.cancelPendingYes(practice.id);
+
+        // Clear Conditional Yes state and threshold
+        participationProvider.clearConditionalYes(practice.id);
+
         // Clear user's own RSVP
         await participationProvider.updateParticipationStatus(
           widget.club.id,
           practice.id,
-          ParticipationStatus.blank
+          ParticipationStatus.blank,
         );
 
         // Clear new player guests and dependents (preserve known Visitors/Club members)
@@ -307,6 +308,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         }).toList();
 
         participationProvider.updatePracticeGuests(practice.id, filteredGuests);
+        participationProvider.updateBringGuestState(practice.id, filteredGuests.isNotEmpty);
       }
 
       _showCustomToast(
