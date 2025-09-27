@@ -70,18 +70,14 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     _tabController = TabController(length: 5, vsync: this);
     _scrollController = ScrollController();
 
-    // Add listener to auto-scroll when tab is clicked (after frame is built)
-    // Note: Using onTap in TabBar widget instead of controller listener to avoid conflicts
-    /*
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _tabController.addListener(() {
-        if (_tabController.indexIsChanging) {
-          _autoScrollToTabsPosition();
-        }
-      });
+    // Auto-scroll on swipe between tabs (in addition to tap)
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _autoScrollToTabsPosition();
+      }
     });
-    */
-  // Removed call to _initializeRSVPStatus (method no longer exists)
+
+    // Removed call to _initializeRSVPStatus (method no longer exists)
   }
 
   // ...existing code...

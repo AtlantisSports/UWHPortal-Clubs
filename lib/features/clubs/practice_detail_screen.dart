@@ -13,6 +13,7 @@ import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/providers/navigation_provider.dart';
+import '../../core/utils/time_utils.dart';
 
 import '../../base/widgets/rsvp_components.dart';
 import 'club_detail_screen.dart';
@@ -61,6 +62,14 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    // Also auto-scroll when user swipes between tabs (not just taps)
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        _autoScrollToTabsPosition();
+      }
+    });
+
     _generateMockRSVPSummary();
   }
 
@@ -101,17 +110,47 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
 
   void _autoScrollToTabsPosition() {
     final ctx = _tabBarKey.currentContext;
-    if (ctx != null) {
+    if (ctx == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
       Scrollable.ensureVisible(
         ctx,
-        duration: const Duration(milliseconds: 200),
-        alignment: 0.0,
-        alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtStart,
+        duration: const Duration(milliseconds: 300),
         curve: Curves.easeInOut,
+        alignment: 0.0,
       );
-    }
+    });
   }
 
+  // Compute header title as "<DayOfWeek> <Morning/Afternoon/Evening>"
+  String _computeHeaderTitle(Practice p) {
+    final day = TimeUtils.formatDayName(p.dateTime.weekday);
+    final h = p.dateTime.hour;
+    // Use existing app convention for non-recurring practices: Morning/Afternoon/Evening buckets
+    String period;
+    if (h < 12) {
+      period = 'Morning';
+    } else if (h < 17) {
+      period = 'Afternoon';
+    } else {
+      period = 'Evening';
+    }
+    return '$day $period';
+  }
+
+
+
+  // Safe parser for trailing parenthetical (recurrence) from title
+  String? _getRecurringTextSafe() {
+    final t = widget.practice.title.trim();
+    if (t.endsWith(')')) {
+      final start = t.lastIndexOf('(');
+      if (start != -1 && start < t.length - 1) {
+        final inner = t.substring(start + 1, t.length - 1).trim();
+        if (inner.isNotEmpty) return inner;
+      }
+    }
+    return null;
+  }
 
 
   Widget _buildRSVPsTab(BuildContext context) {
@@ -338,30 +377,35 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
         body: NestedScrollView(
           headerSliverBuilder: (context, innerBoxIsScrolled) {
             return [
+              // Title in header (non-pinned, matches Club Details layout pattern)
+              SliverToBoxAdapter(
+                child: Container(
+                  width: double.infinity,
+                  margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  padding: EdgeInsets.symmetric(vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.grey[300]!),
+                  ),
+                  child: Center(
+                    child: Text(
+                      _computeHeaderTitle(widget.practice),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
               SliverToBoxAdapter(
                 child: Column(
                   children: [
-                    // Practice Title above RSVP card
-                    Container(
-                      width: double.infinity,
-                      margin: EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      padding: EdgeInsets.all(10), // Reduced from 20 to 10 (50% reduction)
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.grey[300]!),
-                      ),
-                      child: Center(
-                        child: Text(
-                          widget.practice.title,
-                          style: TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
                     // RSVP Card for future events, Attendance card for past events
                     _isPastEvent(widget.practice)
                         ? Container(
@@ -407,6 +451,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                   ],
                 ),
               ),
+
               SliverPersistentHeader(
                 pinned: true,
                 delegate: _StickyTabBarDelegate(
@@ -420,7 +465,13 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                       labelColor: AppColors.primary,
                       unselectedLabelColor: AppColors.textSecondary,
                       indicatorColor: AppColors.primary,
-                      onTap: (_) => _autoScrollToTabsPosition(),
+                      onTap: (index) {
+                        if (index == 0) {
+                          Future.delayed(const Duration(milliseconds: 50), _autoScrollToTabsPosition);
+                        } else {
+                          _autoScrollToTabsPosition();
+                        }
+                      },
                       tabs: const [
                         Tab(text: 'About'),
                         Tab(text: 'RSVPs'),
@@ -570,6 +621,20 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Recurring pattern (moved from title), when present
+            if (_getRecurringTextSafe() != null)
+              Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: Text(
+                  _getRecurringTextSafe()!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ),
+
             // Description
             Container(
               width: double.infinity,
@@ -664,6 +729,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
                 color: AppColors.textPrimary,
+
               ),
               textAlign: TextAlign.center,
             ),
