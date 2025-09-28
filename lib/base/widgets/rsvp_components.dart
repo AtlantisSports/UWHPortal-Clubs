@@ -12,6 +12,30 @@ import 'phone_aware_modal_utils.dart';
 
 
 // Local top-of-screen toast helper for components used outside calendar/list screens
+
+/// Centralized final-commit toast policy
+void showFinalCommitToastForPractice(BuildContext context, ParticipationProvider provider, Practice practice) {
+  // Use the just-committed target if available to avoid showing the old status toast
+  final finalStatus = provider.getLastCommittedTarget(practice.id) ?? provider.getParticipationStatus(practice.id);
+  if (finalStatus == ParticipationStatus.yes) {
+    showTopToast(context, 'Going', ParticipationStatus.yes.color, Icons.check);
+  } else if (finalStatus == ParticipationStatus.no) {
+    showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
+  } else if (finalStatus == ParticipationStatus.maybe) {
+    final cond = provider.getConditionalMaybe(practice.id);
+    if (cond) {
+      final th = provider.getConditionalMaybeThreshold(practice.id) ?? 6;
+      final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
+      final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
+      final color = satisfied ? AppColors.success : const Color(0xFFF59E0B);
+      const icon = Icons.help_outline;
+      showTopToast(context, msg, color, icon);
+    } else {
+      showTopToast(context, 'Maybe', const Color(0xFFF59E0B), Icons.help_outline);
+    }
+  }
+}
+
 void showTopToast(BuildContext context, String message, Color color, IconData icon, {bool persistent = false}) {
   final overlay = Overlay.of(context);
   late OverlayEntry entry;
@@ -233,28 +257,31 @@ class RSVPStatusDisplay extends StatelessWidget {
   final ParticipationStatus status;
   final double size;
   final bool showText;
+  final Color? overrideColor;
 
   const RSVPStatusDisplay({
     super.key,
     required this.status,
     this.size = 24.0,
     this.showText = true,
+    this.overrideColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = overrideColor ?? status.color;
     final iconWidget = Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: status.color,
+          color: effectiveColor,
           width: 2,
         ),
         color: status == ParticipationStatus.blank
           ? Colors.transparent
-          : status.color.withValues(alpha: 0.1),
+          : effectiveColor.withValues(alpha: 0.1),
       ),
       child: status == ParticipationStatus.blank
           ? null
@@ -265,7 +292,7 @@ class RSVPStatusDisplay extends StatelessWidget {
               size: status == ParticipationStatus.maybe
                   ? size * 0.7  // Smaller question mark
                   : (size * 0.6) * 1.3, // Increased by 30% (0.6 * 1.3 = 0.78)
-              color: status.color,
+              color: effectiveColor,
             ),
     );
 
@@ -279,7 +306,7 @@ class RSVPStatusDisplay extends StatelessWidget {
         Text(
           status.displayText,
           style: TextStyle(
-            color: status.color,
+            color: effectiveColor,
             fontWeight: FontWeight.w500,
             fontSize: size * 0.6,
           ),
@@ -404,7 +431,7 @@ class PracticeStatusCard extends StatefulWidget {
 }
 
 class _PracticeStatusCardState extends State<PracticeStatusCard> {
-  bool _wasPendingYes = false;
+  bool _wasPending = false;
   // Conditional Yes threshold options
   final List<int> _condThresholdOptions = const [6, 8, 10, 12];
 
@@ -777,13 +804,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         final guestList = participationProvider.getPracticeGuests(widget.practice.id);
         final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
 
-        // Defer YES toast until after pending window completes and commit occurs
-        final isPending = participationProvider.isPendingYes(widget.practice.id);
+        // Defer toast until after pending window completes and commit occurs
+        final isPending = participationProvider.isPendingChange(widget.practice.id);
         WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_wasPendingYes && !isPending && participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.yes) {
-            showTopToast(context, 'RSVP updated to: Yes', ParticipationStatus.yes.color, Icons.check);
+          if (_wasPending && !isPending) {
+            showFinalCommitToastForPractice(context, participationProvider, widget.practice);
           }
-          _wasPendingYes = isPending;
+          _wasPending = isPending;
         });
 
         return Container(
@@ -970,14 +997,21 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 ],
               ),
 
-              // Conditions section (hidden unless Yes selected or pending YES)
-              if (currentParticipationStatus == ParticipationStatus.yes || participationProvider.isPendingYes(widget.practice.id)) ...[
+              // Conditions section (only for Maybe or when pending target is Maybe)
+              if (currentParticipationStatus == ParticipationStatus.maybe ||
+                  (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe)) ...[
                 const SizedBox(height: 12),
                 _buildConditionsSection(widget.practice.id),
               ],
 
-              // Bring a guest section (only show if user selected "Yes" or pending YES)
-              if (currentParticipationStatus == ParticipationStatus.yes || participationProvider.isPendingYes(widget.practice.id)) ...[
+              // Bring a guest section:
+              // - Always for Yes (or pending Yes)
+              // - For Maybe only when Conditional is ON (also during pending Maybe target)
+              if (currentParticipationStatus == ParticipationStatus.yes ||
+                  (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.yes) ||
+                  ((currentParticipationStatus == ParticipationStatus.maybe ||
+                    (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe))
+                   && participationProvider.getConditionalMaybe(widget.practice.id))) ...[
                 const SizedBox(height: 12),
                 _buildGuestSection(participationProvider, bringGuest, guestList),
               ],
@@ -1144,11 +1178,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     // Automatically open guest modal when checkbox is checked
                     // Use a small delay to ensure the UI state is updated first
                     Future.delayed(const Duration(milliseconds: 100), () async {
-                      final wasPending = participationProvider.isPendingYes(widget.practice.id);
-                      if (wasPending) participationProvider.pausePendingYes(widget.practice.id);
-                      await _showGuestManagementModal(participationProvider, guestList);
-                      if (wasPending && participationProvider.isPendingYes(widget.practice.id)) {
-                        participationProvider.resumePendingYes(widget.practice.id);
+                      final wasPending = participationProvider.isPendingChange(widget.practice.id);
+                      if (wasPending) participationProvider.pausePendingChange(widget.practice.id);
+                      final pendingMaybe = participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe;
+                      final isConditionalMaybe = (participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.maybe || pendingMaybe) && participationProvider.getConditionalMaybe(widget.practice.id);
+                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: isConditionalMaybe);
+                      if (wasPending && participationProvider.isPendingChange(widget.practice.id)) {
+                        participationProvider.resumePendingChange(widget.practice.id);
                       }
                     });
                   }
@@ -1182,11 +1218,13 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   cursor: SystemMouseCursors.click,
                   child: GestureDetector(
                     onTap: () async {
-                      final wasPending = participationProvider.isPendingYes(widget.practice.id);
-                      if (wasPending) participationProvider.pausePendingYes(widget.practice.id);
-                      await _showGuestManagementModal(participationProvider, guestList);
-                      if (wasPending && participationProvider.isPendingYes(widget.practice.id)) {
-                        participationProvider.resumePendingYes(widget.practice.id);
+                      final wasPending = participationProvider.isPendingChange(widget.practice.id);
+                      if (wasPending) participationProvider.pausePendingChange(widget.practice.id);
+                      final pendingMaybe = participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe;
+                      final isConditionalMaybe = (participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.maybe || pendingMaybe) && participationProvider.getConditionalMaybe(widget.practice.id);
+                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: isConditionalMaybe);
+                      if (wasPending && participationProvider.isPendingChange(widget.practice.id)) {
+                        participationProvider.resumePendingChange(widget.practice.id);
                       }
                     },
                     child: Container(
@@ -1239,8 +1277,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
 
   Widget _buildConditionsSection(String practiceId) {
     final participationProvider = Provider.of<ParticipationProvider>(context, listen: true);
-    final checked = participationProvider.getConditionalYes(practiceId);
-    final threshold = participationProvider.getConditionalThreshold(practiceId) ?? _condThresholdOptions.first;
+    final checked = participationProvider.getConditionalMaybe(practiceId);
+    final threshold = participationProvider.getConditionalMaybeThreshold(practiceId) ?? _condThresholdOptions.first;
 
     return Container(
       padding: const EdgeInsets.all(6),
@@ -1259,32 +1297,38 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 onChanged: (value) async {
                   final newChecked = value ?? false;
                   if (newChecked) {
-                    // Pause pending countdown while the modal is open
-                    final wasPending = participationProvider.isPendingYes(practiceId);
-                    if (wasPending) {
-                      participationProvider.pausePendingYes(practiceId);
-                    }
+                    // Pause countdown while picking threshold
+                    final wasPending = participationProvider.isPendingChange(practiceId);
+                    if (wasPending) participationProvider.pausePendingChange(practiceId);
 
-                    // Open modal to pick threshold, default to lowest or previous
                     final selected = await _showConditionsModal(practiceId, initial: threshold);
                     if (!mounted) return;
                     if (selected != null) {
-                      // Switching to Conditional Yes cancels any pending YES countdown
-                      participationProvider.cancelPendingYes(practiceId);
-                      participationProvider.setConditionalYes(practiceId, true, threshold: selected);
+                      // Enable Conditional Maybe, reset countdown to target Maybe per spec
+                      participationProvider.setConditionalMaybe(practiceId, true, threshold: selected);
+
+                      // Remove non-dependent guests and keep only Dependents
+                      final currentGuests = participationProvider.getPracticeGuests(practiceId);
+                      final filtered = currentGuests.guests.where((g) => g.type == GuestType.dependent).toList();
+                      participationProvider.updatePracticeGuests(practiceId, filtered);
+                      participationProvider.updateBringGuestState(practiceId, filtered.isNotEmpty);
+
+                      if (widget.clubId != null) {
+                        participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
+                      }
+                      if (wasPending && participationProvider.isPendingChange(practiceId)) {
+                        participationProvider.resumePendingChange(practiceId);
+                      }
                     } else {
-                      // User cancelled; keep unchecked, resume countdown if it was pending
-                      participationProvider.setConditionalYes(practiceId, false);
-                      if (wasPending && participationProvider.isPendingYes(practiceId)) {
-                        participationProvider.resumePendingYes(practiceId);
+                      // Cancelled: keep unchecked, resume countdown if it was pending
+                      participationProvider.setConditionalMaybe(practiceId, false);
+                      if (wasPending && participationProvider.isPendingChange(practiceId)) {
+                        participationProvider.resumePendingChange(practiceId);
                       }
                     }
                   } else {
-                    // Unchecking Conditional Yes restarts a pending YES countdown
-                    participationProvider.setConditionalYes(practiceId, false);
-                    if (widget.clubId != null) {
-                      participationProvider.startPendingYes(widget.clubId!, practiceId);
-                    }
+                    // Turning OFF Conditional Maybe does not reset countdown per spec
+                    participationProvider.setConditionalMaybe(practiceId, false);
                   }
                 },
                 activeColor: const Color(0xFF0284C7),
@@ -1292,7 +1336,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ),
               const SizedBox(width: 4),
               const Text(
-                'Conditional Yes',
+                'Conditional Maybe',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
@@ -1308,6 +1352,25 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     fontWeight: FontWeight.w600,
                     color: Color(0xFF6B7280),
                   ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  icon: const Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
+                  tooltip: 'Edit threshold',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  onPressed: () async {
+                    final wasPending = participationProvider.isPendingChange(practiceId);
+                    if (wasPending) participationProvider.pausePendingChange(practiceId);
+                    final selected = await _showConditionsModal(practiceId, initial: threshold);
+                    if (!mounted) return;
+                    if (selected != null) {
+                      participationProvider.setConditionalMaybe(practiceId, true, threshold: selected);
+                    }
+                    if (wasPending && participationProvider.isPendingChange(practiceId)) {
+                      participationProvider.resumePendingChange(practiceId);
+                    }
+                  },
                 ),
               ],
             ],
@@ -1364,7 +1427,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     );
   }
 
-  Future<void> _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList) {
+  Future<void> _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList, {required bool dependentsOnly}) {
     return PhoneAwareModalUtils.showPhoneAwareBottomSheet<void>(
       context: context,
       child: GuestManagementModal(
@@ -1374,18 +1437,26 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           participationProvider.updatePracticeGuests(widget.practice.id, newGuestList.guests);
         },
         practiceId: widget.practice.id,
+        dependentsOnly: dependentsOnly,
       ),
     );
   }
 
   Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
-    final bool isPendingYes = status == ParticipationStatus.yes && participationProvider.isPendingYes(widget.practice.id);
-    final isSelected = currentParticipationStatus == status || isPendingYes;
-    final color = status.color;
+    final bool isPending = participationProvider.isPendingChange(widget.practice.id) &&
+        (participationProvider.getPendingTarget(widget.practice.id) == status);
+    final isSelected = currentParticipationStatus == status || isPending;
+
+    // Dynamic color: Maybe turns green when Conditional is ON and satisfied
+    Color color = status.color;
+    if (status == ParticipationStatus.maybe && participationProvider.getConditionalMaybe(widget.practice.id)) {
+      final satisfied = participationProvider.isCurrentUserConditionalSatisfied(widget.practice);
+      if (satisfied) color = AppColors.success;
+    }
     final fadedBg = _getFadedBackground(status);
 
-    // Conditional Yes satisfaction using centralized fixed-point logic
-    final bool condSatisfied = status == ParticipationStatus.yes
+    // Conditional satisfaction for Maybe
+    final bool condSatisfied = status == ParticipationStatus.maybe
         ? participationProvider.isCurrentUserConditionalSatisfied(widget.practice)
         : false;
 
@@ -1394,33 +1465,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         try {
           if (widget.clubId == null) return;
 
-          if (status == ParticipationStatus.yes) {
-            // Always (re)start 10s pending YES countdown on tapping YES
-            participationProvider.startPendingYes(widget.clubId!, widget.practice.id);
-          } else if (currentParticipationStatus != status) {
-            // Enforce Maybe limit (max 10) for individual RSVP cards
-            if (status == ParticipationStatus.maybe && currentParticipationStatus != ParticipationStatus.maybe) {
-              if (participationProvider.totalMaybeCount >= 10) {
-                showTopToast(
-                  context,
-                  'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
-                  const Color(0xFFF59E0B),
-                  Icons.help_outline,
-                  persistent: true,
-                );
-                return;
-              }
-            }
-
-            // Cancel any pending YES and commit the chosen status immediately
-            participationProvider.cancelPendingYes(widget.practice.id);
-            await participationProvider.updateParticipationStatus(widget.clubId!, widget.practice.id, status);
-          }
-
-          // Call legacy callback if provided for backward compatibility
-          if (status != ParticipationStatus.yes) {
-            widget.onParticipationChanged?.call(status);
-          }
+          // Universal 10s countdown for any change in state (Yes/Maybe/No)
+          participationProvider.startPendingChange(widget.clubId!, widget.practice.id, status);
         } catch (error) {
           // Show error toast if RSVP update fails
           if (mounted) {
@@ -1450,7 +1496,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           children: [
             Center(
               child: (
-                status == ParticipationStatus.yes && isPendingYes
+                isPending
               )
                   ? SizedBox(
                       width: 35,
@@ -1459,7 +1505,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                         strokeWidth: 3.0,
                         color: AppColors.primary,
                         backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                        value: participationProvider.pendingYesProgress(widget.practice.id),
+                        value: context.select<ParticipationProvider, double>((p) => p.pendingChangeProgress(widget.practice.id)),
                       ),
                     )
                   : Container(
@@ -1480,7 +1526,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                       ),
                     ),
             ),
-            if (status == ParticipationStatus.yes && isSelected && !isPendingYes && (participationProvider.getConditionalYes(widget.practice.id)))
+            if (status == ParticipationStatus.maybe && isSelected && !isPending && participationProvider.getConditionalMaybe(widget.practice.id))
               Positioned(
                 right: 2,
                 top: 2,
@@ -1488,12 +1534,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   width: 18,
                   height: 18,
                   decoration: BoxDecoration(
-                    color: condSatisfied ? AppColors.success : AppColors.primary,
+                    color: condSatisfied ? AppColors.success : AppColors.maybe,
                     borderRadius: BorderRadius.circular(3),
                   ),
                   child: Center(
                     child: Text(
-                      '${participationProvider.getConditionalThreshold(widget.practice.id) ?? _condThresholdOptions.first}',
+                      '${participationProvider.getConditionalBadgeText(widget.practice.id) ?? _condThresholdOptions.first}',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -1525,30 +1571,9 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   String _getParticipationHeaderText(ParticipationStatus? currentParticipationStatus) {
-    switch (currentParticipationStatus) {
-      case ParticipationStatus.yes:
-        // If Conditional Yes is enabled, show conditional label
-        final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-        final cond = participationProvider.getConditionalYes(widget.practice.id);
-        if (cond) {
-          final th = participationProvider.getConditionalThreshold(widget.practice.id) ?? 6;
-          final satisfied = participationProvider.isCurrentUserConditionalSatisfied(widget.practice);
-          return satisfied ? '$th+ you are going!' : 'Going if $th+';
-        }
-        return 'Going';
-      case ParticipationStatus.no:
-        return 'Not going';
-      case ParticipationStatus.maybe:
-        return 'Maybe';
-      case ParticipationStatus.blank:
-        return 'Pending';
-      case ParticipationStatus.attended:
-        return 'You attended';
-      case ParticipationStatus.missed:
-        return 'You did not attend';
-      case null:
-        return 'Maybe';
-    }
+    final provider = Provider.of<ParticipationProvider>(context); // listen: true to react both to provider and parent rebuilds
+    final view = provider.getPracticeStatusViewState(widget.practice);
+    return view.label;
   }
 
   Color _getParticipationHeaderColor(ParticipationStatus? currentParticipationStatus) {
@@ -1558,7 +1583,10 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.no:
         return AppColors.error; // Red
       case ParticipationStatus.maybe:
-        return const Color(0xFFF59E0B); // Yellow (same as status indicator)
+        // Use provider's view model for Maybe color hint; depend on provider to rebuild
+        final provider = Provider.of<ParticipationProvider>(context);
+        final view = provider.getPracticeStatusViewState(widget.practice);
+        return view.useSuccessColorForMaybe ? AppColors.success : const Color(0xFFF59E0B);
       case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
       case ParticipationStatus.attended:
@@ -1669,13 +1697,13 @@ class ParticipationStatusLegendModal extends StatelessWidget {
           // Content area
           Flexible(
             child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
+              padding: const EdgeInsets.fromLTRB(20, 5, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Subtitle
                   const Text(
-                    'All practices that have been announced as confirmed',
+                    'All practices confirmed by the Club Admins',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w500,
@@ -1720,6 +1748,14 @@ class ParticipationStatusLegendModal extends StatelessWidget {
                     ParticipationStatus.maybe.color,
                     'MAYBE',
                     'You\'re unsure about attending this practice',
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  _buildLegendItemWithCustomIcon(
+                    _conditionalMaybeSampleIcon(),
+                    'Conditional Maybe (N+)',
+                    'Shows an N+ badge next to Maybe. Yellow until the condition is met; turns green when satisfied (\'N+ you are going!\').',
                   ),
 
                   const SizedBox(height: 12),
@@ -1797,6 +1833,74 @@ class ParticipationStatusLegendModal extends StatelessWidget {
       ],
     );
   }
+
+  // Custom legend item that accepts a prebuilt icon widget
+  Widget _buildLegendItemWithCustomIcon(Widget icon, String title, String description) {
+    return Row(
+      children: [
+        SizedBox(width: 24, height: 24, child: Center(child: icon)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF111827),
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                description,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF6B7280),
+                  height: 1.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Sample Conditional Maybe icon with an "8+" badge, to illustrate the badge UI in the legend
+  Widget _conditionalMaybeSampleIcon() {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Icon(
+          Icons.help_outline,
+          size: 24,
+          color: ParticipationStatus.maybe.color,
+        ),
+        Positioned(
+          right: -2,
+          bottom: -2,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+            decoration: BoxDecoration(
+              color: AppColors.maybe,
+              borderRadius: BorderRadius.circular(3),
+            ),
+            child: const Text(
+              '8+',
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
 }
 
 /// Selectable practice card for bulk RSVP operations

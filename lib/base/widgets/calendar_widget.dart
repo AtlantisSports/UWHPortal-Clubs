@@ -625,12 +625,10 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
     // Pending YES countdown: show full-size blue spinner replacing the circle
     if (!isAttendance) {
-      final pending = Provider.of<ParticipationProvider>(context, listen: true)
-          .isPendingYes(filteredStatus.practiceId);
+      final pending = context.select<ParticipationProvider, bool>((p) => p.isPendingChange(filteredStatus.practiceId));
       if (pending) {
         final stroke = (size * 0.15).clamp(1.5, 3.0);
-        final provider = Provider.of<ParticipationProvider>(context, listen: true);
-        final progress = provider.pendingYesProgress(filteredStatus.practiceId);
+        final progress = context.select<ParticipationProvider, double>((p) => p.pendingChangeProgress(filteredStatus.practiceId));
         return Opacity(
           opacity: opacity,
           child: SizedBox(
@@ -709,15 +707,15 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
     Widget child = baseCircle;
 
-    // Add Conditional Yes badge in RSVP mode for YES status
-    if (!isAttendance && ps == ParticipationStatus.yes) {
+    // Add Conditional Maybe badge in RSVP mode for Maybe status
+    if (!isAttendance && ps == ParticipationStatus.maybe) {
       child = Consumer<ParticipationProvider>(
         builder: (context, provider, _) {
           final pid = filteredStatus.practiceId;
-          if (!provider.getConditionalYes(pid)) {
+          if (!provider.getConditionalMaybe(pid)) {
             return baseCircle;
           }
-          final threshold = provider.getConditionalThreshold(pid);
+          final threshold = provider.getConditionalMaybeThreshold(pid);
           if (threshold == null) return baseCircle;
 
           // Find practice by ID (if not found, skip badge)
@@ -729,12 +727,23 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           }
           if (practice == null) return baseCircle;
           final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
-          final badgeColor = satisfied ? AppColors.success : AppColors.primary;
+          final badgeColor = satisfied ? AppColors.success : AppColors.maybe;
 
           return Stack(
             clipBehavior: Clip.none,
             children: [
+              // Base circle; overlay a green icon if satisfied to switch visual color throughout
               baseCircle,
+              if (satisfied && icon != null)
+                Positioned.fill(
+                  child: Center(
+                    child: Icon(
+                      icon,
+                      size: size * 0.6,
+                      color: AppColors.success,
+                    ),
+                  ),
+                ),
               Positioned(
                 right: -1,
                 top: -1,
@@ -747,7 +756,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   ),
                   child: Center(
                     child: Text(
-                      '$threshold',
+                      '${provider.getConditionalBadgeText(pid) ?? threshold}',
                       style: TextStyle(
                         fontSize: size * 0.35,
                         fontWeight: FontWeight.w700,
@@ -769,16 +778,14 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     );
   }
 
-  /// Small status icon with Conditional Yes numeric badge when applicable (for lists/modals)
+  /// Small status icon with Conditional Maybe numeric badge when applicable (for lists/modals)
   Widget _rsvpIconWithCondBadge(Practice p, ParticipationStatus ps, double size) {
-    final base = RSVPStatusDisplay(status: ps, size: size, showText: false);
-
     return Consumer<ParticipationProvider>(
       builder: (context, provider, _) {
-        // Pending YES countdown: show spinner regardless of current status
-        if (provider.isPendingYes(p.id)) {
+        // Pending countdown: show spinner regardless of current status
+        if (provider.isPendingChange(p.id)) {
           final stroke = (size * 0.15).clamp(1.5, 3.0);
-          final progress = provider.pendingYesProgress(p.id);
+          final progress = provider.pendingChangeProgress(p.id);
           return SizedBox(
             width: size,
             height: size,
@@ -791,14 +798,20 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           );
         }
 
-        if (ps != ParticipationStatus.yes) return base;
+        // Conditional badge applies to Maybe now
+        final isCondMaybe = ps == ParticipationStatus.maybe && provider.getConditionalMaybe(p.id);
+        if (!isCondMaybe) {
+          return RSVPStatusDisplay(status: ps, size: size, showText: false);
+        }
 
-        if (!provider.getConditionalYes(p.id)) return base;
-        final threshold = provider.getConditionalThreshold(p.id);
-        if (threshold == null) return base;
+        final threshold = provider.getConditionalMaybeThreshold(p.id);
+        if (threshold == null) return RSVPStatusDisplay(status: ps, size: size, showText: false);
 
         final satisfied = provider.isCurrentUserConditionalSatisfied(p);
-        final badgeColor = satisfied ? AppColors.success : AppColors.primary;
+        final badgeColor = satisfied ? AppColors.success : AppColors.maybe;
+        final overrideColor = satisfied ? AppColors.success : null; // Green icon when satisfied
+
+        final base = RSVPStatusDisplay(status: ps, size: size, showText: false, overrideColor: overrideColor);
 
         return Stack(
           clipBehavior: Clip.none,
@@ -816,7 +829,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 ),
                 child: Center(
                   child: Text(
-                    '$threshold',
+                    '${provider.getConditionalBadgeText(p.id) ?? threshold}',
                     style: TextStyle(
                       fontSize: size * 0.35,
                       fontWeight: FontWeight.w700,
@@ -1429,8 +1442,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
             const SizedBox(height: 8),
 
-            // Conditional Yes row: only when Yes is selected
-            if (_bulkChoice == BulkChoice.yes)
+            // Conditional Maybe row: only when Maybe is selected
+            if (_bulkChoice == BulkChoice.maybe)
               Row(
                 children: [
                   Checkbox(
@@ -1466,7 +1479,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     },
                     materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
-                  const Text('Conditional Yes'),
+                  const Text('Conditional Maybe'),
                   if (_bulkConditional && _bulkConditionalThreshold != null) ...[
                     const SizedBox(width: 8),
                     Container(
@@ -1477,12 +1490,16 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         border: Border.all(color: AppColors.primary, width: 1),
                       ),
                       child: Text(
-                        '≥ $_bulkConditionalThreshold',
+                        'at least $_bulkConditionalThreshold',
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
                       ),
                     ),
-                    const Spacer(),
-                    TextButton(
+                    const SizedBox(width: 4),
+                    IconButton(
+                      icon: const Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
+                      tooltip: 'Edit threshold',
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                       onPressed: () async {
                         final selected = await _showBulkConditionsModal(initial: _bulkConditionalThreshold);
                         if (!mounted) return;
@@ -1494,14 +1511,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                         });
                         _updateSelectionOverlay();
                       },
-                      child: const Text('Edit'),
                     ),
                   ],
                 ],
               ),
 
-            // Guests row: only when Yes is selected
-            if (_bulkChoice == BulkChoice.yes)
+            // Guests row: for Conditional Maybe only
+            if (_bulkChoice == BulkChoice.maybe && _bulkConditional)
               Row(
                 children: [
                   Checkbox(
@@ -1716,6 +1732,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           });
         },
         practiceId: 'bulk',
+        dependentsOnly: true,
       ),
     );
   }
@@ -1774,7 +1791,31 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
             : ParticipationStatus.no;
 
     // Guests handling per spec
-    if (_bulkChoice == BulkChoice.yes) {
+    if (_bulkChoice == BulkChoice.maybe && _bulkConditional) {
+      // Dependents only for Conditional Maybe
+      if (_bulkBringGuests) {
+        for (final id in practiceIds) {
+          final existing = provider.getPracticeGuests(id).guests.where((g) => g.type == GuestType.dependent).toList();
+          final mergedMap = <String, Guest>{};
+          for (final g in existing) {
+            mergedMap[g.id] = g;
+          }
+          for (final g in _bulkGuestList.guests.where((g) => g.type == GuestType.dependent)) {
+            mergedMap[g.id] = g;
+          }
+          final merged = mergedMap.values.toList();
+          provider.updatePracticeGuests(id, merged);
+          provider.updateBringGuestState(id, merged.isNotEmpty);
+        }
+      }
+    } else if (_bulkChoice == BulkChoice.no) {
+      // For NO: clear guests and bring flag
+      for (final id in practiceIds) {
+        provider.updatePracticeGuests(id, const []);
+        provider.updateBringGuestState(id, false);
+      }
+    } else if (_bulkChoice == BulkChoice.yes) {
+      // Bring guest UX remains available for YES
       if (_bulkBringGuests) {
         for (final id in practiceIds) {
           final existing = provider.getPracticeGuests(id).guests;
@@ -1790,13 +1831,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           provider.updateBringGuestState(id, merged.isNotEmpty);
         }
       }
-      // If bring OFF, leave existing guests/bringGuest unchanged
-    } else if (_bulkChoice == BulkChoice.no) {
-      // For NO: clear guests and bring flag
-      for (final id in practiceIds) {
-        provider.updatePracticeGuests(id, const []);
-        provider.updateBringGuestState(id, false);
-      }
     }
 
     // Apply participation status in bulk
@@ -1811,22 +1845,23 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         ),
       );
 
-      // Apply Conditional Yes settings if YES selected
-      if (status == ParticipationStatus.yes) {
-        if (_bulkConditional && _bulkConditionalThreshold == null) {
+      // Apply Conditional Maybe settings if MAYBE selected; clear otherwise
+      if (status == ParticipationStatus.maybe) {
+        if (!_bulkConditional || _bulkConditionalThreshold == null) {
           _showCustomToast(
-            'Pick a threshold for Conditional Yes',
-            AppColors.primary,
-            Icons.info_outline,
+            'You must pick a threshold to apply a bulk Maybe RSVP',
+            const Color(0xFFF59E0B),
+            Icons.help_outline,
           );
           return;
         }
         for (final id in practiceIds) {
-          if (_bulkConditional) {
-            provider.setConditionalYes(id, true, threshold: _bulkConditionalThreshold ?? 6);
-          } else {
-            provider.setConditionalYes(id, false);
-          }
+          provider.setConditionalMaybe(id, true, threshold: _bulkConditionalThreshold!);
+        }
+      } else {
+        // For YES/NO clear conditional flag and remove stored threshold
+        for (final id in practiceIds) {
+          provider.clearConditionalMaybe(id);
         }
       }
 
@@ -1852,15 +1887,13 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           label = 'No';
       }
       String message;
-      if (status == ParticipationStatus.maybe) {
-        final count = practiceIds.length;
-        message = 'Maybe applied to ${count == 1 ? '1 practice' : '$count practices'}';
-      } else if (status == ParticipationStatus.yes && _bulkConditional && _bulkConditionalThreshold != null) {
+      if (status == ParticipationStatus.maybe && _bulkConditional && _bulkConditionalThreshold != null) {
         final n = _bulkConditionalThreshold!;
         final x = practiceIds.length;
-        message = 'Yes if $n+ applied for $x practices';
+        message = 'Maybe if $n+ applied for $x practices';
       } else {
-        message = '$label applied to ${practiceIds.length} practice(s)';
+        final count = practiceIds.length;
+        message = '$label applied to ${count == 1 ? '1 practice' : '$count practices'}';
       }
       _showTopScreenToast(message, color, icon);
       _exitSelectionMode();

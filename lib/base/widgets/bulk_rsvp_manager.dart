@@ -57,8 +57,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   List<String> _selectedDependents = [];
 
 
-  // Conditional Yes state for bulk YES
-  bool _conditionalYesEnabled = false;
+  // Conditional Maybe threshold for bulk Maybe
   int? _conditionalYesThreshold;
 
   // UI state
@@ -287,10 +286,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
       for (final practice in eligiblePractices) {
         // Cancel any pending YES countdown
-        participationProvider.cancelPendingYes(practice.id);
+        participationProvider.cancelPendingChange(practice.id);
 
         // Clear Conditional Yes state and threshold
-        participationProvider.clearConditionalYes(practice.id);
+        participationProvider.clearConditionalMaybe(practice.id);
 
         // Clear user's own RSVP
         await participationProvider.updateParticipationStatus(
@@ -890,63 +889,135 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Instruction note
-          const Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: EdgeInsets.only(bottom: 16.0),
-              child: Text(
-                'Select Timeframe and RSVP option:',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF111827),
-                ),
-              ),
-            ),
-          ),
-
-          // Timeframe and RSVP Selection in horizontal layout
+          // Top row: left (note + timeframe + conditional threshold) and right (vertical RSVP stack)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Timeframe Selection (left side)
+              // Left side
               Expanded(
                 flex: 3,
-                child: _buildTimeframeSelection(),
-              ),
-
-              const SizedBox(width: 12),
-
-              // YES/NO RSVP Buttons (right side)
-              Expanded(
-                flex: 2,
-                child: Padding(
-                  padding: const EdgeInsets.only(top: 8.0),
-                  child: Row(
-                    children: [
-                      _buildPracticeRSVPButton(
-                        status: ParticipationStatus.yes,
-                        isSelected: _selectedRSVPChoice == ParticipationStatus.yes,
-                        onTap: () {
-                          setState(() {
-                            _selectedRSVPChoice = ParticipationStatus.yes;
-                          });
-                        },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Select Timeframe and RSVP option:',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF111827),
                       ),
-                      const SizedBox(width: 8),
-                      _buildPracticeRSVPButton(
-                        status: ParticipationStatus.no,
-                        isSelected: _selectedRSVPChoice == ParticipationStatus.no,
-                        onTap: () {
-                          setState(() {
-                            _selectedRSVPChoice = ParticipationStatus.no;
-                          });
-                        },
+                    ),
+                    const SizedBox(height: 16),
+                    _buildTimeframeSelection(),
+                    if (_selectedRSVPChoice == ParticipationStatus.maybe) ...[
+                      const SizedBox(height: 12),
+                      Row(
+                        children: const [
+                          Text(
+                            'Conditional Maybe threshold',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF111827),
+                            ),
+                          ),
+                          SizedBox(width: 6),
+                          Tooltip(
+                            message: 'Bulk Maybe RSVPs must be condition driven',
+                            child: Icon(
+                              Icons.help_outline,
+                              size: 16,
+                              color: Color(0xFF6B7280),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      // Radio options (no default; must choose)
+                      RadioListTile<int>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: 6,
+                        // ignore: deprecated_member_use
+                        groupValue: _conditionalYesThreshold,
+                        // ignore: deprecated_member_use
+                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        title: const Text('6+'),
+                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      ),
+                      RadioListTile<int>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: 8,
+                        // ignore: deprecated_member_use
+                        groupValue: _conditionalYesThreshold,
+                        // ignore: deprecated_member_use
+                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        title: const Text('8+'),
+                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      ),
+                      RadioListTile<int>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: 10,
+                        // ignore: deprecated_member_use
+                        groupValue: _conditionalYesThreshold,
+                        // ignore: deprecated_member_use
+                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        title: const Text('10+'),
+                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                      ),
+                      RadioListTile<int>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: 12,
+                        // ignore: deprecated_member_use
+                        groupValue: _conditionalYesThreshold,
+                        // ignore: deprecated_member_use
+                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        title: const Text('12+'),
+                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
                       ),
                     ],
-                  ),
+                  ],
                 ),
+              ),
+              const SizedBox(width: 12),
+              // Right side: vertical RSVP stack (fixed 53x53 squares)
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildPracticeRSVPButton(
+                    status: ParticipationStatus.yes,
+                    isSelected: _selectedRSVPChoice == ParticipationStatus.yes,
+                    onTap: () {
+                      setState(() {
+                        _selectedRSVPChoice = ParticipationStatus.yes;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPracticeRSVPButton(
+                    status: ParticipationStatus.maybe,
+                    isSelected: _selectedRSVPChoice == ParticipationStatus.maybe,
+                    onTap: () {
+                      setState(() {
+                        _selectedRSVPChoice = ParticipationStatus.maybe;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  _buildPracticeRSVPButton(
+                    status: ParticipationStatus.no,
+                    isSelected: _selectedRSVPChoice == ParticipationStatus.no,
+                    onTap: () {
+                      setState(() {
+                        _selectedRSVPChoice = ParticipationStatus.no;
+                      });
+                    },
+                  ),
+                ],
               ),
             ],
           ),
@@ -967,70 +1038,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
             ),
 
-          // Conditional Yes control at bottom (only show when YES is selected)
-          if (_selectedRSVPChoice == ParticipationStatus.yes)
-            Row(
-              children: [
-                Checkbox(
-                  value: _conditionalYesEnabled,
-                  onChanged: (v) async {
-                    final newVal = v ?? false;
-                    if (newVal) {
-                      setState(() {
-                        _conditionalYesEnabled = true;
-                      });
-                      final selected = await _showConditionalYesModal(initial: _conditionalYesThreshold);
-                      if (!mounted) return;
-                      if (selected != null) {
-                        setState(() {
-                          _conditionalYesThreshold = selected;
-                        });
-                      } else {
-                        setState(() {
-                          _conditionalYesEnabled = false;
-                          _conditionalYesThreshold = null;
-                        });
-                      }
-                    } else {
-                      setState(() {
-                        _conditionalYesEnabled = false;
-                        _conditionalYesThreshold = null;
-                      });
-                    }
-                  },
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-                const Text('Conditional Yes'),
-                if (_conditionalYesEnabled && _conditionalYesThreshold != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary, width: 1),
-                    ),
-                    child: Text(
-                      '\u2265 $_conditionalYesThreshold',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
-                    ),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: () async {
-                      final selected = await _showConditionalYesModal(initial: _conditionalYesThreshold);
-                      if (!mounted) return;
-                      setState(() {
-                        if (selected != null) {
-                          _conditionalYesThreshold = selected;
-                        }
-                      });
-                    },
-                    child: const Text('Edit'),
-                  ),
-                ],
-              ],
-            ),
+
 
           const SizedBox(height: 16),
 
@@ -1132,9 +1140,11 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
               ),
               color: isSelected ? color.withValues(alpha: 0.1) : Colors.transparent,
             ),
+
+
             child: Icon(
               _getOverlayIcon(status),
-              size: 25.7, // Only YES/NO, no maybe option
+              size: status == ParticipationStatus.maybe ? 20.8 : 25.7,
               color: color,
             ),
           ),
@@ -1149,6 +1159,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return const Color(0xFFECFDF5);
       case ParticipationStatus.no:
         return const Color(0xFFFEF2F2);
+      case ParticipationStatus.maybe:
+        return const Color(0xFFFFFBEB);
       default:
         return const Color(0xFFF3F4F6);
     }
@@ -1160,6 +1172,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         return Icons.check;
       case ParticipationStatus.no:
         return Icons.close;
+      case ParticipationStatus.maybe:
+        return Icons.question_mark;
       default:
         return Icons.radio_button_unchecked;
     }
@@ -1186,6 +1200,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           trailing: (_customStartDate != null && _customEndDate != null)
               ? GestureDetector(
                   onTap: _showCustomDatePicker,
+
+
+
+
                   child: const Icon(
                     Icons.edit,
                     size: 16,
@@ -1193,6 +1211,18 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                   ),
                 )
               : null,
+        ),
+
+        // Temporary placeholder option to help layout (disabled)
+        Padding(
+          padding: const EdgeInsets.symmetric(vertical: 4),
+          child: Row(
+            children: const [
+              Icon(Icons.radio_button_unchecked, size: 20, color: Color(0xFFD1D5DB)),
+              SizedBox(width: 8),
+              Text('Placeholder (coming soon)', style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
+            ],
+          ),
         ),
 
         // All future option
@@ -1204,6 +1234,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       ],
     );
   }
+
+
 
   Widget _buildCustomRadioOption({
     required String value,
@@ -1331,29 +1363,47 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
 
   bool _canApply() {
-    return rsvpService.canApplyBulkRSVP(
+    final base = rsvpService.canApplyBulkRSVP(
       selectedPracticeIds: _selectedPracticeIds.toList(),
       selectedChoice: _selectedRSVPChoice,
     );
+    if (!base) return false;
+    // Bulk Maybe requires a conditional threshold
+    if (_selectedRSVPChoice == ParticipationStatus.maybe) {
+      return _conditionalYesThreshold != null;
+    }
+    return true;
   }
 
   /// Show helpful toast when user clicks inactive Apply button
   void _showInactiveApplyMessage() {
     String message;
+    Color color = const Color(0xFF0284C7); // Default blue info
+    IconData icon = Icons.info_outline;
 
     if (_selectedRSVPChoice == null && _selectedPracticeIds.isEmpty) {
       message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
     } else if (_selectedRSVPChoice == null) {
       message = 'Please choose an RSVP option to apply Bulk RSVP';
-    } else {
+    } else if (_selectedRSVPChoice == ParticipationStatus.maybe && (_conditionalYesThreshold == null)) {
+      if (_selectedPracticeIds.isEmpty) {
+        message = 'Select at least 1 practice and set a condition for Maybe';
+      } else {
+        message = 'You must pick a threshold to apply a bulk Maybe RSVP';
+      }
+      color = const Color(0xFFF59E0B); // Amber (Maybe)
+      icon = Icons.help_outline;
+    } else if (_selectedPracticeIds.isEmpty) {
       // RSVP chosen but no practices selected
       message = 'Please select at least 1 practice to apply Bulk RSVP';
+    } else {
+      message = 'Unable to apply. Please review your selections.';
     }
 
     _showCustomToast(
       message,
-      const Color(0xFF0284C7), // Blue color
-      Icons.info_outline,
+      color,
+      icon,
     );
   }
 
@@ -1454,8 +1504,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       // Get practice IDs based on selected timeframe and filters
       final targetPracticeIds = _getTargetPracticeIds();
 
-      // If we're including dependents and RSVPing YES, store guest data
-      if (_includeDependents && _selectedRSVPChoice == ParticipationStatus.yes && _selectedDependents.isNotEmpty) {
+      // If we're including dependents and RSVPing YES or MAYBE, store guest data
+      if (_includeDependents && (_selectedRSVPChoice == ParticipationStatus.yes || _selectedRSVPChoice == ParticipationStatus.maybe) && _selectedDependents.isNotEmpty) {
         // Convert dependent names to guest objects for storage
         final guestList = _selectedDependents.map((dependentName) {
           return DependentGuest(
@@ -1478,19 +1528,23 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
 
       // Execute the bulk update through participation provider
-      // Note: We'll simulate the bulk operation since ParticipationProvider may not have bulkUpdateRSVP
       for (final practiceId in targetPracticeIds) {
         await participationProvider.updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
-        // Apply Conditional Yes state per practice based on selection
-        if (_selectedRSVPChoice == ParticipationStatus.yes) {
-          if (_conditionalYesEnabled && _conditionalYesThreshold != null) {
-            participationProvider.setConditionalYes(practiceId, true, threshold: _conditionalYesThreshold);
+        // Apply Conditional state per practice based on selection
+        if (_selectedRSVPChoice == ParticipationStatus.maybe) {
+          // Bulk Maybe requires a threshold
+          if (_conditionalYesThreshold != null) {
+            participationProvider.setConditionalMaybe(practiceId, true, threshold: _conditionalYesThreshold);
           } else {
-            participationProvider.setConditionalYes(practiceId, false);
+            // If plain Maybe were allowed here, we would remove any stored threshold.
+            // Currently validation prevents applying plain Maybe without a threshold.
           }
+        } else if (_selectedRSVPChoice == ParticipationStatus.yes) {
+          // Clear any conditional state and remove stored threshold on bulk YES
+          participationProvider.clearConditionalMaybe(practiceId);
         } else {
-          // Clear Conditional Yes when applying NO
-          participationProvider.setConditionalYes(practiceId, false);
+          // Clear conditional state and remove stored threshold when applying NO
+          participationProvider.clearConditionalMaybe(practiceId);
         }
       }
 
@@ -1498,8 +1552,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       if (mounted) {
         final successCount = targetPracticeIds.length;
         String message;
-        if (_selectedRSVPChoice == ParticipationStatus.yes && _conditionalYesEnabled && _conditionalYesThreshold != null) {
-          message = 'Yes if $_conditionalYesThreshold+ applied for $successCount practices';
+        if (_selectedRSVPChoice == ParticipationStatus.maybe && _conditionalYesThreshold != null) {
+          message = 'Maybe if $_conditionalYesThreshold+ applied for $successCount practices';
         } else {
           message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
         }
@@ -1513,10 +1567,20 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           message = '$message + $dependentText';
         }
 
+        final toastColor = _selectedRSVPChoice == ParticipationStatus.yes
+            ? AppColors.success
+            : _selectedRSVPChoice == ParticipationStatus.no
+                ? AppColors.error
+                : AppColors.maybe;
+        final toastIcon = _selectedRSVPChoice == ParticipationStatus.yes
+            ? Icons.check
+            : _selectedRSVPChoice == ParticipationStatus.no
+                ? Icons.cancel
+                : Icons.help_outline;
         _showCustomToast(
           message,
-          _selectedRSVPChoice == ParticipationStatus.yes ? AppColors.success : AppColors.error,
-          _selectedRSVPChoice == ParticipationStatus.yes ? Icons.check : Icons.cancel,
+          toastColor,
+          toastIcon,
         );
 
         // Reset the form after successful operation but keep window open
@@ -1530,7 +1594,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _includeDependents = false; // Reset include dependents checkbox
           _selectedLocations.clear(); // Clear location filter
           _selectedLevels.clear(); // Clear level filter
-          _conditionalYesEnabled = false;
+
           _conditionalYesThreshold = null;
         });
       }
@@ -1701,52 +1765,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     return '$truncated...';
   }
 
-  Future<int?> _showConditionalYesModal({int? initial}) async {
-    int temp = initial ?? 6;
-    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
-      context: context,
-      child: StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'I will attend so long as at least this many (including myself) will attend',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                DropdownButton<int>(
-                  value: temp,
-                  items: const [6, 8, 10, 12]
-                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
-                      .toList(),
-                  onChanged: (v) => setModalState(() => temp = v ?? temp),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(null),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(temp),
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+
 
 }
 
