@@ -57,9 +57,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
   bool _isRecurringPracticesExpanded = false; // Track expansion state for recurring practices dropdown
 
   // Toast state
-  bool _showToast = false;
-  String _toastMessage = '';
-  Color _toastColor = Colors.green;
+  final bool _showToast = false;
+  final String _toastMessage = '';
+  final Color _toastColor = Colors.green;
   IconData? _toastIcon;
   String? _toastText;
 // ...existing code...
@@ -197,24 +197,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
     );
   }
 
-  void _showCustomToast(String message, Color color, IconData icon) {
-    setState(() {
-      _toastMessage = message;
-      _toastColor = color;
-      _toastIcon = icon;
-      _toastText = null;
-      _showToast = true;
-    });
 
-    // Hide toast after 4 seconds
-    Timer(Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-      }
-    });
-  }
 
   @override
   void dispose() {
@@ -406,26 +389,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       mode: PracticeStatusCardMode.clickable,
                       clubId: widget.club.id,
                       onParticipationChanged: (status) {
-                        // Build toast message reflecting Conditional Yes state
-                        final Color toastColor = status.color;
-                        if (status == ParticipationStatus.yes) {
-                          final cond = participationProvider.getConditionalYes(nextPractice.id);
-                          if (cond) {
-                            final th = participationProvider.getConditionalThreshold(nextPractice.id) ?? 6;
-                            final satisfied = participationProvider.isCurrentUserConditionalSatisfied(nextPractice);
-                            final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
-                            _showCustomToast(msg, toastColor, status.overlayIcon);
-                            return;
-                          }
-                          final msg = 'RSVP updated to: ${status.displayText}';
-                          _showCustomToast(msg, toastColor, status.overlayIcon);
-                        } else if (status == ParticipationStatus.maybe) {
-                          final msg = 'RSVP updated to: ${status.displayText}';
-                          _showCustomToast(msg, toastColor, Icons.help);
-                        } else {
-                          final msg = 'RSVP updated to: ${status.displayText}';
-                          _showCustomToast(msg, toastColor, status.overlayIcon);
-                        }
+                        // Toasts are handled after commit by PracticeStatusCard; suppress here.
                       },
                       onLocationTap: _handleLocationTap,
                       onInfoTap: () => _handlePracticeSelected(nextPractice),
@@ -518,6 +482,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                       TabBar(
                         key: _tabBarKey,
                         controller: _tabController,
+                        isScrollable: false,
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 8),
                         labelColor: AppColors.primary,
                         unselectedLabelColor: AppColors.textSecondary,
                         indicatorColor: AppColors.primary,

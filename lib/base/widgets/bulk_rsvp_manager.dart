@@ -58,7 +58,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
 
   // Conditional Maybe threshold for bulk Maybe
-  int? _conditionalYesThreshold;
+  int? _conditionalMaybeThreshold;
 
   // UI state
   bool _isLoading = false;
@@ -288,7 +288,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         // Cancel any pending YES countdown
         participationProvider.cancelPendingChange(practice.id);
 
-        // Clear Conditional Yes state and threshold
+        // Clear Conditional Maybe state and threshold
         participationProvider.clearConditionalMaybe(practice.id);
 
         // Clear user's own RSVP
@@ -912,8 +912,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                     if (_selectedRSVPChoice == ParticipationStatus.maybe) ...[
                       const SizedBox(height: 12),
                       Row(
-                        children: const [
-                          Text(
+                        children: [
+                          const Text(
                             'Conditional Maybe threshold',
                             style: TextStyle(
                               fontSize: 14,
@@ -921,10 +921,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                               color: Color(0xFF111827),
                             ),
                           ),
-                          SizedBox(width: 6),
-                          Tooltip(
+                          const SizedBox(width: 6),
+                          _TooltipWidget(
                             message: 'Bulk Maybe RSVPs must be condition driven',
-                            child: Icon(
+                            child: const Icon(
                               Icons.help_outline,
                               size: 16,
                               color: Color(0xFF6B7280),
@@ -939,9 +939,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         contentPadding: EdgeInsets.zero,
                         value: 6,
                         // ignore: deprecated_member_use
-                        groupValue: _conditionalYesThreshold,
+                        groupValue: _conditionalMaybeThreshold,
                         // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
                         title: const Text('6+'),
                         visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
                       ),
@@ -950,9 +950,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         contentPadding: EdgeInsets.zero,
                         value: 8,
                         // ignore: deprecated_member_use
-                        groupValue: _conditionalYesThreshold,
+                        groupValue: _conditionalMaybeThreshold,
                         // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
                         title: const Text('8+'),
                         visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
                       ),
@@ -961,9 +961,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         contentPadding: EdgeInsets.zero,
                         value: 10,
                         // ignore: deprecated_member_use
-                        groupValue: _conditionalYesThreshold,
+                        groupValue: _conditionalMaybeThreshold,
                         // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
                         title: const Text('10+'),
                         visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
                       ),
@@ -972,9 +972,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         contentPadding: EdgeInsets.zero,
                         value: 12,
                         // ignore: deprecated_member_use
-                        groupValue: _conditionalYesThreshold,
+                        groupValue: _conditionalMaybeThreshold,
                         // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalYesThreshold = v),
+                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
                         title: const Text('12+'),
                         visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
                       ),
@@ -1370,7 +1370,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     if (!base) return false;
     // Bulk Maybe requires a conditional threshold
     if (_selectedRSVPChoice == ParticipationStatus.maybe) {
-      return _conditionalYesThreshold != null;
+      return _conditionalMaybeThreshold != null;
     }
     return true;
   }
@@ -1385,7 +1385,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
     } else if (_selectedRSVPChoice == null) {
       message = 'Please choose an RSVP option to apply Bulk RSVP';
-    } else if (_selectedRSVPChoice == ParticipationStatus.maybe && (_conditionalYesThreshold == null)) {
+    } else if (_selectedRSVPChoice == ParticipationStatus.maybe && (_conditionalMaybeThreshold == null)) {
       if (_selectedPracticeIds.isEmpty) {
         message = 'Select at least 1 practice and set a condition for Maybe';
       } else {
@@ -1528,13 +1528,15 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       }
 
       // Execute the bulk update through participation provider
+      int removedNonDependentTotal = 0;
       for (final practiceId in targetPracticeIds) {
         await participationProvider.updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
         // Apply Conditional state per practice based on selection
         if (_selectedRSVPChoice == ParticipationStatus.maybe) {
           // Bulk Maybe requires a threshold
-          if (_conditionalYesThreshold != null) {
-            participationProvider.setConditionalMaybe(practiceId, true, threshold: _conditionalYesThreshold);
+          if (_conditionalMaybeThreshold != null) {
+            participationProvider.setConditionalMaybe(practiceId, true, threshold: _conditionalMaybeThreshold);
+            removedNonDependentTotal += participationProvider.consumeRemovedNonDependentGuests(practiceId);
           } else {
             // If plain Maybe were allowed here, we would remove any stored threshold.
             // Currently validation prevents applying plain Maybe without a threshold.
@@ -1552,8 +1554,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       if (mounted) {
         final successCount = targetPracticeIds.length;
         String message;
-        if (_selectedRSVPChoice == ParticipationStatus.maybe && _conditionalYesThreshold != null) {
-          message = 'Maybe if $_conditionalYesThreshold+ applied for $successCount practices';
+        if (_selectedRSVPChoice == ParticipationStatus.maybe && _conditionalMaybeThreshold != null) {
+          message = 'Maybe if $_conditionalMaybeThreshold+ applied for $successCount practices';
         } else {
           message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
         }
@@ -1582,6 +1584,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           toastColor,
           toastIcon,
         );
+        if (removedNonDependentTotal > 0) {
+          _showCustomToast(
+            removedNonDependentTotal == 1 ? 'Removed non-dependent guest' : 'Removed non-dependent guests',
+            AppColors.info,
+            Icons.person_remove_alt_1,
+          );
+        }
 
         // Reset the form after successful operation but keep window open
         setState(() {
@@ -1595,7 +1604,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _selectedLocations.clear(); // Clear location filter
           _selectedLevels.clear(); // Clear level filter
 
-          _conditionalYesThreshold = null;
+          _conditionalMaybeThreshold = null;
         });
       }
     } catch (error) {

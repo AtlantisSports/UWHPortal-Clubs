@@ -87,7 +87,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   String _toastMessage = '';
   Color _toastColor = AppColors.info;
   IconData? _toastIcon;
-  bool _bulkConditional = false; // Conditional Yes for bulk
+  bool _bulkConditional = false; // Conditional Maybe for bulk
   int? _bulkConditionalThreshold; // Bulk threshold
 
   OverlayEntry? _toastOverlay;
@@ -194,7 +194,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       _bulkChoice = BulkChoice.none;
       _bulkBringGuests = false;
       _bulkGuestList = const PracticeGuestList();
-      // Also reset Conditional Yes state each new session
+      // Also reset Conditional Maybe state each new session
       _bulkConditional = false;
       _bulkConditionalThreshold = null;
     });
@@ -498,19 +498,41 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           // Guest count indicator (lower-left corner)
                           Consumer<ParticipationProvider>(
                             builder: (context, participationProvider, child) {
-                              final guestCount = _getGuestCountForDate(date, participationProvider);
+                              // Determine which practices to count based on filters
+                              final filtered = practicesForDay
+                                  .where((s) => s.passesFilter)
+                                  .map((s) => s.practiceId)
+                                  .toList();
+                              final consideredIds = filtered.isNotEmpty
+                                  ? filtered
+                                  : practicesForDay.map((s) => s.practiceId).toList();
+                              final faded = filtered.isEmpty;
+
+                              // Sum unique guests across the considered practices (unique by Guest.id)
+                              final uniqueGuestIds = <String>{};
+                              for (final pid in consideredIds) {
+                                final guestList = participationProvider.getPracticeGuests(pid);
+                                for (final g in guestList.guests) {
+                                  uniqueGuestIds.add(g.id);
+                                }
+                              }
+                              final guestCount = uniqueGuestIds.length;
+
                               if (guestCount > 0) {
                                 return Positioned(
                                   bottom: 2,
                                   left: 2,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                    child: Text(
-                                      '+$guestCount',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
+                                  child: Opacity(
+                                    opacity: faded ? 0.25 : 1.0,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                      child: Text(
+                                        '+$guestCount',
+                                        style: const TextStyle(
+                                          fontSize: 8,
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.primary,
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -732,18 +754,23 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           return Stack(
             clipBehavior: Clip.none,
             children: [
-              // Base circle; overlay a green icon if satisfied to switch visual color throughout
-              baseCircle,
-              if (satisfied && icon != null)
-                Positioned.fill(
-                  child: Center(
-                    child: Icon(
-                      icon,
-                      size: size * 0.6,
-                      color: AppColors.success,
-                    ),
-                  ),
+              // Base circle switches to green when Conditional Maybe is satisfied
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  color: filled ? (satisfied ? AppColors.success : color) : Colors.transparent,
+                  border: Border.all(color: satisfied ? AppColors.success : color, width: borderWidth),
+                  shape: BoxShape.circle,
                 ),
+                child: icon != null
+                    ? Icon(
+                        icon,
+                        size: size * 0.6,
+                        color: filled ? Colors.white : (satisfied ? AppColors.success : color),
+                      )
+                    : null,
+              ),
               Positioned(
                 right: -1,
                 top: -1,
@@ -853,24 +880,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
 
-  int _getGuestCountForDate(DateTime date, ParticipationProvider? participationProvider) {
-    if (participationProvider == null) return 0;
-
-    int maxGuestCount = 0;
-
-    // Get all practices for this date
-    final practicesForDate = _getPracticesForDate(date);
-
-    // Find the highest guest count among all practices on this date
-    for (final practice in practicesForDate) {
-      final guestList = participationProvider.getPracticeGuests(practice.id);
-      if (guestList.totalGuests > maxGuestCount) {
-        maxGuestCount = guestList.totalGuests;
-      }
-    }
-
-    return maxGuestCount;
-  }
 
   Map<DateTime, List<FilteredPracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
     final practices = <DateTime, List<FilteredPracticeStatus>>{};
@@ -1855,8 +1864,17 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           );
           return;
         }
+        int removedNonDependentTotal = 0;
         for (final id in practiceIds) {
           provider.setConditionalMaybe(id, true, threshold: _bulkConditionalThreshold!);
+          removedNonDependentTotal += provider.consumeRemovedNonDependentGuests(id);
+        }
+        if (removedNonDependentTotal > 0) {
+          _showTopScreenToast(
+            removedNonDependentTotal == 1 ? 'Removed non-dependent guest' : 'Removed non-dependent guests',
+            AppColors.info,
+            Icons.person_remove_alt_1,
+          );
         }
       } else {
         // For YES/NO clear conditional flag and remove stored threshold

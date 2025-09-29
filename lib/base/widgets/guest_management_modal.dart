@@ -10,17 +10,27 @@ class GuestManagementModal extends StatefulWidget {
   final PracticeGuestList initialGuests;
   final Function(PracticeGuestList) onGuestsChanged;
   final String practiceId;
+  final bool dependentsOnly;
 
   const GuestManagementModal({
     super.key,
     required this.initialGuests,
     required this.onGuestsChanged,
     required this.practiceId,
+    required this.dependentsOnly,
   });
 
   @override
   State<GuestManagementModal> createState() => _GuestManagementModalState();
 }
+
+// Mock Club Members option model (top-level)
+class _ClubMemberOption {
+  final String id;
+  final String name;
+  const _ClubMemberOption({required this.id, required this.name});
+}
+
 
 class _GuestManagementModalState extends State<GuestManagementModal> {
   late PracticeGuestList _guestList;
@@ -33,6 +43,16 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     'Lisa Simpson',
     'Maggie Simpson',
   ];
+
+  // Mock Club Members list and selection state
+  final List<_ClubMemberOption> _availableClubMembers = const [
+    _ClubMemberOption(id: 'member_001', name: 'Homer Simpson'),
+    _ClubMemberOption(id: 'member_002', name: 'Marge Simpson'),
+    _ClubMemberOption(id: 'member_003', name: 'Ned Flanders'),
+  ];
+
+  final List<String> _selectedClubMemberIds = [];
+
 
   final ScrollController _scrollController = ScrollController(); // Add scroll controller
 
@@ -133,11 +153,14 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                         const SizedBox(height: 16),
                       ],
 
-                      // Guest type sections - show dependents at bottom
-                      for (final type in GuestType.values.where((t) => t != GuestType.dependent))
-                        _buildGuestTypeSection(type),
-                      // Dependents section at the bottom
-                      _buildGuestTypeSection(GuestType.dependent),
+                      // Guest type sections
+                      if (widget.dependentsOnly) ...[
+                        _buildGuestTypeSection(GuestType.dependent),
+                      ] else ...[
+                        for (final type in GuestType.values.where((t) => t != GuestType.dependent))
+                          _buildGuestTypeSection(type),
+                        _buildGuestTypeSection(GuestType.dependent),
+                      ],
                     ],
                   ),
                 ),
@@ -446,33 +469,82 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
                 style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 8),
-              ..._availableDependents.map((name) => CheckboxListTile(
-                    value: _selectedDependents.contains(name),
-                    onChanged: (checked) {
-                      setState(() {
-                        if (checked ?? false) {
-                          if (!_selectedDependents.contains(name)) {
-                            _selectedDependents.add(name);
+              ...(() {
+                // Hide dependents that are already added to the guest list
+                final existingNames = _guestList
+                    .getGuestsByType(GuestType.dependent)
+                    .map((g) => g.name)
+                    .toSet();
+                final availableOptions = _availableDependents
+                    .where((n) => !existingNames.contains(n))
+                    .toList();
+                return availableOptions.map((name) => CheckboxListTile(
+                      value: _selectedDependents.contains(name),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked ?? false) {
+                            if (!_selectedDependents.contains(name)) {
+                              _selectedDependents.add(name);
+                            }
+                          } else {
+                            _selectedDependents.remove(name);
                           }
-                        } else {
-                          _selectedDependents.remove(name);
-                        }
-                      });
-                    },
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    controlAffinity: ListTileControlAffinity.leading,
-                    title: Text(name),
-                  )),
+                        });
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(name),
+                    ));
+              })(),
+            ],
+          )
+        else if (type == GuestType.clubMember)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Club Members',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
+              ...(() {
+                // Hide options already added to the guest list (by name)
+                final existingNames = _guestList
+                    .getGuestsByType(GuestType.clubMember)
+                    .map((g) => g.name)
+                    .toSet();
+                final options = _availableClubMembers
+                    .where((m) => !existingNames.contains(m.name))
+                    .toList();
+                return options.map((m) => CheckboxListTile(
+                      value: _selectedClubMemberIds.contains(m.id),
+                      onChanged: (checked) {
+                        setState(() {
+                          if (checked ?? false) {
+                            if (!_selectedClubMemberIds.contains(m.id)) {
+                              _selectedClubMemberIds.add(m.id);
+                            }
+                          } else {
+                            _selectedClubMemberIds.remove(m.id);
+                          }
+                        });
+                      },
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      controlAffinity: ListTileControlAffinity.leading,
+                      title: Text(m.name),
+                    ));
+              })(),
             ],
           )
         else
           TextField(
             controller: nameController,
-            decoration: InputDecoration(
-              labelText: type == GuestType.clubMember ? 'Select member' : 'Guest name',
+            decoration: const InputDecoration(
+              labelText: 'Guest name',
               border: OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             ),
             textCapitalization: TextCapitalization.words,
             onChanged: (_) {
@@ -580,17 +652,31 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           waiverSigned: waiverSigned,
         );
         _guestList = _guestList.addGuest(guest);
-        // TODO: Replace with proper logging
-        // print('Added dependent guest: ${guest.name}, ID: ${guest.id}, Type: ${guest.type}');
       }
 
       setState(() {
         _waiverStates[type] = false;
         _expandedSections[type] = false;
         _selectedDependents.clear();
-        // TODO: Replace with proper logging
-        // print('Current guest list has ${_guestList.totalGuests} guests');
-        // print('Dependents in list: ${_guestList.getGuestsByType(GuestType.dependent).map((g) => g.name).toList()}');
+      });
+    } else if (type == GuestType.clubMember) {
+      // Handle multiple club member selections
+      if (_selectedClubMemberIds.isEmpty) return;
+
+      for (final memberId in _selectedClubMemberIds) {
+        final member = _availableClubMembers.firstWhere((m) => m.id == memberId);
+        final guestId = '${widget.practiceId}_${type.name}_${memberId}_${DateTime.now().millisecondsSinceEpoch}';
+        final guest = ClubMemberGuest(
+          id: guestId,
+          name: member.name,
+          memberId: member.id,
+        );
+        _guestList = _guestList.addGuest(guest);
+      }
+
+      setState(() {
+        _expandedSections[type] = false;
+        _selectedClubMemberIds.clear();
       });
     } else {
       // Handle single guest addition for other types
@@ -616,12 +702,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           );
           break;
         case GuestType.clubMember:
-          guest = ClubMemberGuest(
-            id: guestId,
-            name: name,
-            memberId: guestId, // Placeholder - would be actual member ID
-          );
-          break;
+          // This case is handled above
+          return;
         case GuestType.dependent:
           // This case is handled above
           return;
@@ -649,6 +731,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       _expandedSections[type] = false;
       if (type == GuestType.dependent) {
         _selectedDependents.clear();
+      } else if (type == GuestType.clubMember) {
+        _selectedClubMemberIds.clear();
       }
     });
   }
@@ -680,8 +764,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       // For dependents, check if any are selected and waiver is signed
       return _selectedDependents.isNotEmpty && waiverSigned;
     } else if (type == GuestType.clubMember) {
-      // Club members do not require a waiver toggle in the UI; only require a valid name
-      return guestService.isValidGuestName(nameController.text);
+      // For club members, enable Add if at least one checkbox is selected (no waiver needed)
+      return _selectedClubMemberIds.isNotEmpty;
     } else {
       // For other types, require name + waiver
       return guestService.canAddGuest(
@@ -724,6 +808,10 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         _showValidationToast('Please select at least one dependent');
       } else if (!waiverSigned) {
         _showValidationToast('Please sign the waiver to add dependents');
+      }
+    } else if (type == GuestType.clubMember) {
+      if (_selectedClubMemberIds.isEmpty) {
+        _showValidationToast('Please select at least one club member');
       }
     } else {
       // Use service for validation error message

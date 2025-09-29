@@ -190,7 +190,7 @@ class Practice extends BaseModel {
   final int maxParticipants;
   final List<String> participants;
   final Map<String, ParticipationStatus> participationResponses;
-  // Per-user conditional-yes threshold (presence implies user selected Conditional Yes)
+  // Per-user conditional threshold for Maybe (presence implies user selected Conditional Maybe)
   final Map<String, int> conditionalYesThresholds;
   final bool isRecurring;
   final String? recurringPattern;

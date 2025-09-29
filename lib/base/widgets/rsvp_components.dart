@@ -72,6 +72,44 @@ void showTopToast(BuildContext context, String message, Color color, IconData ic
   }
 }
 
+/// Blue pending toast with optional Cancel action. Returns the OverlayEntry so callers can dismiss.
+OverlayEntry showPendingCountdownToast(BuildContext context, String message, {bool showCancel = false, VoidCallback? onCancel}) {
+  final overlay = Overlay.of(context);
+  late OverlayEntry entry;
+  entry = OverlayEntry(
+    builder: (ctx) => Positioned(
+      top: MediaQuery.of(ctx).padding.top + 12,
+      left: 16,
+      right: 16,
+      child: Material(
+        elevation: 6,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(color: const Color(0xFF0284C7), borderRadius: BorderRadius.circular(8)),
+          child: Row(children: [
+            const Icon(Icons.info_outline, color: Colors.white, size: 20),
+            const SizedBox(width: 12),
+            Expanded(child: Text(message, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w500))),
+            if (showCancel)
+              TextButton(
+                onPressed: () {
+                  onCancel?.call();
+                  entry.remove();
+                },
+                style: TextButton.styleFrom(foregroundColor: Colors.white),
+                child: const Text('Cancel'),
+              ),
+          ]),
+        ),
+      ),
+    ),
+  );
+  overlay.insert(entry);
+  return entry;
+}
+
+
 /// Truncate tag to 4 characters (exact same as bulk RSVP)
 String truncateTag(String tag) {
   if (tag.isEmpty) return '';
@@ -395,7 +433,7 @@ class RSVPSummary extends StatelessWidget {
   }
 }
 
-/// Practice Status Card component with two modes: CLICKABLE and READ_ONLY
+
 /// CLICKABLE mode: Interactive RSVP for future practices (replaces PracticeRSVPCard)
 /// READ_ONLY mode: Status display for past practices and modals (replaces PracticeAttendanceCard)
 enum PracticeStatusCardMode { clickable, readOnly }
@@ -432,8 +470,17 @@ class PracticeStatusCard extends StatefulWidget {
 
 class _PracticeStatusCardState extends State<PracticeStatusCard> {
   bool _wasPending = false;
-  // Conditional Yes threshold options
+  // Conditional Maybe threshold options
   final List<int> _condThresholdOptions = const [6, 8, 10, 12];
+
+  OverlayEntry? _pendingToastEntry;
+
+  @override
+  void dispose() {
+    _pendingToastEntry?.remove();
+    _pendingToastEntry = null;
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -442,6 +489,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       final isPastEvent = widget.practice.dateTime.isBefore(DateTime.now());
       if (isPastEvent) {
         return _buildReadOnlyPastCard();
+
       } else {
         return _buildReadOnlyFutureCard();
       }
@@ -804,10 +852,23 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         final guestList = participationProvider.getPracticeGuests(widget.practice.id);
         final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
 
-        // Defer toast until after pending window completes and commit occurs
+        // Show blue pending toast at start; show final toast on commit; remove pending toast in both commit/cancel
         final isPending = participationProvider.isPendingChange(widget.practice.id);
         WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!_wasPending && isPending) {
+            const msg = 'Applying your selection now, tap again to cancel';
+            // Remove any existing pending toast
+            _pendingToastEntry?.remove();
+            _pendingToastEntry = showPendingCountdownToast(
+              context,
+              msg,
+            );
+          }
           if (_wasPending && !isPending) {
+            // Dismiss pending toast when countdown ends or is cancelled
+            _pendingToastEntry?.remove();
+            _pendingToastEntry = null;
+            // Only show final toast upon commit; noop on cancel (no committed target)
             showFinalCommitToastForPractice(context, participationProvider, widget.practice);
           }
           _wasPending = isPending;
@@ -1304,20 +1365,28 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     final selected = await _showConditionsModal(practiceId, initial: threshold);
                     if (!mounted) return;
                     if (selected != null) {
-                      // Enable Conditional Maybe, reset countdown to target Maybe per spec
+                      // Enable Conditional Maybe; provider will clear non-dependent guests centrally
                       participationProvider.setConditionalMaybe(practiceId, true, threshold: selected);
 
-                      // Remove non-dependent guests and keep only Dependents
-                      final currentGuests = participationProvider.getPracticeGuests(practiceId);
-                      final filtered = currentGuests.guests.where((g) => g.type == GuestType.dependent).toList();
-                      participationProvider.updatePracticeGuests(practiceId, filtered);
-                      participationProvider.updateBringGuestState(practiceId, filtered.isNotEmpty);
-
-                      if (widget.clubId != null) {
-                        participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
+                      // Show removal toast if any guests were cleared
+                      final removed = participationProvider.consumeRemovedNonDependentGuests(practiceId);
+                      if (removed > 0) {
+                        showTopToast(context, 'Removed non-dependent ${removed == 1 ? 'guest' : 'guests'}', AppColors.info, Icons.person_remove_alt_1);
                       }
-                      if (wasPending && participationProvider.isPendingChange(practiceId)) {
-                        participationProvider.resumePendingChange(practiceId);
+
+                      if (wasPending) {
+                        // Resume existing countdown; do NOT start a new pending change (would cancel)
+                        if (participationProvider.isPendingChange(practiceId)) {
+                          participationProvider.resumePendingChange(practiceId);
+                        } else if (widget.clubId != null) {
+                          // Fallback: if somehow no pending exists anymore, start fresh
+                          participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
+                        }
+                      } else {
+                        // No existing countdown: start a new pending change toward Maybe
+                        if (widget.clubId != null) {
+                          participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
+                        }
                       }
                     } else {
                       // Cancelled: keep unchecked, resume countdown if it was pending
@@ -1669,6 +1738,8 @@ class ParticipationStatusLegendModal extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Header with title and close button
+
+
           Container(
             padding: const EdgeInsets.all(20),
             child: Row(
@@ -1750,7 +1821,15 @@ class ParticipationStatusLegendModal extends StatelessWidget {
                     'You\'re unsure about attending this practice',
                   ),
 
+                  _buildLegendItemWithCustomIcon(
+                    _countdownSampleIcon(),
+                    'Countdown',
+                    'Your change is being applied. During the countdown, tap again to cancel.',
+                  ),
+
                   const SizedBox(height: 12),
+
+
 
                   _buildLegendItemWithCustomIcon(
                     _conditionalMaybeSampleIcon(),
@@ -1879,14 +1958,16 @@ class ParticipationStatusLegendModal extends StatelessWidget {
           color: ParticipationStatus.maybe.color,
         ),
         Positioned(
-          right: -2,
-          bottom: -2,
+          right: -4,
+          top: -4,
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+            width: 16,
+            height: 16,
             decoration: BoxDecoration(
-              color: AppColors.maybe,
+              color: AppColors.maybe, // Unsatisfied color
               borderRadius: BorderRadius.circular(3),
             ),
+            alignment: Alignment.center,
             child: const Text(
               '8+',
               style: TextStyle(
@@ -1900,6 +1981,31 @@ class ParticipationStatusLegendModal extends StatelessWidget {
       ],
     );
   }
+
+  // Sample countdown icon with a blue circular progress ring (3/4 complete) around the YES circle
+  Widget _countdownSampleIcon() {
+    return SizedBox(
+      width: 24,
+      height: 24,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Icon(
+            Icons.check_circle_outline,
+            size: 20,
+            color: Color(0xFF10B981), // YES green check outline for inner icon
+          ),
+          CircularProgressIndicator(
+            value: 0.75,
+            strokeWidth: 2.5,
+            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF0284C7)), // System blue ring
+            backgroundColor: const Color(0xFF0284C7).withValues(alpha: 0.15),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 }
 

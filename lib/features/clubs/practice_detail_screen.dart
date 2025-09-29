@@ -37,9 +37,9 @@ class PracticeDetailScreen extends StatefulWidget {
 
 class _PracticeDetailScreenState extends State<PracticeDetailScreen> with SingleTickerProviderStateMixin {
   // Toast state
-  bool _showToast = false;
-  String _toastMessage = '';
-  Color _toastColor = Colors.green;
+  final bool _showToast = false;
+  final String _toastMessage = '';
+  final Color _toastColor = Colors.green;
   IconData? _toastIcon;
   String? _toastText;
 
@@ -72,6 +72,16 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
     });
 
     _generateMockRSVPSummary();
+
+    // After first frame, feed mock overrides into provider so header/icons reflect satisfaction even outside RSVPs tab
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = context.read<ParticipationProvider>();
+      provider.setMockEffectiveYesOverrides(
+        widget.practice.id,
+        baseYes: _baseYes,
+        otherConditionalCounts: _conditionalCounts,
+      );
+    });
   }
 
   void _generateMockRSVPSummary() {
@@ -89,7 +99,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
     // Randomize counts per category
     // Effective Yes base should feel realistic: 4..6
     _baseYes = 4 + _rand.nextInt(3); // 4..6
-    // Conditional Yes totals limited for testing: 0..2 each
+    // Conditional Maybe totals limited for testing: 0..2 each
     _conditionalCounts = {for (final t in _condThresholds) t: _rand.nextInt(3)};
     // Maybe/Blank, No: keep 1..5
     _maybeBlank = 1 + _rand.nextInt(5);
@@ -126,6 +136,11 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
 
   @override
   void dispose() {
+    // Clear provider overrides for this practice so other screens dont keep mock state
+    try {
+      final provider = context.read<ParticipationProvider>();
+      provider.clearMockEffectiveYesOverrides(widget.practice.id);
+    } catch (_) {}
     _tabController.dispose();
     super.dispose();
   }
@@ -189,11 +204,21 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
             for (final t in thresholds) t: (_conditionalCounts[t] ?? 0)
           };
 
-          // Current user state (live)
+          // Feed overrides into provider so all UI (header, icons, calendar) uses the same totals
+          participationProvider.setMockEffectiveYesOverrides(
+            widget.practice.id,
+            baseYes: baseYes,
+            otherConditionalCounts: otherTotals,
+          );
+
+          // Respect pending countdown: don't include current user until commit
           final practiceId = widget.practice.id;
+          final bool myPending = participationProvider.isPendingChange(practiceId);
+
+          // Current user state (live)
           final myStatus = participationProvider.getParticipationStatus(practiceId);
-          final myCondEnabled = participationProvider.getConditionalYes(practiceId);
-          final myThreshold = participationProvider.getConditionalThreshold(practiceId);
+          final myCondEnabled = participationProvider.getConditionalMaybe(practiceId);
+          final myThreshold = participationProvider.getConditionalMaybeThreshold(practiceId);
           final myGuests = participationProvider.getPracticeGuests(practiceId).totalGuests;
           final int userContribution = 1 + myGuests;
 
@@ -210,13 +235,13 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
           }
 
           // If user is a hard YES and not using conditional, count immediately so they can help satisfy others
-          if (myStatus == ParticipationStatus.yes && !myCondEnabled) {
+          if (myStatus == ParticipationStatus.yes && !myCondEnabled && !myPending) {
             effective += userContribution;
             userCounted = true;
           }
 
-          // If user has Conditional Yes enabled, add as a pending group
-          if (myCondEnabled && myThreshold != null) {
+          // If user has Conditional Maybe enabled, add as a pending group only when not pending a change
+          if (myCondEnabled && myThreshold != null && !myPending) {
             pending.add({'t': myThreshold, 'c': userContribution, 'user': true});
           }
 
@@ -252,8 +277,8 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
             for (final t in thresholds) t: (otherTotals[t] ?? 0) - (satisfiedOther[t] ?? 0)
           };
 
-          // If user's conditional is pending, include them in the appropriate bucket as people (1 + guests)
-          if (myCondEnabled && myThreshold != null && !userCounted) {
+          // If user's conditional is pending (but not during countdown), include them in unsatisfied bucket as people (1 + guests)
+          if (myCondEnabled && myThreshold != null && !userCounted && !myPending) {
             unsatisfied[myThreshold] = (unsatisfied[myThreshold] ?? 0) + userContribution;
           }
 
@@ -282,14 +307,14 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                 Text('$effective',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.success)),
                 const SizedBox(height: 4),
-                Text('Includes satisfied Conditional Yes',
+                Text('Includes satisfied Conditional Maybe',
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 4),
                 Text(debug, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
               ]),
             ),
             const SizedBox(height: 12),
-            // Conditional Yes pending (not yet effective)
+            // Conditional Maybe pending (not yet effective)
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
@@ -299,7 +324,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                 border: Border.all(color: Colors.grey[300]!),
               ),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Conditional Yes (not yet effective)',
+                Text('Conditional Maybe (not yet effective)',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 const SizedBox(height: 8),
                 ...thresholds.map((t) {
@@ -407,24 +432,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
     return practiceEndTime.isBefore(now);
   }
 
-  void _showCustomToast(String message, Color color, IconData icon) {
-    setState(() {
-      _toastMessage = message;
-      _toastColor = color;
-      _toastIcon = icon;
-      _toastText = null;
-      _showToast = true;
-    });
 
-    // Hide toast after 4 seconds
-    Timer(Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-      }
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -552,26 +560,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                                   onParticipationChanged: widget.onParticipationChanged != null
                                       ? (status) {
                                           widget.onParticipationChanged!(widget.practice.id, status);
-                                          // Build toast message reflecting Conditional Yes state
-                                          final Color toastColor = status.color;
-                                          if (status == ParticipationStatus.yes) {
-                                            final cond = participationProvider.getConditionalYes(widget.practice.id);
-                                            if (cond) {
-                                              final th = participationProvider.getConditionalThreshold(widget.practice.id) ?? 6;
-                                              final satisfied = participationProvider.isCurrentUserConditionalSatisfied(widget.practice);
-                                              final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
-                                              _showCustomToast(msg, toastColor, status.overlayIcon);
-                                              return;
-                                            }
-                                            final msg = 'RSVP updated to: ${status.displayText}';
-                                            _showCustomToast(msg, toastColor, status.overlayIcon);
-                                          } else if (status == ParticipationStatus.maybe) {
-                                            final msg = 'RSVP updated to: ${status.displayText}';
-                                            _showCustomToast(msg, toastColor, Icons.help);
-                                          } else {
-                                            final msg = 'RSVP updated to: ${status.displayText}';
-                                            _showCustomToast(msg, toastColor, status.overlayIcon);
-                                          }
+                                          // Toasts are handled after commit by PracticeStatusCard; suppress here.
                                         }
                                       : null,
                                   onLocationTap: () => _handleLocationTap(context, widget.practice.location),
