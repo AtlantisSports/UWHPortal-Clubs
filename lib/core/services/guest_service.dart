@@ -9,9 +9,10 @@ class GuestService {
   /// Validate if all guests have required waivers
   bool allGuestsHaveWaivers(List<Guest> guests) {
     if (guests.isEmpty) return true;
-    
+
     for (final guest in guests) {
-      if (!guest.waiverSigned) {
+      // Require waivers only for Visitors and New Players; Dependents and Club Members are exempt
+      if ((guest.type == GuestType.visitor || guest.type == GuestType.newPlayer) && !guest.waiverSigned) {
         return false;
       }
     }

@@ -14,6 +14,9 @@ import '../../core/utils/time_utils.dart';
 
 import '../../core/models/guest.dart';
 import '../../base/widgets/guest_management_modal.dart';
+import 'shared_rsvp_confirm.dart';
+import '../../core/utils/rsvp_apply_helper.dart';
+
 
 import 'dart:async';
 
@@ -498,17 +501,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           // Guest count indicator (lower-left corner)
                           Consumer<ParticipationProvider>(
                             builder: (context, participationProvider, child) {
-                              // Determine which practices to count based on filters
-                              final filtered = practicesForDay
-                                  .where((s) => s.passesFilter)
-                                  .map((s) => s.practiceId)
-                                  .toList();
-                              final consideredIds = filtered.isNotEmpty
-                                  ? filtered
-                                  : practicesForDay.map((s) => s.practiceId).toList();
-                              final faded = filtered.isEmpty;
-
-                              // Sum unique guests across the considered practices (unique by Guest.id)
+                              // Sum unique guests across all practices on this day (unique by Guest.id)
+                              final consideredIds = practicesForDay.map((s) => s.practiceId).toList();
                               final uniqueGuestIds = <String>{};
                               for (final pid in consideredIds) {
                                 final guestList = participationProvider.getPracticeGuests(pid);
@@ -522,17 +516,14 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                 return Positioned(
                                   bottom: 2,
                                   left: 2,
-                                  child: Opacity(
-                                    opacity: faded ? 0.25 : 1.0,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                      child: Text(
-                                        '+$guestCount',
-                                        style: const TextStyle(
-                                          fontSize: 8,
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
+                                    child: Text(
+                                      '+$guestCount',
+                                      style: const TextStyle(
+                                        fontSize: 8,
+                                        fontWeight: FontWeight.bold,
+                                        color: AppColors.primary,
                                       ),
                                     ),
                                   ),
@@ -1380,12 +1371,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Color.alphaBlend(
-            AppColors.primary.withValues(alpha: 0.06),
-            Theme.of(context).colorScheme.surface,
-          ),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey[300]!),
+          border: Border.all(color: AppColors.primary, width: 2),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -1451,82 +1439,8 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
             const SizedBox(height: 8),
 
-            // Conditional Maybe row: only when Maybe is selected
-            if (_bulkChoice == BulkChoice.maybe)
-              Row(
-                children: [
-                  Checkbox(
-                    value: _bulkConditional,
-                    onChanged: (v) async {
-                      final newVal = v ?? false;
-                      if (newVal) {
-                        setState(() {
-                          _bulkConditional = true;
-                        });
-                        _updateSelectionOverlay();
-                        final selected = await _showBulkConditionsModal(initial: _bulkConditionalThreshold);
-                        if (!mounted) return;
-                        if (selected != null) {
-                          setState(() {
-                            _bulkConditionalThreshold = selected;
-                          });
-                          _updateSelectionOverlay();
-                        } else {
-                          setState(() {
-                            _bulkConditional = false;
-                            _bulkConditionalThreshold = null;
-                          });
-                          _updateSelectionOverlay();
-                        }
-                      } else {
-                        setState(() {
-                          _bulkConditional = false;
-                          _bulkConditionalThreshold = null;
-                        });
-                        _updateSelectionOverlay();
-                      }
-                    },
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  const Text('Conditional Maybe'),
-                  if (_bulkConditional && _bulkConditionalThreshold != null) ...[
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.08),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.primary, width: 1),
-                      ),
-                      child: Text(
-                        'at least $_bulkConditionalThreshold',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF1D4ED8)),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    IconButton(
-                      icon: const Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
-                      tooltip: 'Edit threshold',
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      onPressed: () async {
-                        final selected = await _showBulkConditionsModal(initial: _bulkConditionalThreshold);
-                        if (!mounted) return;
-                        setState(() {
-                          if (selected != null) {
-                            _bulkConditional = true;
-                            _bulkConditionalThreshold = selected;
-                          }
-                        });
-                        _updateSelectionOverlay();
-                      },
-                    ),
-                  ],
-                ],
-              ),
-
-            // Guests row: for Conditional Maybe only
-            if (_bulkChoice == BulkChoice.maybe && _bulkConditional)
+            // Guests row: show for Yes and Maybe
+            if (_bulkChoice == BulkChoice.yes || _bulkChoice == BulkChoice.maybe)
               Row(
                 children: [
                   Checkbox(
@@ -1556,9 +1470,73 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 ],
               ),
 
+            const SizedBox(height: 8),
+
+            // Conditional Maybe row: only when Maybe is selected
+            if (_bulkChoice == BulkChoice.maybe)
+              Row(
+                children: [
+                  Checkbox(
+                    value: _bulkConditional,
+                    onChanged: (v) {
+                      final newVal = v ?? false;
+                      setState(() {
+                        _bulkConditional = newVal;
+                        if (!newVal) _bulkConditionalThreshold = null;
+                      });
+                      _updateSelectionOverlay();
+                    },
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  const Text('Conditional Maybe'),
+
+                ],
+              ),
+
+
+              if (_bulkConditional) ...[
+                const SizedBox(height: 6),
+                const Text(
+                  'I will commit so long as at least this many (including myself) will attend',
+                  style: TextStyle(color: Colors.black54),
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 16,
+                    runSpacing: 8,
+                    children: [6, 8, 10, 12].map<Widget>((t) {
+                      final selected = _bulkConditionalThreshold == t;
+                      return GestureDetector(
+                        onTap: () {
+                          setState(() { _bulkConditionalThreshold = t; });
+                          _updateSelectionOverlay();
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                            border: Border.all(color: selected ? AppColors.primary : const Color(0xFFE5E7EB), width: 1),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '$t+',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: selected ? AppColors.primary : const Color(0xFF374151),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+              ],
 
             // Guest list below checkbox (match RSVP cards display)
-            if (_bulkChoice == BulkChoice.yes && _bulkBringGuests && _bulkGuestList.totalGuests > 0) ...[
+            if ((_bulkChoice == BulkChoice.yes || _bulkChoice == BulkChoice.maybe) && _bulkBringGuests && _bulkGuestList.totalGuests > 0) ...[
               const SizedBox(height: 8),
               Container(
                 padding: const EdgeInsets.all(6),
@@ -1651,6 +1629,11 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           fontSize: 16,
                           fontWeight: FontWeight.w500,
                         ),
+
+
+
+
+
                       ),
                     ),
 
@@ -1730,21 +1713,80 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   void _showBulkGuestModal() {
-    PhoneAwareModalUtils.showPhoneAwareBottomSheet(
+    final future = PhoneAwareModalUtils.showPhoneAwareBottomSheet(
       context: context,
       child: GuestManagementModal(
         initialGuests: _bulkGuestList,
         onGuestsChanged: (updated) {
           setState(() {
             _bulkGuestList = updated;
-            // Keep checkbox state as-is; bringGuest on apply depends on merged list non-empty
+            _bulkBringGuests = updated.totalGuests > 0;
+            _updateSelectionOverlay();
           });
         },
         practiceId: 'bulk',
-        dependentsOnly: true,
+        dependentsOnly: false,
       ),
     );
+    future.whenComplete(() {
+      if (mounted && _bulkGuestList.totalGuests == 0) {
+        setState(() {
+          _bulkBringGuests = false;
+          _updateSelectionOverlay();
+        });
+      }
+    });
   }
+  Future<bool> _applyOverlayBulkWithGuestConfirmation(ParticipationProvider provider, List<String> practiceIds, ParticipationStatus target) async {
+    final decision = await showSharedRSVPConfirmationDialog(
+      context: context,
+      provider: provider,
+      practiceId: practiceIds.first,
+      target: target,
+      initialMakeConditional: target == ParticipationStatus.maybe ? (_bulkConditional && _bulkConditionalThreshold != null) : false,
+      initialThreshold: _bulkConditionalThreshold,
+      overrideHasClubMembers: true,
+      overrideHasVisitors: true,
+      overrideHasDependents: true,
+      overrideHasNewPlayers: true,
+    );
+    if (decision == null) return false;
+
+    if (!mounted) return false;
+
+    await applyRSVPChange(
+      context: context,
+      provider: provider,
+      clubId: widget.club.id,
+      practiceIds: practiceIds,
+      target: target,
+      decision: decision,
+    );
+
+    // Success toast and close selection mode
+    String label;
+    IconData icon;
+    Color color;
+    switch (target) {
+      case ParticipationStatus.yes:
+        label = 'Yes'; icon = Icons.check; color = AppColors.success; break;
+      case ParticipationStatus.maybe:
+        label = 'Maybe'; icon = Icons.help_outline; color = AppColors.maybe; break;
+      default:
+        label = 'No'; icon = Icons.cancel; color = AppColors.error; break;
+    }
+    String message;
+    if (target == ParticipationStatus.maybe && _bulkConditional && _bulkConditionalThreshold != null) {
+      message = 'Maybe if ${_bulkConditionalThreshold!}+ applied for ${practiceIds.length} practices';
+    } else {
+      message = '$label applied to ${practiceIds.length == 1 ? '1 practice' : '${practiceIds.length} practices'}';
+    }
+    _showTopScreenToast(message, color, icon);
+    _exitSelectionMode();
+
+    return true;
+  }
+
   Future<void> _applyBulk() async {
     if (_bulkChoice == BulkChoice.none) {
       _showCustomToast(
@@ -1798,6 +1840,18 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         : _bulkChoice == BulkChoice.maybe
             ? ParticipationStatus.maybe
             : ParticipationStatus.no;
+
+    // If any selected practice has guest implications when moving from YES to Maybe/No, confirm once and apply
+    if (status == ParticipationStatus.maybe || status == ParticipationStatus.no) {
+      bool needsConfirm = false;
+      for (final id in practiceIds) {
+        if (provider.needsGuestConfirmation(id, status)) { needsConfirm = true; break; }
+      }
+      if (needsConfirm) {
+        final applied = await _applyOverlayBulkWithGuestConfirmation(provider, practiceIds, status);
+        if (applied) return;
+      }
+    }
 
     // Guests handling per spec
     if (_bulkChoice == BulkChoice.maybe && _bulkConditional) {
@@ -2093,52 +2147,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: const ParticipationStatusLegendModal(),
-    );
-  }
-  Future<int?> _showBulkConditionsModal({int? initial}) async {
-    int temp = initial ?? 6;
-    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
-      context: context,
-      child: StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'I will attend so long as at least this many (including myself) will attend',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                DropdownButton<int>(
-                  value: temp,
-                  items: const [6, 8, 10, 12]
-                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
-                      .toList(),
-                  onChanged: (v) => setModalState(() => temp = v ?? temp),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(null),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(temp),
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
     );
   }
 

@@ -32,6 +32,10 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
   final Map<String, bool> _conditionalMaybeMap = {}; // practiceId -> checked
   final Map<String, int> _conditionalMaybeThresholdMap = {}; // practiceId -> threshold
 
+  // Remember last-used Conditional Maybe threshold across practices
+  int? _lastUsedConditionalThreshold;
+
+
   // Map to track guest lists for each practice
   // Key: practiceId, Value: PracticeGuestList
   final Map<String, PracticeGuestList> _practiceGuestsMap = {};
@@ -286,6 +290,17 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
   ParticipationStatus getParticipationStatus(String practiceId) {
     return _participationStatusMap[practiceId] ?? ParticipationStatus.blank;
   }
+  /// Return the last-used Conditional Maybe threshold if available, else the minimum of options
+  int getLastUsedOrMinThreshold(List<int> options) {
+    if (_lastUsedConditionalThreshold != null) return _lastUsedConditionalThreshold!;
+    if (options.isEmpty) return 0;
+    int minVal = options.first;
+    for (final v in options) {
+      if (v < minVal) minVal = v;
+    }
+    return minVal;
+  }
+
 
   /// Conditional Maybe state
   bool getConditionalMaybe(String practiceId) => _conditionalMaybeMap[practiceId] ?? false;
@@ -302,24 +317,14 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
     _conditionalMaybeMap[practiceId] = checked;
     if (checked && threshold != null) {
       _conditionalMaybeThresholdMap[practiceId] = threshold;
+      _lastUsedConditionalThreshold = threshold; // remember last used globally
     }
-
-    if (checked) {
-      // When enabling Conditional Maybe, clear all non-dependent guests per spec.
-      final current = getPracticeGuests(practiceId);
-      final dependents = current.guests.where((g) => g.type == GuestType.dependent).toList();
-      final removedCount = current.guests.length - dependents.length;
-      if (removedCount > 0) {
-        _lastRemovedNonDependentGuests[practiceId] = removedCount;
-      }
-      // Update guest list and bring-guest state accordingly
-      updatePracticeGuests(practiceId, dependents);
-      updateBringGuestState(practiceId, dependents.isNotEmpty);
-    }
-
     if (!checked) {
-      // Keep last threshold in memory for convenience, but could be cleared if desired
+      // When disabling conditional, clear stored threshold for this practice but keep last-used global
+      _conditionalMaybeThresholdMap.remove(practiceId);
     }
+    // Per new spec: Do not auto-clear any non-dependent guests when enabling Conditional Maybe.
+    // We simply toggle the flag and optionally store the threshold.
     notifyListeners();
   }
 
@@ -329,6 +334,28 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
     _conditionalMaybeThresholdMap.remove(practiceId);
     notifyListeners();
   }
+
+  /// Determine if a confirmation modal is needed for a transition based on guest composition
+  bool needsGuestConfirmation(String practiceId, ParticipationStatus newTarget) {
+    final current = getParticipationStatus(practiceId);
+    // Only consider transitions to Maybe/No
+    if (newTarget != ParticipationStatus.maybe && newTarget != ParticipationStatus.no) return false;
+
+    // Require any guests present
+    final guests = getPracticeGuests(practiceId).guests;
+    if (guests.isEmpty) return false;
+
+    // Show confirmation for:
+    // - Yes -> Maybe/No
+    // - Maybe -> No
+    if ((current == ParticipationStatus.yes && (newTarget == ParticipationStatus.maybe || newTarget == ParticipationStatus.no)) ||
+        (current == ParticipationStatus.maybe && newTarget == ParticipationStatus.no)) {
+      return true;
+    }
+
+    return false;
+  }
+
 
   /// Badge text helper (for buttons/calendar). Returns "N" or null when no badge.
   String? getConditionalBadgeText(String practiceId) {
@@ -469,9 +496,12 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
 
       // Update local state
       _participationStatusMap[practiceId] = newStatus;
+      // Record last committed target for UI selection stability across all change paths
+      _lastCommittedTarget[practiceId] = newStatus;
 
       // Notify all listeners that this practice participation has changed
       notifyListeners();
+
 
     } catch (error) {
       final errorMessage = AppErrorHandler.getErrorMessage(error);
@@ -533,6 +563,29 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
       errors: errors,
       appliedStatus: request.newStatus,
     );
+  }
+
+  /// Update RSVP for a club member (guest) directly
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status, {int? conditionalThreshold}) async {
+    await _clubsRepository.updateMemberParticipationStatus(clubId, practiceId, memberId, status);
+    if (status == ParticipationStatus.maybe) {
+      await _clubsRepository.setMemberConditionalMaybeThreshold(clubId, practiceId, memberId, conditionalThreshold);
+    } else {
+      await _clubsRepository.setMemberConditionalMaybeThreshold(clubId, practiceId, memberId, null);
+    }
+    notifyListeners();
+  }
+
+  /// Send notification to a guest about their RSVP change (placeholder impl)
+  Future<void> sendGuestRSVPNotification({
+    required String practiceId,
+    required String guestDisplayName,
+    required GuestType guestType,
+    required ParticipationStatus newStatus,
+    required bool isClubMember,
+    String? memberId,
+  }) async {
+    debugPrint('[Notify] Guest "$guestDisplayName" (${guestType.name}) changed to ${newStatus.name} for practice $practiceId. memberId=$memberId');
   }
 
   /// Get participation statuses for multiple practices
@@ -627,34 +680,18 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
       final int myGuests = getPracticeGuests(practice.id).totalGuests;
       pending.add(_CondGroup(threshold: myThreshold, contribution: 1 + myGuests, isCurrentUser: true));
     } else {
-      // If not using Conditional Maybe (or currently pending), and current user is a hard Yes in the model, count them only when not pending.
+      // If not using Conditional Maybe (or currently pending), and current user is a hard Yes in the model,
+      // count them (and their guests) only when not pending.
       final myStatus = practice.getParticipationStatus(uid);
-      if (!myPending && myStatus == ParticipationStatus.yes) effective++;
+      if (!myPending && myStatus == ParticipationStatus.yes) {
+        final int myGuests = getPracticeGuests(practice.id).totalGuests;
+        effective += 1 + myGuests;
+      }
     }
 
-    // Fixed-point satisfaction loop
-    bool changed = true;
-    while (changed) {
-      changed = false;
-      final remaining = <_CondGroup>[];
-      for (final g in pending) {
-        if (g.threshold <= (effective + g.contribution)) {
-          effective += g.contribution;
-          changed = true;
-        } else {
-          remaining.add(g);
-        }
-      }
-      if (remaining.length == pending.length) {
-        // No progress; break to avoid infinite loop
-        break;
-      }
-      pending
-        ..clear()
-        ..addAll(remaining);
-    }
-
-    return effective;
+    // Solve using shared fixed-point solver
+    final res = _solveFixedPoint(baseEffective: effective, groups: pending);
+    return res.effective;
   }
 
   /// Determine whether the current user's Conditional Maybe (if enabled) is satisfied
@@ -662,10 +699,9 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
   bool isCurrentUserConditionalSatisfied(Practice practice) {
     final String uid = currentUserId;
 
-    // If there is a pending change, only block satisfaction when the pending target is not Maybe.
-    // For pending target = Maybe, we still want the UI to reflect satisfaction immediately.
+    // If there is any pending change, do not consider Conditional Maybe satisfied yet.
+    // We only compute satisfaction after the countdown commits.
     if (isPendingChange(practice.id)) {
-      // Defer satisfaction until the pending change commits (end of countdown)
       return false;
     }
 
@@ -707,30 +743,9 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
     final int myGuests = getPracticeGuests(practice.id).totalGuests;
     pending.add(_CondGroup(threshold: myThreshold, contribution: 1 + myGuests, isCurrentUser: true));
 
-    // Fixed-point loop, tracking when current user's group satisfies
-    bool mySatisfied = false;
-    bool changed = true;
-    while (changed) {
-      changed = false;
-      final remaining = <_CondGroup>[];
-      for (final g in pending) {
-        if (g.threshold <= (effective + g.contribution)) {
-          effective += g.contribution;
-          if (g.isCurrentUser) mySatisfied = true;
-          changed = true;
-        } else {
-          remaining.add(g);
-        }
-      }
-      if (remaining.length == pending.length) {
-        break;
-      }
-      pending
-        ..clear()
-        ..addAll(remaining);
-    }
-
-    return mySatisfied;
+    // Solve using shared fixed-point solver, tracking current user
+    final res = _solveFixedPoint(baseEffective: effective, groups: pending, trackCurrentUser: true);
+    return res.mySatisfied;
   }
 
   /// Private helper methods
@@ -791,7 +806,7 @@ class ParticipationProvider with ChangeNotifier, WidgetsBindingObserver {
         return const PracticeStatusViewState(label: 'Not going');
       case ParticipationStatus.maybe:
         if (getConditionalMaybe(practice.id)) {
-          final th = getConditionalMaybeThreshold(practice.id) ?? 6;
+          final th = getConditionalMaybeThreshold(practice.id) ?? getLastUsedOrMinThreshold(const [6, 8, 10, 12]);
           final satisfied = isCurrentUserConditionalSatisfied(practice);
           return PracticeStatusViewState(
             label: satisfied ? '$th+ you are going!' : 'Going if $th+',
@@ -839,6 +854,41 @@ class PendingChange {
     this.progressCache,
     this.pausedAt,
   });
+}
+
+
+class _SolveResult {
+  final int effective;
+  final bool mySatisfied;
+  const _SolveResult(this.effective, this.mySatisfied);
+}
+
+_SolveResult _solveFixedPoint({
+  required int baseEffective,
+  required List<_CondGroup> groups,
+  bool trackCurrentUser = false,
+}) {
+  int effective = baseEffective;
+  bool mySatisfied = false;
+  bool changed = true;
+  while (changed) {
+    changed = false;
+    final remaining = <_CondGroup>[];
+    for (final g in groups) {
+      if (g.threshold <= (effective + g.contribution)) {
+        effective += g.contribution;
+        if (trackCurrentUser && g.isCurrentUser) mySatisfied = true;
+        changed = true;
+      } else {
+        remaining.add(g);
+      }
+    }
+    // If nothing changed, loop will exit; no need for length guard
+    groups
+      ..clear()
+      ..addAll(remaining);
+  }
+  return _SolveResult(effective, mySatisfied);
 }
 
 /// Minimal view-model for PracticeStatus card header

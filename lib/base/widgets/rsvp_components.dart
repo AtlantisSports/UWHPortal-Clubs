@@ -10,32 +10,14 @@ import '../../core/utils/time_utils.dart';
 import 'guest_management_modal.dart';
 import 'phone_aware_modal_utils.dart';
 
+import 'shared_rsvp_confirm.dart';
+import '../../core/utils/rsvp_apply_helper.dart';
+
+
 
 // Local top-of-screen toast helper for components used outside calendar/list screens
 
-/// Centralized final-commit toast policy
-void showFinalCommitToastForPractice(BuildContext context, ParticipationProvider provider, Practice practice) {
-  // Use the just-committed target if available to avoid showing the old status toast
-  final finalStatus = provider.getLastCommittedTarget(practice.id) ?? provider.getParticipationStatus(practice.id);
-  if (finalStatus == ParticipationStatus.yes) {
-    showTopToast(context, 'Going', ParticipationStatus.yes.color, Icons.check);
-  } else if (finalStatus == ParticipationStatus.no) {
-    showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
-  } else if (finalStatus == ParticipationStatus.maybe) {
-    final cond = provider.getConditionalMaybe(practice.id);
-    if (cond) {
-      final th = provider.getConditionalMaybeThreshold(practice.id) ?? 6;
-      final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
-      final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
-      final color = satisfied ? AppColors.success : const Color(0xFFF59E0B);
-      const icon = Icons.help_outline;
-      showTopToast(context, msg, color, icon);
-    } else {
-      showTopToast(context, 'Maybe', const Color(0xFFF59E0B), Icons.help_outline);
-    }
-  }
-}
-
+// Toast UI helpers first (so callers above can reference them without forward-lookup ambiguity)
 void showTopToast(BuildContext context, String message, Color color, IconData icon, {bool persistent = false}) {
   final overlay = Overlay.of(context);
   late OverlayEntry entry;
@@ -109,7 +91,6 @@ OverlayEntry showPendingCountdownToast(BuildContext context, String message, {bo
   return entry;
 }
 
-
 /// Truncate tag to 4 characters (exact same as bulk RSVP)
 String truncateTag(String tag) {
   if (tag.isEmpty) return '';
@@ -131,6 +112,44 @@ String truncateTag(String tag) {
       // Truncate to 4 characters and uppercase
       return tag.toUpperCase().substring(0, tag.length > 4 ? 4 : tag.length);
   }
+}
+
+/// Centralized final-commit toast policy
+void showFinalCommitToastForPractice(BuildContext context, ParticipationProvider provider, Practice practice) {
+  // Use the just-committed target if available to avoid showing the old status toast
+  final finalStatus = provider.getLastCommittedTarget(practice.id) ?? provider.getParticipationStatus(practice.id);
+  if (finalStatus == ParticipationStatus.yes) {
+    showTopToast(context, 'Going', ParticipationStatus.yes.color, Icons.check);
+  } else if (finalStatus == ParticipationStatus.no) {
+    showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
+  } else if (finalStatus == ParticipationStatus.maybe) {
+    final cond = provider.getConditionalMaybe(practice.id);
+    if (cond) {
+      final th = provider.getConditionalMaybeThreshold(practice.id) ?? provider.getLastUsedOrMinThreshold(const [6, 8, 10, 12]);
+      final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
+      final msg = satisfied ? '$th+ you are going!' : 'Going if $th+';
+      final color = satisfied ? AppColors.success : const Color(0xFFF59E0B);
+      const icon = Icons.help_outline;
+      showTopToast(context, msg, color, icon);
+    } else {
+      showTopToast(context, 'Maybe', const Color(0xFFF59E0B), Icons.help_outline);
+    }
+  }
+}
+
+/// Show final toast explicitly for a known new status (avoids race with provider state)
+void showFinalCommitToastForStatus(
+  BuildContext context,
+  ParticipationStatus status,
+  ParticipationProvider provider,
+  Practice practice,
+) {
+  if (status == ParticipationStatus.no) {
+    showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
+    return;
+  }
+  // Fallback to existing helper for Maybe and other cases
+  showFinalCommitToastForPractice(context, provider, practice);
 }
 
 /// Interactive circle-based RSVP component
@@ -1058,23 +1077,18 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                 ],
               ),
 
-              // Conditions section (only for Maybe or when pending target is Maybe)
+              // Bring a guest section: show for Yes and Maybe (including pending), hide only on No
+              if (currentParticipationStatus != ParticipationStatus.no ||
+                  (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) != ParticipationStatus.no)) ...[
+                const SizedBox(height: 12),
+                _buildGuestSection(participationProvider, bringGuest, guestList),
+              ],
+
+              // Conditions section (only for Maybe or when pending target is Maybe), appears below guest section
               if (currentParticipationStatus == ParticipationStatus.maybe ||
                   (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe)) ...[
                 const SizedBox(height: 12),
                 _buildConditionsSection(widget.practice.id),
-              ],
-
-              // Bring a guest section:
-              // - Always for Yes (or pending Yes)
-              // - For Maybe only when Conditional is ON (also during pending Maybe target)
-              if (currentParticipationStatus == ParticipationStatus.yes ||
-                  (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.yes) ||
-                  ((currentParticipationStatus == ParticipationStatus.maybe ||
-                    (participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe))
-                   && participationProvider.getConditionalMaybe(widget.practice.id))) ...[
-                const SizedBox(height: 12),
-                _buildGuestSection(participationProvider, bringGuest, guestList),
               ],
             ],
           ),
@@ -1241,9 +1255,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     Future.delayed(const Duration(milliseconds: 100), () async {
                       final wasPending = participationProvider.isPendingChange(widget.practice.id);
                       if (wasPending) participationProvider.pausePendingChange(widget.practice.id);
-                      final pendingMaybe = participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe;
-                      final isConditionalMaybe = (participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.maybe || pendingMaybe) && participationProvider.getConditionalMaybe(widget.practice.id);
-                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: isConditionalMaybe);
+                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: false);
+                      // Clear bring-guest if exiting with no guests
+                      if (participationProvider.getPracticeGuests(widget.practice.id).totalGuests == 0) {
+                        participationProvider.updateBringGuestState(widget.practice.id, false);
+                      }
                       if (wasPending && participationProvider.isPendingChange(widget.practice.id)) {
                         participationProvider.resumePendingChange(widget.practice.id);
                       }
@@ -1281,9 +1297,11 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                     onTap: () async {
                       final wasPending = participationProvider.isPendingChange(widget.practice.id);
                       if (wasPending) participationProvider.pausePendingChange(widget.practice.id);
-                      final pendingMaybe = participationProvider.isPendingChange(widget.practice.id) && participationProvider.getPendingTarget(widget.practice.id) == ParticipationStatus.maybe;
-                      final isConditionalMaybe = (participationProvider.getParticipationStatus(widget.practice.id) == ParticipationStatus.maybe || pendingMaybe) && participationProvider.getConditionalMaybe(widget.practice.id);
-                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: isConditionalMaybe);
+                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: false);
+                      // Clear bring-guest if exiting with no guests
+                      if (participationProvider.getPracticeGuests(widget.practice.id).totalGuests == 0) {
+                        participationProvider.updateBringGuestState(widget.practice.id, false);
+                      }
                       if (wasPending && participationProvider.isPendingChange(widget.practice.id)) {
                         participationProvider.resumePendingChange(widget.practice.id);
                       }
@@ -1339,7 +1357,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   Widget _buildConditionsSection(String practiceId) {
     final participationProvider = Provider.of<ParticipationProvider>(context, listen: true);
     final checked = participationProvider.getConditionalMaybe(practiceId);
-    final threshold = participationProvider.getConditionalMaybeThreshold(practiceId) ?? _condThresholdOptions.first;
+    final threshold = participationProvider.getConditionalMaybeThreshold(practiceId) ?? participationProvider.getLastUsedOrMinThreshold(_condThresholdOptions);
 
     return Container(
       padding: const EdgeInsets.all(6),
@@ -1355,48 +1373,18 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
             children: [
               Checkbox(
                 value: checked,
-                onChanged: (value) async {
+                onChanged: (value) {
                   final newChecked = value ?? false;
                   if (newChecked) {
-                    // Pause countdown while picking threshold
-                    final wasPending = participationProvider.isPendingChange(practiceId);
-                    if (wasPending) participationProvider.pausePendingChange(practiceId);
-
-                    final selected = await _showConditionsModal(practiceId, initial: threshold);
-                    if (!mounted) return;
-                    if (selected != null) {
-                      // Enable Conditional Maybe; provider will clear non-dependent guests centrally
-                      participationProvider.setConditionalMaybe(practiceId, true, threshold: selected);
-
-                      // Show removal toast if any guests were cleared
-                      final removed = participationProvider.consumeRemovedNonDependentGuests(practiceId);
-                      if (removed > 0) {
-                        showTopToast(context, 'Removed non-dependent ${removed == 1 ? 'guest' : 'guests'}', AppColors.info, Icons.person_remove_alt_1);
-                      }
-
-                      if (wasPending) {
-                        // Resume existing countdown; do NOT start a new pending change (would cancel)
-                        if (participationProvider.isPendingChange(practiceId)) {
-                          participationProvider.resumePendingChange(practiceId);
-                        } else if (widget.clubId != null) {
-                          // Fallback: if somehow no pending exists anymore, start fresh
-                          participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
-                        }
-                      } else {
-                        // No existing countdown: start a new pending change toward Maybe
-                        if (widget.clubId != null) {
-                          participationProvider.startPendingChange(widget.clubId!, practiceId, ParticipationStatus.maybe);
-                        }
-                      }
-                    } else {
-                      // Cancelled: keep unchecked, resume countdown if it was pending
-                      participationProvider.setConditionalMaybe(practiceId, false);
-                      if (wasPending && participationProvider.isPendingChange(practiceId)) {
-                        participationProvider.resumePendingChange(practiceId);
-                      }
+                    // Enable Conditional Maybe immediately with current/default threshold
+                    final currentOrDefault = threshold;
+                    participationProvider.setConditionalMaybe(practiceId, true, threshold: currentOrDefault);
+                    // Show removal toast if any guests were cleared
+                    final removed = participationProvider.consumeRemovedNonDependentGuests(practiceId);
+                    if (removed > 0) {
+                      showTopToast(context, 'Removed non-dependent ${removed == 1 ? 'guest' : 'guests'}', AppColors.info, Icons.person_remove_alt_1);
                     }
                   } else {
-                    // Turning OFF Conditional Maybe does not reset countdown per spec
                     participationProvider.setConditionalMaybe(practiceId, false);
                   }
                 },
@@ -1412,89 +1400,67 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   color: Color(0xFF374151),
                 ),
               ),
-              if (checked) ...[
-                const SizedBox(width: 8),
-                Text(
-                  'at least $threshold',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                IconButton(
-                  icon: const Icon(Icons.edit, size: 18, color: Color(0xFF6B7280)),
-                  tooltip: 'Edit threshold',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () async {
-                    final wasPending = participationProvider.isPendingChange(practiceId);
-                    if (wasPending) participationProvider.pausePendingChange(practiceId);
-                    final selected = await _showConditionsModal(practiceId, initial: threshold);
-                    if (!mounted) return;
-                    if (selected != null) {
-                      participationProvider.setConditionalMaybe(practiceId, true, threshold: selected);
-                    }
-                    if (wasPending && participationProvider.isPendingChange(practiceId)) {
-                      participationProvider.resumePendingChange(practiceId);
-                    }
-                  },
-                ),
-              ],
+              const SizedBox(width: 6),
+              Tooltip(
+                triggerMode: TooltipTriggerMode.tap,
+                showDuration: Duration(seconds: 3),
+                message: 'Selecting this gives you the option to set a minimum attendance threshold before you will commit to attend',
+                child: const Icon(Icons.help_outline, size: 16, color: Color(0xFF6B7280)),
+              ),
+
             ],
           ),
+          if (checked) ...[
+            const SizedBox(height: 6),
+            const Text(
+              'I will commit so long as at least this many (including myself) will attend',
+              style: TextStyle(color: Color(0xFF6B7280), fontSize: 12),
+            ),
+            const SizedBox(height: 8),
+            Center(
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                spacing: 16,
+                runSpacing: 8,
+                children: _condThresholdOptions.map((t) {
+                  final selected = t == threshold;
+                  return GestureDetector(
+                    onTap: () {
+                      participationProvider.setConditionalMaybe(practiceId, true, threshold: t);
+                      final removed = participationProvider.consumeRemovedNonDependentGuests(practiceId);
+                      if (removed > 0) {
+                        showTopToast(context, 'Removed non-dependent ${removed == 1 ? 'guest' : 'guests'}', AppColors.info, Icons.person_remove_alt_1);
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
+                        border: Border.all(color: selected ? AppColors.primary : const Color(0xFFE5E7EB), width: 1),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '$t+',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? AppColors.primary : const Color(0xFF374151),
+                        ),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+          ],
+
         ],
       ),
     );
   }
 
-  Future<int?> _showConditionsModal(String practiceId, {required int initial}) async {
-    int temp = initial;
-    return await PhoneAwareModalUtils.showPhoneAwareBottomSheet<int>(
-      context: context,
-      child: StatefulBuilder(
-        builder: (context, setModalState) {
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'I will attend so long as at least this many (including myself) will attend',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 12),
-                DropdownButton<int>(
-                  value: temp,
-                  items: _condThresholdOptions
-                      .map((t) => DropdownMenuItem<int>(value: t, child: Text('$t')))
-                      .toList(),
-                  onChanged: (v) => setModalState(() => temp = v ?? temp),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
-                  children: [
-                    TextButton(
-                      onPressed: () => Navigator.of(context).pop(null),
-                      child: const Text('Cancel'),
-                    ),
-                    const SizedBox(width: 8),
-                    ElevatedButton(
-                      onPressed: () => Navigator.of(context).pop(temp),
-                      child: const Text('Save'),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
+
+
 
   Future<void> _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList, {required bool dependentsOnly}) {
     return PhoneAwareModalUtils.showPhoneAwareBottomSheet<void>(
@@ -1504,6 +1470,10 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         onGuestsChanged: (newGuestList) {
           // Update provider with new guest data
           participationProvider.updatePracticeGuests(widget.practice.id, newGuestList.guests);
+          // Clear bring guest when no guests remain
+          if (newGuestList.totalGuests == 0) {
+            participationProvider.updateBringGuestState(widget.practice.id, false);
+          }
         },
         practiceId: widget.practice.id,
         dependentsOnly: dependentsOnly,
@@ -1511,10 +1481,17 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     );
   }
 
+
+
+
   Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
-    final bool isPending = participationProvider.isPendingChange(widget.practice.id) &&
-        (participationProvider.getPendingTarget(widget.practice.id) == status);
-    final isSelected = currentParticipationStatus == status || isPending;
+    final bool hasPending = participationProvider.isPendingChange(widget.practice.id);
+    final pendingTarget = hasPending ? participationProvider.getPendingTarget(widget.practice.id) : null;
+    final bool isPending = hasPending && pendingTarget == status;
+    final bool isCommittedTarget = participationProvider.getLastCommittedTarget(widget.practice.id) == status;
+    final bool isSelected = hasPending
+        ? isPending
+        : (currentParticipationStatus == status || isCommittedTarget);
 
     // Dynamic color: Maybe turns green when Conditional is ON and satisfied
     Color color = status.color;
@@ -1534,10 +1511,42 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         try {
           if (widget.clubId == null) return;
 
-          // Universal 10s countdown for any change in state (Yes/Maybe/No)
+          final current = participationProvider.getParticipationStatus(widget.practice.id);
+          final needsConfirm = participationProvider.needsGuestConfirmation(widget.practice.id, status);
+
+          if (needsConfirm && ((current == ParticipationStatus.yes && (status == ParticipationStatus.maybe || status == ParticipationStatus.no)) || (current == ParticipationStatus.maybe && status == ParticipationStatus.no))) {
+            final res = await showSharedRSVPConfirmationDialog(
+              context: context,
+              provider: participationProvider,
+              practiceId: widget.practice.id,
+              target: status,
+              initialMakeConditional: status == ParticipationStatus.maybe ? participationProvider.getConditionalMaybe(widget.practice.id) : false,
+              initialThreshold: participationProvider.getConditionalMaybeThreshold(widget.practice.id) ?? participationProvider.getLastUsedOrMinThreshold(const [6, 8, 10, 12]),
+            );
+            if (res == null) return; // cancelled
+
+            if (!mounted) return;
+
+            await applyRSVPChange(
+              context: context,
+              provider: participationProvider,
+              clubId: widget.clubId!,
+              practiceIds: [widget.practice.id],
+              target: status,
+              decision: res,
+            );
+
+            if (!mounted) return;
+
+            if (mounted) {
+              showFinalCommitToastForStatus(context, status, participationProvider, widget.practice);
+            }
+            return;
+          }
+
+          // Default path: use countdown flow
           participationProvider.startPendingChange(widget.clubId!, widget.practice.id, status);
         } catch (error) {
-          // Show error toast if RSVP update fails
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -1608,7 +1617,7 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   ),
                   child: Center(
                     child: Text(
-                      '${participationProvider.getConditionalBadgeText(widget.practice.id) ?? _condThresholdOptions.first}',
+                      '${participationProvider.getConditionalBadgeText(widget.practice.id) ?? participationProvider.getLastUsedOrMinThreshold(_condThresholdOptions)}',
                       style: const TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -2541,4 +2550,89 @@ class GuestTypeTag extends StatelessWidget {
       ),
     );
   }
+}
+
+
+/// Inline tap-triggered tooltip bubble with arrow, positioned above the icon
+class _InlineTooltipBubble extends StatefulWidget {
+  final String message;
+  final Widget child;
+  const _InlineTooltipBubble({required this.message, required this.child});
+
+  @override
+  State<_InlineTooltipBubble> createState() => _InlineTooltipBubbleState();
+}
+
+class _InlineTooltipBubbleState extends State<_InlineTooltipBubble> {
+  bool _visible = false;
+
+  void _toggle() => setState(() => _visible = !_visible);
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _toggle,
+      behavior: HitTestBehavior.opaque,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          widget.child,
+          if (_visible)
+            Positioned(
+              bottom: 25,
+              left: -60,
+              child: SizedBox(
+                width: 180,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF374151),
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        widget.message,
+                        style: const TextStyle(color: Colors.white, fontSize: 12, height: 1.3),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    Transform.translate(
+                      offset: const Offset(0, -1),
+                      child: CustomPaint(size: const Size(8, 4), painter: _InlineTooltipArrowPainter()),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InlineTooltipArrowPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF374151)
+      ..style = PaintingStyle.fill;
+    final path = Path()
+      ..moveTo(size.width / 2, size.height)
+      ..lineTo(0, 0)
+      ..lineTo(size.width, 0)
+      ..close();
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

@@ -416,7 +416,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
             ),
           ),
           // Waiver status
-          if (guest.type != GuestType.clubMember)
+          if (guest.type != GuestType.clubMember && guest.type != GuestType.dependent)
             Row(
               children: [
                 Icon(
@@ -556,7 +556,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
         const SizedBox(height: 12),
 
         // Waiver checkbox (not for club members)
-        if (type != GuestType.clubMember)
+        if (type != GuestType.clubMember && type != GuestType.dependent)
           Row(
             children: [
               Checkbox(
@@ -641,15 +641,12 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
       // Handle multiple dependent selections
       if (_selectedDependents.isEmpty) return;
 
-      final waiverSigned = _waiverStates[type] ?? false;
-
       // Add each selected dependent as a separate guest
       for (final dependentName in _selectedDependents) {
         final guestId = '${widget.practiceId}_${type.name}_${dependentName}_${DateTime.now().millisecondsSinceEpoch}';
         final guest = DependentGuest(
           id: guestId,
           name: dependentName,
-          waiverSigned: waiverSigned,
         );
         _guestList = _guestList.addGuest(guest);
       }
@@ -761,8 +758,8 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     final waiverSigned = _waiverStates[type] ?? false;
 
     if (type == GuestType.dependent) {
-      // For dependents, check if any are selected and waiver is signed
-      return _selectedDependents.isNotEmpty && waiverSigned;
+      // For dependents, check if any are selected (no waiver needed)
+      return _selectedDependents.isNotEmpty;
     } else if (type == GuestType.clubMember) {
       // For club members, enable Add if at least one checkbox is selected (no waiver needed)
       return _selectedClubMemberIds.isNotEmpty;
@@ -801,13 +798,9 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
     final waiverSigned = _waiverStates[type] ?? false;
 
     if (type == GuestType.dependent) {
-      // Special handling for dependents
-      if (_selectedDependents.isEmpty && !waiverSigned) {
-        _showValidationToast('Please select dependents and sign waiver');
-      } else if (_selectedDependents.isEmpty) {
+      // Special handling for dependents (no waiver required)
+      if (_selectedDependents.isEmpty) {
         _showValidationToast('Please select at least one dependent');
-      } else if (!waiverSigned) {
-        _showValidationToast('Please sign the waiver to add dependents');
       }
     } else if (type == GuestType.clubMember) {
       if (_selectedClubMemberIds.isEmpty) {

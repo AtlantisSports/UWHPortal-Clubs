@@ -18,6 +18,9 @@ import '../../core/di/service_locator.dart';
 import '../../core/utils/time_utils.dart';
 import '../../core/utils/practice_data_consistency.dart';
 import 'dropdown_utils.dart';
+import 'shared_rsvp_confirm.dart';
+import '../../core/utils/rsvp_apply_helper.dart';
+
 import 'phone_aware_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -933,50 +936,47 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                         ],
                       ),
                       const SizedBox(height: 8),
+                      const Text(
+                        'I will commit so long as at least this many (including myself) will attend',
+                        style: TextStyle(color: Color(0xFF6B7280)),
+                      ),
+                      const SizedBox(height: 8),
                       // Radio options (no default; must choose)
-                      RadioListTile<int>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: 6,
-                        // ignore: deprecated_member_use
+                      RadioGroup<int>(
                         groupValue: _conditionalMaybeThreshold,
-                        // ignore: deprecated_member_use
                         onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
-                        title: const Text('6+'),
-                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                      ),
-                      RadioListTile<int>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: 8,
-                        // ignore: deprecated_member_use
-                        groupValue: _conditionalMaybeThreshold,
-                        // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
-                        title: const Text('8+'),
-                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                      ),
-                      RadioListTile<int>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: 10,
-                        // ignore: deprecated_member_use
-                        groupValue: _conditionalMaybeThreshold,
-                        // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
-                        title: const Text('10+'),
-                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
-                      ),
-                      RadioListTile<int>(
-                        dense: true,
-                        contentPadding: EdgeInsets.zero,
-                        value: 12,
-                        // ignore: deprecated_member_use
-                        groupValue: _conditionalMaybeThreshold,
-                        // ignore: deprecated_member_use
-                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
-                        title: const Text('12+'),
-                        visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
+                        child: Column(
+                          children: const [
+                            RadioListTile<int>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: 6,
+                              title: Text('6+'),
+                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                            ),
+                            RadioListTile<int>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: 8,
+                              title: Text('8+'),
+                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                            ),
+                            RadioListTile<int>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: 10,
+                              title: Text('10+'),
+                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                            ),
+                            RadioListTile<int>(
+                              dense: true,
+                              contentPadding: EdgeInsets.zero,
+                              value: 12,
+                              title: Text('12+'),
+                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ],
@@ -1180,58 +1180,66 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
 
   Widget _buildTimeframeSelection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Only announced option
-        _buildCustomRadioOption(
-          value: 'only_announced',
-          title: 'Announced',
-          tooltip: 'Only confirmed practices',
-        ),
-
-        // Custom date range option
-        _buildCustomRadioOption(
-          value: 'custom',
-          title: (_customStartDate != null && _customEndDate != null)
-              ? _getCustomDateRangeText()
-              : 'Custom',
-          tooltip: 'Custom date range',
-          trailing: (_customStartDate != null && _customEndDate != null)
-              ? GestureDetector(
-                  onTap: _showCustomDatePicker,
-
-
-
-
-                  child: const Icon(
-                    Icons.edit,
-                    size: 16,
-                    color: Color(0xFF6B7280),
-                  ),
-                )
-              : null,
-        ),
-
-        // Temporary placeholder option to help layout (disabled)
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Row(
-            children: const [
-              Icon(Icons.radio_button_unchecked, size: 20, color: Color(0xFFD1D5DB)),
-              SizedBox(width: 8),
-              Text('Placeholder (coming soon)', style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
-            ],
+    return RadioGroup<String>(
+      groupValue: _selectedTimeframe,
+      onChanged: (v) {
+        if (v == null) return;
+        setState(() {
+          _selectedTimeframe = v;
+        });
+        if (v == 'custom') {
+          _showCustomDatePicker();
+        }
+      },
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Only announced option
+          _buildCustomRadioOption(
+            value: 'only_announced',
+            title: 'Announced',
+            tooltip: 'Only confirmed practices',
           ),
-        ),
 
-        // All future option
-        _buildCustomRadioOption(
-          value: 'all_future',
-          title: 'All future',
-          tooltip: 'All events matching this same criteria even if not Announced yet',
-        ),
-      ],
+          // Custom date range option
+          _buildCustomRadioOption(
+            value: 'custom',
+            title: (_customStartDate != null && _customEndDate != null)
+                ? _getCustomDateRangeText()
+                : 'Custom',
+            tooltip: 'Custom date range',
+            trailing: (_customStartDate != null && _customEndDate != null)
+                ? GestureDetector(
+                    onTap: _showCustomDatePicker,
+                    child: const Icon(
+                      Icons.edit,
+                      size: 16,
+                      color: Color(0xFF6B7280),
+                    ),
+                  )
+                : null,
+          ),
+
+          // Temporary placeholder option to help layout (disabled)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Row(
+              children: const [
+                Icon(Icons.radio_button_unchecked, size: 20, color: Color(0xFFD1D5DB)),
+                SizedBox(width: 8),
+                Text('Placeholder (coming soon)', style: TextStyle(fontSize: 14, color: Color(0xFF9CA3AF))),
+              ],
+            ),
+          ),
+
+          // All future option
+          _buildCustomRadioOption(
+            value: 'all_future',
+            title: 'All future',
+            tooltip: 'All events matching this same criteria even if not Announced yet',
+          ),
+        ],
+      ),
     );
   }
 
@@ -1243,70 +1251,34 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     Widget? trailing,
     String? tooltip,
   }) {
-
-    return GestureDetector(
-      onTap: () {
-        setState(() {
-          _selectedTimeframe = value;
-        });
-
-        if (value == 'custom') {
-          // Show date picker immediately when custom is selected
-          _showCustomDatePicker();
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          children: [
-            Container(
-              width: 20,
-              height: 20,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: _selectedTimeframe == value
-                      ? const Color(0xFF0284C7)
-                      : const Color(0xFFD1D5DB),
-                  width: 2,
-                ),
-                color: _selectedTimeframe == value
-                    ? const Color(0xFF0284C7)
-                    : Colors.transparent,
+    return RadioListTile<String>(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      value: value,
+      title: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(fontSize: 14),
+          ),
+          if (tooltip != null) ...[
+            const SizedBox(width: 6),
+            _TooltipWidget(
+              message: tooltip,
+              child: const Icon(
+                Icons.help_outline,
+                size: 16,
+                color: Color(0xFF6B7280),
               ),
-              child: _selectedTimeframe == value
-                  ? const Icon(
-                      Icons.circle,
-                      size: 8,
-                      color: Colors.white,
-                    )
-                  : null,
             ),
-            const SizedBox(width: 8),
-            Text(
-              title,
-              style: const TextStyle(fontSize: 14),
-            ),
-            if (tooltip != null) ...[
-              const SizedBox(width: 6),
-
-
-              _TooltipWidget(
-                message: tooltip,
-                child: const Icon(
-                  Icons.help_outline,
-                  size: 16,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-            ],
-            if (trailing != null) ...[
-              const SizedBox(width: 8),
-              trailing,
-            ],
           ],
-        ),
+          if (trailing != null) ...[
+            const SizedBox(width: 8),
+            trailing,
+          ],
+        ],
       ),
+      visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
     );
   }
 
@@ -1504,6 +1476,25 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       // Get practice IDs based on selected timeframe and filters
       final targetPracticeIds = _getTargetPracticeIds();
 
+      // If changing from YES to Maybe/No and any selected practice has guests requiring confirmation,
+      // show a consolidated confirmation and apply immediately (no countdown).
+      final sel = _selectedRSVPChoice;
+      if (sel == ParticipationStatus.maybe || sel == ParticipationStatus.no) {
+        bool needsConfirm = false;
+        for (final id in targetPracticeIds) {
+          if (participationProvider.needsGuestConfirmation(id, sel!)) { needsConfirm = true; break; }
+        }
+        if (needsConfirm) {
+          final applied = await _applyBulkWithGuestConfirmation(participationProvider, targetPracticeIds, sel!);
+          if (mounted) {
+            setState(() { _isLoading = false; });
+          }
+          if (applied) {
+            return;
+          }
+        }
+      }
+
       // If we're including dependents and RSVPing YES or MAYBE, store guest data
       if (_includeDependents && (_selectedRSVPChoice == ParticipationStatus.yes || _selectedRSVPChoice == ParticipationStatus.maybe) && _selectedDependents.isNotEmpty) {
         // Convert dependent names to guest objects for storage
@@ -1634,9 +1625,56 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
         setState(() {
           _showToast = false;
         });
+
       }
     });
   }
+
+  // Bulk confirmation flow when changing from YES to Maybe/No and guests are involved
+  Future<bool> _applyBulkWithGuestConfirmation(ParticipationProvider provider, List<String> practiceIds, ParticipationStatus target) async {
+    final decision = await showSharedRSVPConfirmationDialog(
+      context: context,
+      provider: provider,
+      practiceId: practiceIds.first,
+      target: target,
+      initialMakeConditional: target == ParticipationStatus.maybe ? (_conditionalMaybeThreshold != null) : false,
+      initialThreshold: _conditionalMaybeThreshold,
+      overrideHasClubMembers: true,
+      overrideHasVisitors: true,
+      overrideHasDependents: true,
+      overrideHasNewPlayers: true,
+    );
+
+    if (decision == null) return false;
+    if (!mounted) return false;
+
+    await applyRSVPChange(
+      context: context,
+      provider: provider,
+      clubId: widget.club.id,
+      practiceIds: practiceIds,
+      target: target,
+      decision: decision,
+    );
+
+    // Success toast
+    final count = practiceIds.length;
+    String message;
+    if (target == ParticipationStatus.maybe && _conditionalMaybeThreshold != null) {
+      message = 'Maybe if ${_conditionalMaybeThreshold!}+ applied for $count practices';
+    } else {
+      message = '$count practices updated to ${target.displayText}';
+    }
+    _showCustomToast(
+      message,
+      target == ParticipationStatus.yes ? AppColors.success : target == ParticipationStatus.no ? AppColors.error : AppColors.maybe,
+      target == ParticipationStatus.yes ? Icons.check : target == ParticipationStatus.no ? Icons.cancel : Icons.help_outline,
+    );
+
+    return true;
+  }
+
+
 
   void _showErrorDialog(String message) {
     showDialog(

@@ -21,6 +21,12 @@ class _FakeClubsRepository implements ClubsRepository {
 
   @override
   Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status) async {}
+
+  @override
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status) async {}
+
+  @override
+  Future<void> setMemberConditionalMaybeThreshold(String clubId, String practiceId, String memberId, int? threshold) async {}
 }
 
 class _FakeUserService implements UserService {

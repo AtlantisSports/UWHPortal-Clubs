@@ -1,5 +1,5 @@
 /// Repository pattern implementation for clubs data
-/// 
+///
 /// This abstracts data sources and provides caching, offline support,
 /// and consistent data access patterns.
 library;
@@ -19,16 +19,24 @@ abstract class ClubsRepository {
     String? location,
     List<String>? tags,
   });
-  
+
   Future<Club> getClub(String clubId);
   Future<void> refreshClubs();
   Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status);
+
+  /// Update participation status for another member (e.g., Club Member guest)
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status);
+
+  /// Set or clear Conditional Maybe threshold for another member
+  Future<void> setMemberConditionalMaybeThreshold(String clubId, String practiceId, String memberId, int? threshold);
 }
+
+
 
 /// Implementation of clubs repository with caching
 class ClubsRepositoryImpl implements ClubsRepository {
   final ClubsService _clubsService;
-  
+
   // Simple in-memory cache
   List<Club>? _cachedClubs;
   DateTime? _lastCacheTime;
@@ -46,9 +54,9 @@ class ClubsRepositoryImpl implements ClubsRepository {
     List<String>? tags,
   }) async {
     // Check cache first (only for basic requests without filters)
-    if (_isCacheValid() && 
-        search == null && 
-        location == null && 
+    if (_isCacheValid() &&
+        search == null &&
+        location == null &&
         (tags == null || tags.isEmpty) &&
         page == 1) {
       return _cachedClubs!;
@@ -91,7 +99,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     // Clear cache and fetch fresh data
     _cachedClubs = null;
     _lastCacheTime = null;
-    
+
     await getClubs(); // This will fetch and cache new data
   }
 
@@ -99,14 +107,14 @@ class ClubsRepositoryImpl implements ClubsRepository {
   Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status) async {
     // Simulate network delay
     await Future.delayed(const Duration(milliseconds: 300));
-    
+
     // Update participation status in cached data if available
     if (_cachedClubs != null) {
       for (var club in _cachedClubs!) {
         if (club.id == clubId) {
           for (var practice in club.upcomingPractices) {
             if (practice.id == practiceId) {
-              // Update the participation status
+              // Update the participation status for current user
               practice.participationResponses[MockDataService.currentUserId] = status;
               break;
             }
@@ -115,9 +123,53 @@ class ClubsRepositoryImpl implements ClubsRepository {
         }
       }
     }
-    
+
     // In a real implementation, this would call the API
     // await _clubsService.updateParticipationStatus(clubId, practiceId, status);
+  }
+
+  @override
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status) async {
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    if (_cachedClubs != null) {
+      for (var club in _cachedClubs!) {
+        if (club.id == clubId) {
+          for (var practice in club.upcomingPractices) {
+            if (practice.id == practiceId) {
+              practice.participationResponses[memberId] = status;
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  Future<void> setMemberConditionalMaybeThreshold(String clubId, String practiceId, String memberId, int? threshold) async {
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 150));
+
+    if (_cachedClubs != null) {
+      for (var club in _cachedClubs!) {
+        if (club.id == clubId) {
+          for (var practice in club.upcomingPractices) {
+            if (practice.id == practiceId) {
+              if (threshold == null) {
+                practice.conditionalYesThresholds.remove(memberId);
+              } else {
+                practice.conditionalYesThresholds[memberId] = threshold;
+              }
+              break;
+            }
+          }
+          break;
+        }
+      }
+    }
   }
 
   /// Check if cache is still valid
@@ -125,7 +177,7 @@ class ClubsRepositoryImpl implements ClubsRepository {
     if (_cachedClubs == null || _lastCacheTime == null) {
       return false;
     }
-    
+
     final now = DateTime.now();
     return now.difference(_lastCacheTime!).compareTo(_cacheExpiration) < 0;
   }

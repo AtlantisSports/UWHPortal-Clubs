@@ -25,6 +25,12 @@ class _FakeClubsRepository implements ClubsRepository {
   Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status) async {
     lastStatus = status; // record call; local provider state is asserted via getParticipationStatus
   }
+
+  @override
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status) async {}
+
+  @override
+  Future<void> setMemberConditionalMaybeThreshold(String clubId, String practiceId, String memberId, int? threshold) async {}
 }
 
 class _FakeUserService implements UserService {
@@ -106,17 +112,17 @@ void main() {
       expect(ok, isTrue); // 5 others + me(1) + 2 guests = 8
     });
 
-    test('pending target blocks satisfaction until commit (regardless of target)', () {
+    test('pending target blocks satisfaction unless target is Maybe (evaluate immediately for pending Maybe)', () {
       // Pending target Yes => blocked
       provider.startPendingChange(club.id, practice.id, ParticipationStatus.yes, duration: const Duration(seconds: 10));
       expect(provider.isPendingChange(practice.id), isTrue);
       expect(provider.isCurrentUserConditionalSatisfied(practice), isFalse);
 
-      // Cancel and start pending Maybe => still blocked until commit
+      // Pending target Maybe => do NOT block; evaluate normally
       provider.cancelPendingChange(practice.id);
       provider.startPendingChange(club.id, practice.id, ParticipationStatus.maybe, duration: const Duration(seconds: 10));
       expect(provider.isPendingChange(practice.id), isTrue);
-      expect(provider.isCurrentUserConditionalSatisfied(practice), isFalse);
+      expect(provider.isCurrentUserConditionalSatisfied(practice), isTrue); // base setup: 5 others + me(1) = 6 meets threshold 6
 
       // Cleanup
       provider.cancelPendingChange(practice.id);
@@ -175,5 +181,52 @@ void main() {
       expect(repo.lastStatus, ParticipationStatus.no);
     });
   });
-}
+
+    group('ParticipationProvider.computeEffectiveYesCount', () {
+      test('counts current user guests when user is hard YES', () async {
+        final me = 'me2';
+        final practice = Practice(
+          id: 'p3',
+          clubId: 'c1',
+          title: 'Practice',
+          description: 'desc',
+          dateTime: DateTime.now().add(const Duration(days: 3)),
+          location: 'loc',
+          address: 'addr',
+          participationResponses: {
+            // 3 other hard yes
+            'u1': ParticipationStatus.yes,
+            'u2': ParticipationStatus.yes,
+            'u3': ParticipationStatus.yes,
+            // me hard yes
+            me: ParticipationStatus.yes,
+          },
+          conditionalYesThresholds: const {},
+        );
+        final club = Club(
+          id: 'c1',
+          name: 'Club',
+          shortName: 'Club',
+          longName: 'Club',
+          description: 'desc',
+          location: 'loc',
+          contactEmail: 'c@e.com',
+          upcomingPractices: [practice],
+        );
+        final provider = ParticipationProvider(
+          clubsRepository: _FakeClubsRepository(club),
+          userService: _FakeUserService(me),
+        );
+        // Seed internal guest list for the practice with 2 dependents
+        provider.updatePracticeGuests(practice.id, const [
+          DependentGuest(id: 'd1', name: 'Kid1'),
+          DependentGuest(id: 'd2', name: 'Kid2'),
+        ]);
+
+        final effective = provider.computeEffectiveYesCount(practice);
+        expect(effective, 3 /*others*/ + 1 /*me*/ + 2 /*guests*/);
+      });
+    });
+
+  }
 
