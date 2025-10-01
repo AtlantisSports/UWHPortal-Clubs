@@ -4,6 +4,8 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
+import 'toast_manager.dart';
+
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/providers/participation_provider.dart';
@@ -85,100 +87,26 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   // Bulk controls state
   BulkChoice _bulkChoice = BulkChoice.none;
   bool _bulkBringGuests = false; // UI affordance; final bringGuest depends on merged guest list
-  // Toast state (top-of-screen)
-  bool _showToast = false;
-  String _toastMessage = '';
-  Color _toastColor = AppColors.info;
-  IconData? _toastIcon;
-  bool _bulkConditional = false; // Conditional Maybe for bulk
-  int? _bulkConditionalThreshold; // Bulk threshold
-
-  OverlayEntry? _toastOverlay;
-
   void _showTopScreenToast(String message, Color color, IconData icon, {bool persistent = false}) {
-    // Remove any existing toast overlay
-    _toastOverlay?.remove();
-    _toastOverlay = null;
-
-    final overlay = Overlay.of(context);
-
-    _toastOverlay = OverlayEntry(
-      builder: (context) {
-        final top = MediaQuery.of(context).padding.top + 12;
-        return Positioned(
-          top: top,
-          left: 16,
-          right: 16,
-          child: Material(
-            elevation: 6,
-            borderRadius: BorderRadius.circular(8),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: color,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(icon, color: Colors.white, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      message,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                  if (persistent)
-                    IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white, size: 20),
-                      onPressed: () {
-                        _toastOverlay?.remove();
-                        _toastOverlay = null;
-                      },
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                    ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    ToastManager.showTopToast(
+      context,
+      message: message,
+      color: color,
+      icon: icon,
+      persistent: persistent,
+      duration: const Duration(seconds: 3),
     );
-
-    overlay.insert(_toastOverlay!);
-
-    if (!persistent) {
-      // Auto-remove after 3 seconds
-      Timer(const Duration(seconds: 3), () {
-        _toastOverlay?.remove();
-        _toastOverlay = null;
-      });
-    }
   }
 
 
   void _showCustomToast(String message, Color color, IconData icon) {
-    setState(() {
-      _toastMessage = message;
-      _toastColor = color;
-      _toastIcon = icon;
-      _showToast = true;
-    });
-    // Auto-hide after 3 seconds
-    Timer(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-        _updateSelectionOverlay();
-      }
-    });
-    _updateSelectionOverlay();
+    ToastManager.showTopToast(
+      context,
+      message: message,
+      color: color,
+      icon: icon,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   // Overlay entry for top selection panel rendered above the tab bar
@@ -197,9 +125,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       _bulkChoice = BulkChoice.none;
       _bulkBringGuests = false;
       _bulkGuestList = const PracticeGuestList();
-      // Also reset Conditional Maybe state each new session
-      _bulkConditional = false;
-      _bulkConditionalThreshold = null;
+      // Reset guest list for new session
     });
     _insertSelectionOverlay();
     // Smooth auto-scroll so the tab bar is at the top
@@ -244,40 +170,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 ),
               ),
             ),
-            if (_showToast)
-              Positioned(
-                top: MediaQuery.of(context).padding.top + 12,
-                left: 16,
-                right: 16,
-                child: Material(
-                  elevation: 6,
-                  borderRadius: BorderRadius.circular(8),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _toastColor,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        if (_toastIcon != null)
-                          Icon(_toastIcon, color: Colors.white, size: 20),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            _toastMessage,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
           ],
         );
       },
@@ -636,28 +528,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     final isAttendance = filteredStatus.isAttendanceMode;
 
 
-    // Pending YES countdown: show full-size blue spinner replacing the circle
-    if (!isAttendance) {
-      final pending = context.select<ParticipationProvider, bool>((p) => p.isPendingChange(filteredStatus.practiceId));
-      if (pending) {
-        final stroke = (size * 0.15).clamp(1.5, 3.0);
-        final progress = context.select<ParticipationProvider, double>((p) => p.pendingChangeProgress(filteredStatus.practiceId));
-        return Opacity(
-          opacity: opacity,
-          child: SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              strokeWidth: stroke,
-              color: AppColors.primary,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-              value: progress,
-            ),
-          ),
-        );
-      }
-    }
-
     Color color;
     IconData? icon;
     bool filled = isAttendance;
@@ -720,147 +590,15 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
     Widget child = baseCircle;
 
-    // Add Conditional Maybe badge in RSVP mode for Maybe status
-    if (!isAttendance && ps == ParticipationStatus.maybe) {
-      child = Consumer<ParticipationProvider>(
-        builder: (context, provider, _) {
-          final pid = filteredStatus.practiceId;
-          if (!provider.getConditionalMaybe(pid)) {
-            return baseCircle;
-          }
-          final threshold = provider.getConditionalMaybeThreshold(pid);
-          if (threshold == null) return baseCircle;
-
-          // Find practice by ID (if not found, skip badge)
-          Practice? practice;
-          try {
-            practice = widget.club.upcomingPractices.firstWhere((p) => p.id == pid);
-          } catch (_) {
-            practice = null;
-          }
-          if (practice == null) return baseCircle;
-          final satisfied = provider.isCurrentUserConditionalSatisfied(practice);
-          final badgeColor = satisfied ? AppColors.success : AppColors.maybe;
-
-          return Stack(
-            clipBehavior: Clip.none,
-            children: [
-              // Base circle switches to green when Conditional Maybe is satisfied
-              Container(
-                width: size,
-                height: size,
-                decoration: BoxDecoration(
-                  color: filled ? (satisfied ? AppColors.success : color) : Colors.transparent,
-                  border: Border.all(color: satisfied ? AppColors.success : color, width: borderWidth),
-                  shape: BoxShape.circle,
-                ),
-                child: icon != null
-                    ? Icon(
-                        icon,
-                        size: size * 0.6,
-                        color: filled ? Colors.white : (satisfied ? AppColors.success : color),
-                      )
-                    : null,
-              ),
-              Positioned(
-                right: -1,
-                top: -1,
-                child: Container(
-                  width: size * 0.6,
-                  height: size * 0.6,
-                  decoration: BoxDecoration(
-                    color: badgeColor,
-                    borderRadius: BorderRadius.circular(3),
-                  ),
-                  child: Center(
-                    child: Text(
-                      '${provider.getConditionalBadgeText(pid) ?? threshold}',
-                      style: TextStyle(
-                        fontSize: size * 0.35,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        },
-      );
-    }
-
     return Opacity(
       opacity: opacity,
       child: child,
     );
   }
 
-  /// Small status icon with Conditional Maybe numeric badge when applicable (for lists/modals)
-  Widget _rsvpIconWithCondBadge(Practice p, ParticipationStatus ps, double size) {
-    return Consumer<ParticipationProvider>(
-      builder: (context, provider, _) {
-        // Pending countdown: show spinner regardless of current status
-        if (provider.isPendingChange(p.id)) {
-          final stroke = (size * 0.15).clamp(1.5, 3.0);
-          final progress = provider.pendingChangeProgress(p.id);
-          return SizedBox(
-            width: size,
-            height: size,
-            child: CircularProgressIndicator(
-              strokeWidth: stroke,
-              color: AppColors.primary,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-              value: progress,
-            ),
-          );
-        }
-
-        // Conditional badge applies to Maybe now
-        final isCondMaybe = ps == ParticipationStatus.maybe && provider.getConditionalMaybe(p.id);
-        if (!isCondMaybe) {
-          return RSVPStatusDisplay(status: ps, size: size, showText: false);
-        }
-
-        final threshold = provider.getConditionalMaybeThreshold(p.id);
-        if (threshold == null) return RSVPStatusDisplay(status: ps, size: size, showText: false);
-
-        final satisfied = provider.isCurrentUserConditionalSatisfied(p);
-        final badgeColor = satisfied ? AppColors.success : AppColors.maybe;
-        final overrideColor = satisfied ? AppColors.success : null; // Green icon when satisfied
-
-        final base = RSVPStatusDisplay(status: ps, size: size, showText: false, overrideColor: overrideColor);
-
-        return Stack(
-          clipBehavior: Clip.none,
-          children: [
-            base,
-            Positioned(
-              right: -2,
-              top: -2,
-              child: Container(
-                width: size * 0.6,
-                height: size * 0.6,
-                decoration: BoxDecoration(
-                  color: badgeColor,
-                  borderRadius: BorderRadius.circular(3),
-                ),
-                child: Center(
-                  child: Text(
-                    '${provider.getConditionalBadgeText(p.id) ?? threshold}',
-                    style: TextStyle(
-                      fontSize: size * 0.35,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  /// Small status icon
+  Widget _rsvpIcon(Practice p, ParticipationStatus ps, double size) {
+    return RSVPStatusDisplay(status: ps, size: size, showText: false);
   }
 
   bool _isToday(DateTime date) {
@@ -1144,7 +882,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                                       color: Color(0xFF7C3AED),
                                                     ),
                                                   )
-                                                : _rsvpIconWithCondBadge(p, ps, 24),
+                                                : _rsvpIcon(p, ps, 24),
                                           ),
 
                                         ),
@@ -1238,7 +976,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                                       SizedBox(
                                         width: 28,
                                         child: Center(
-                                          child: _rsvpIconWithCondBadge(p, ps, 24),
+                                          child: _rsvpIcon(p, ps, 24),
                                         ),
                                       ),
                                       const SizedBox(width: 8),
@@ -1415,8 +1153,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                       _bulkChoice = BulkChoice.none;
                       _bulkBringGuests = false;
                       _bulkGuestList = const PracticeGuestList();
-                      _bulkConditional = false;
-                      _bulkConditionalThreshold = null;
                     });
                     _updateSelectionOverlay();
                   },
@@ -1472,68 +1208,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
             const SizedBox(height: 8),
 
-            // Conditional Maybe row: only when Maybe is selected
-            if (_bulkChoice == BulkChoice.maybe)
-              Row(
-                children: [
-                  Checkbox(
-                    value: _bulkConditional,
-                    onChanged: (v) {
-                      final newVal = v ?? false;
-                      setState(() {
-                        _bulkConditional = newVal;
-                        if (!newVal) _bulkConditionalThreshold = null;
-                      });
-                      _updateSelectionOverlay();
-                    },
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  const Text('Conditional Maybe'),
-
-                ],
-              ),
-
-
-              if (_bulkConditional) ...[
-                const SizedBox(height: 6),
-                const Text(
-                  'I will commit so long as at least this many (including myself) will attend',
-                  style: TextStyle(color: Colors.black54),
-                ),
-                const SizedBox(height: 8),
-                Center(
-                  child: Wrap(
-                    alignment: WrapAlignment.center,
-                    spacing: 16,
-                    runSpacing: 8,
-                    children: [6, 8, 10, 12].map<Widget>((t) {
-                      final selected = _bulkConditionalThreshold == t;
-                      return GestureDetector(
-                        onTap: () {
-                          setState(() { _bulkConditionalThreshold = t; });
-                          _updateSelectionOverlay();
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: selected ? AppColors.primary.withValues(alpha: 0.08) : Colors.white,
-                            border: Border.all(color: selected ? AppColors.primary : const Color(0xFFE5E7EB), width: 1),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text(
-                            '$t+',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: selected ? AppColors.primary : const Color(0xFF374151),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-              ],
 
             // Guest list below checkbox (match RSVP cards display)
             if ((_bulkChoice == BulkChoice.yes || _bulkChoice == BulkChoice.maybe) && _bulkBringGuests && _bulkGuestList.totalGuests > 0) ...[
@@ -1743,8 +1417,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       provider: provider,
       practiceId: practiceIds.first,
       target: target,
-      initialMakeConditional: target == ParticipationStatus.maybe ? (_bulkConditional && _bulkConditionalThreshold != null) : false,
-      initialThreshold: _bulkConditionalThreshold,
       overrideHasClubMembers: true,
       overrideHasVisitors: true,
       overrideHasDependents: true,
@@ -1775,12 +1447,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       default:
         label = 'No'; icon = Icons.cancel; color = AppColors.error; break;
     }
-    String message;
-    if (target == ParticipationStatus.maybe && _bulkConditional && _bulkConditionalThreshold != null) {
-      message = 'Maybe if ${_bulkConditionalThreshold!}+ applied for ${practiceIds.length} practices';
-    } else {
-      message = '$label applied to ${practiceIds.length == 1 ? '1 practice' : '${practiceIds.length} practices'}';
-    }
+    String message = '$label applied to ${practiceIds.length == 1 ? '1 practice' : '${practiceIds.length} practices'}';
     _showTopScreenToast(message, color, icon);
     _exitSelectionMode();
 
@@ -1854,24 +1521,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     }
 
     // Guests handling per spec
-    if (_bulkChoice == BulkChoice.maybe && _bulkConditional) {
-      // Dependents only for Conditional Maybe
-      if (_bulkBringGuests) {
-        for (final id in practiceIds) {
-          final existing = provider.getPracticeGuests(id).guests.where((g) => g.type == GuestType.dependent).toList();
-          final mergedMap = <String, Guest>{};
-          for (final g in existing) {
-            mergedMap[g.id] = g;
-          }
-          for (final g in _bulkGuestList.guests.where((g) => g.type == GuestType.dependent)) {
-            mergedMap[g.id] = g;
-          }
-          final merged = mergedMap.values.toList();
-          provider.updatePracticeGuests(id, merged);
-          provider.updateBringGuestState(id, merged.isNotEmpty);
-        }
-      }
-    } else if (_bulkChoice == BulkChoice.no) {
+    if (_bulkChoice == BulkChoice.no) {
       // For NO: clear guests and bring flag
       for (final id in practiceIds) {
         provider.updatePracticeGuests(id, const []);
@@ -1908,34 +1558,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         ),
       );
 
-      // Apply Conditional Maybe settings if MAYBE selected; clear otherwise
-      if (status == ParticipationStatus.maybe) {
-        if (!_bulkConditional || _bulkConditionalThreshold == null) {
-          _showCustomToast(
-            'You must pick a threshold to apply a bulk Maybe RSVP',
-            const Color(0xFFF59E0B),
-            Icons.help_outline,
-          );
-          return;
-        }
-        int removedNonDependentTotal = 0;
-        for (final id in practiceIds) {
-          provider.setConditionalMaybe(id, true, threshold: _bulkConditionalThreshold!);
-          removedNonDependentTotal += provider.consumeRemovedNonDependentGuests(id);
-        }
-        if (removedNonDependentTotal > 0) {
-          _showTopScreenToast(
-            removedNonDependentTotal == 1 ? 'Removed non-dependent guest' : 'Removed non-dependent guests',
-            AppColors.info,
-            Icons.person_remove_alt_1,
-          );
-        }
-      } else {
-        // For YES/NO clear conditional flag and remove stored threshold
-        for (final id in practiceIds) {
-          provider.clearConditionalMaybe(id);
-        }
-      }
 
       if (!mounted) return;
 
@@ -1946,27 +1568,24 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         case ParticipationStatus.yes:
           icon = Icons.check_circle;
           color = AppColors.success;
-          label = 'Yes';
+          label = 'Going';
           break;
         case ParticipationStatus.maybe:
           icon = Icons.help;
           color = const Color(0xFFF59E0B);
-          label = 'Maybe';
+          label = 'Might go';
           break;
         default:
           icon = Icons.cancel;
           color = AppColors.error;
-          label = 'No';
+          label = 'Not going';
       }
-      String message;
-      if (status == ParticipationStatus.maybe && _bulkConditional && _bulkConditionalThreshold != null) {
-        final n = _bulkConditionalThreshold!;
-        final x = practiceIds.length;
-        message = 'Maybe if $n+ applied for $x practices';
-      } else {
-        final count = practiceIds.length;
-        message = '$label applied to ${count == 1 ? '1 practice' : '$count practices'}';
-      }
+      final count = practiceIds.length;
+      final guestCount = _bulkGuestList.totalGuests;
+      final base = '${count == 1 ? '1 practice' : '$count practices'} set to $label';
+      final message = (status == ParticipationStatus.no || guestCount == 0)
+          ? base
+          : '$base with $guestCount ${guestCount == 1 ? 'guest' : 'guests'}';
       _showTopScreenToast(message, color, icon);
       _exitSelectionMode();
     } catch (e) {

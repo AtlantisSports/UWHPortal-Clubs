@@ -25,6 +25,8 @@ import 'phone_aware_modal_utils.dart';
 import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 
+import 'toast_manager.dart';
+
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
 class BulkRSVPManager extends StatefulWidget {
   final Club club;
@@ -60,9 +62,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   List<String> _selectedDependents = [];
 
 
-  // Conditional Maybe threshold for bulk Maybe
-  int? _conditionalMaybeThreshold;
-
   // UI state
   bool _isLoading = false;
   final Map<String, bool> _expandedDescriptions = <String, bool>{};
@@ -70,11 +69,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   // Dependent state - Simpson family mock data
   bool _includeDependents = false;
 
-  // Toast state
-  bool _showToast = false;
-  String _toastMessage = '';
-  Color _toastColor = Colors.green;
-  IconData? _toastIcon;
+
+
 
   // Available options (populated from data)
   List<String> _availableLocations = [];
@@ -288,11 +284,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       final eligiblePractices = allInstances.where((p) => p.isRSVPWindowOpen).toList();
 
       for (final practice in eligiblePractices) {
-        // Cancel any pending YES countdown
-        participationProvider.cancelPendingChange(practice.id);
-
-        // Clear Conditional Maybe state and threshold
-        participationProvider.clearConditionalMaybe(practice.id);
 
         // Clear user's own RSVP
         await participationProvider.updateParticipationStatus(
@@ -352,46 +343,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                 // Dependent Selection Section
                 _buildDependentSelectionSection(),
 
+
                 // Bottom Action Bar
                 _buildBottomActionBar(filteredPractices),
               ],
             ),
           ),
         ),
-        // Custom Toast (top of visible screen, just below AppBar)
-        if (_showToast)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 16,
-            right: 16,
-            child: Material(
-              elevation: 6,
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: _toastColor,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    Icon(_toastIcon, color: Colors.white, size: 20),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        _toastMessage,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -892,7 +850,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top row: left (note + timeframe + conditional threshold) and right (vertical RSVP stack)
+          // Top row: left (note + timeframe) and right (vertical RSVP stack)
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -912,73 +870,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
                     ),
                     const SizedBox(height: 16),
                     _buildTimeframeSelection(),
-                    if (_selectedRSVPChoice == ParticipationStatus.maybe) ...[
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          const Text(
-                            'Conditional Maybe threshold',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF111827),
-                            ),
-                          ),
-                          const SizedBox(width: 6),
-                          _TooltipWidget(
-                            message: 'Bulk Maybe RSVPs must be condition driven',
-                            child: const Icon(
-                              Icons.help_outline,
-                              size: 16,
-                              color: Color(0xFF6B7280),
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'I will commit so long as at least this many (including myself) will attend',
-                        style: TextStyle(color: Color(0xFF6B7280)),
-                      ),
-                      const SizedBox(height: 8),
-                      // Radio options (no default; must choose)
-                      RadioGroup<int>(
-                        groupValue: _conditionalMaybeThreshold,
-                        onChanged: (v) => setState(() => _conditionalMaybeThreshold = v),
-                        child: Column(
-                          children: const [
-                            RadioListTile<int>(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: 6,
-                              title: Text('6+'),
-                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
-                            ),
-                            RadioListTile<int>(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: 8,
-                              title: Text('8+'),
-                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
-                            ),
-                            RadioListTile<int>(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: 10,
-                              title: Text('10+'),
-                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
-                            ),
-                            RadioListTile<int>(
-                              dense: true,
-                              contentPadding: EdgeInsets.zero,
-                              value: 12,
-                              title: Text('12+'),
-                              visualDensity: VisualDensity(horizontal: -4, vertical: -4),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),
@@ -1340,10 +1231,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       selectedChoice: _selectedRSVPChoice,
     );
     if (!base) return false;
-    // Bulk Maybe requires a conditional threshold
-    if (_selectedRSVPChoice == ParticipationStatus.maybe) {
-      return _conditionalMaybeThreshold != null;
-    }
     return true;
   }
 
@@ -1357,14 +1244,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       message = 'Please select practices and choose an RSVP option to apply Bulk RSVP';
     } else if (_selectedRSVPChoice == null) {
       message = 'Please choose an RSVP option to apply Bulk RSVP';
-    } else if (_selectedRSVPChoice == ParticipationStatus.maybe && (_conditionalMaybeThreshold == null)) {
-      if (_selectedPracticeIds.isEmpty) {
-        message = 'Select at least 1 practice and set a condition for Maybe';
-      } else {
-        message = 'You must pick a threshold to apply a bulk Maybe RSVP';
-      }
-      color = const Color(0xFFF59E0B); // Amber (Maybe)
-      icon = Icons.help_outline;
     } else if (_selectedPracticeIds.isEmpty) {
       // RSVP chosen but no practices selected
       message = 'Please select at least 1 practice to apply Bulk RSVP';
@@ -1477,7 +1356,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       final targetPracticeIds = _getTargetPracticeIds();
 
       // If changing from YES to Maybe/No and any selected practice has guests requiring confirmation,
-      // show a consolidated confirmation and apply immediately (no countdown).
+      // show a consolidated confirmation and apply immediately.
       final sel = _selectedRSVPChoice;
       if (sel == ParticipationStatus.maybe || sel == ParticipationStatus.no) {
         bool needsConfirm = false;
@@ -1522,42 +1401,23 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       int removedNonDependentTotal = 0;
       for (final practiceId in targetPracticeIds) {
         await participationProvider.updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
-        // Apply Conditional state per practice based on selection
-        if (_selectedRSVPChoice == ParticipationStatus.maybe) {
-          // Bulk Maybe requires a threshold
-          if (_conditionalMaybeThreshold != null) {
-            participationProvider.setConditionalMaybe(practiceId, true, threshold: _conditionalMaybeThreshold);
-            removedNonDependentTotal += participationProvider.consumeRemovedNonDependentGuests(practiceId);
-          } else {
-            // If plain Maybe were allowed here, we would remove any stored threshold.
-            // Currently validation prevents applying plain Maybe without a threshold.
-          }
-        } else if (_selectedRSVPChoice == ParticipationStatus.yes) {
-          // Clear any conditional state and remove stored threshold on bulk YES
-          participationProvider.clearConditionalMaybe(practiceId);
-        } else {
-          // Clear conditional state and remove stored threshold when applying NO
-          participationProvider.clearConditionalMaybe(practiceId);
-        }
       }
 
       // Show success result to user
       if (mounted) {
         final successCount = targetPracticeIds.length;
-        String message;
-        if (_selectedRSVPChoice == ParticipationStatus.maybe && _conditionalMaybeThreshold != null) {
-          message = 'Maybe if $_conditionalMaybeThreshold+ applied for $successCount practices';
-        } else {
-          message = '$successCount practices updated to ${_selectedRSVPChoice!.displayText}';
-        }
+        final label = _selectedRSVPChoice == ParticipationStatus.yes
+            ? 'Going'
+            : _selectedRSVPChoice == ParticipationStatus.maybe
+                ? 'Might go'
+                : 'Not going';
+        String message = '$successCount ${successCount == 1 ? 'practice' : 'practices'} set to $label';
 
-
-
-        // If we included dependents, add dependent count to message
-        if (_includeDependents && _selectedDependents.isNotEmpty) {
-          final dependentCount = _selectedDependents.length;
-          final dependentText = dependentCount == 1 ? '1 dependent' : '$dependentCount dependents';
-          message = '$message + $dependentText';
+        // For bulk manager, Y = number of dependents selected in this action
+        if (_selectedRSVPChoice != ParticipationStatus.no && _includeDependents && _selectedDependents.isNotEmpty) {
+          final y = _selectedDependents.length;
+          final suffix = y == 1 ? 'guest' : 'guests';
+          message = '$message with $y $suffix';
         }
 
         final toastColor = _selectedRSVPChoice == ParticipationStatus.yes
@@ -1595,7 +1455,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
           _selectedLocations.clear(); // Clear location filter
           _selectedLevels.clear(); // Clear level filter
 
-          _conditionalMaybeThreshold = null;
         });
       }
     } catch (error) {
@@ -1612,22 +1471,14 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   }
 
   void _showCustomToast(String message, Color color, IconData icon) {
-    setState(() {
-      _toastMessage = message;
-      _toastColor = color;
-      _toastIcon = icon;
-      _showToast = true;
-    });
-
-    // Hide toast after 4 seconds
-    Timer(const Duration(seconds: 4), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-
-      }
-    });
+    ToastManager.showTopToast(
+      context,
+      message: message,
+      color: color,
+      icon: icon,
+      persistent: false,
+      duration: const Duration(seconds: 4),
+    );
   }
 
   // Bulk confirmation flow when changing from YES to Maybe/No and guests are involved
@@ -1637,8 +1488,6 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       provider: provider,
       practiceId: practiceIds.first,
       target: target,
-      initialMakeConditional: target == ParticipationStatus.maybe ? (_conditionalMaybeThreshold != null) : false,
-      initialThreshold: _conditionalMaybeThreshold,
       overrideHasClubMembers: true,
       overrideHasVisitors: true,
       overrideHasDependents: true,
@@ -1659,12 +1508,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
     // Success toast
     final count = practiceIds.length;
-    String message;
-    if (target == ParticipationStatus.maybe && _conditionalMaybeThreshold != null) {
-      message = 'Maybe if ${_conditionalMaybeThreshold!}+ applied for $count practices';
-    } else {
-      message = '$count practices updated to ${target.displayText}';
-    }
+    final label = target == ParticipationStatus.yes ? 'Going' : target == ParticipationStatus.maybe ? 'Might go' : 'Not going';
+    final message = '$count ${count == 1 ? 'practice' : 'practices'} set to $label';
     _showCustomToast(
       message,
       target == ParticipationStatus.yes ? AppColors.success : target == ParticipationStatus.no ? AppColors.error : AppColors.maybe,
