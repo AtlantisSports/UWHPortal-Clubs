@@ -1,20 +1,11 @@
 
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/practice.dart';
-import '../../core/models/guest.dart';
-import '../../core/providers/participation_provider.dart';
+import '../../core/providers/participation_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/utils/time_utils.dart';
-import 'guest_management_modal.dart';
-import 'phone_aware_modal_utils.dart';
-
-import 'shared_rsvp_confirm.dart';
-import '../../core/utils/rsvp_apply_helper.dart';
-
-import '../../features/rsvp/application/rsvp_service.dart';
-
 
 // Local top-of-screen toast helper for components used outside calendar/list screens
 // Delegates to standardized ToastManager
@@ -57,36 +48,25 @@ String truncateTag(String tag) {
 }
 
 /// Centralized final-commit toast policy
-void showFinalCommitToastForPractice(BuildContext context, ParticipationProvider provider, Practice practice) {
-  // Use the just-committed target if available to avoid showing the old status toast
-  final finalStatus = provider.getLastCommittedTarget(practice.id) ?? provider.getParticipationStatus(practice.id);
+void showFinalCommitToastForPractice(BuildContext context, ParticipationStatus finalStatus) {
   if (finalStatus == ParticipationStatus.no) {
     showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
     return;
   }
   if (finalStatus == ParticipationStatus.yes || finalStatus == ParticipationStatus.maybe) {
-    final guestCount = provider.getPracticeGuests(practice.id).totalGuests;
     final base = finalStatus == ParticipationStatus.yes ? 'Going' : 'Might go';
-    final message = guestCount > 0 ? '$base with $guestCount ${guestCount == 1 ? 'guest' : 'guests'}' : base;
     final color = finalStatus == ParticipationStatus.yes ? ParticipationStatus.yes.color : ParticipationStatus.maybe.color;
     final icon = finalStatus == ParticipationStatus.yes ? Icons.check : Icons.help_outline;
-    showTopToast(context, message, color, icon);
+    showTopToast(context, base, color, icon);
   }
 }
 
-/// Show final toast explicitly for a known new status (avoids race with provider state)
+/// Show final toast explicitly for a known new status (avoids race)
 void showFinalCommitToastForStatus(
   BuildContext context,
   ParticipationStatus status,
-  ParticipationProvider provider,
-  Practice practice,
 ) {
-  if (status == ParticipationStatus.no) {
-    showTopToast(context, 'Not going', ParticipationStatus.no.color, Icons.close);
-    return;
-  }
-  // Fallback to existing helper for Maybe and other cases
-  showFinalCommitToastForPractice(context, provider, practice);
+  showFinalCommitToastForPractice(context, status);
 }
 
 /// Interactive circle-based RSVP component
@@ -394,7 +374,7 @@ class RSVPSummary extends StatelessWidget {
 /// READ_ONLY mode: Status display for past practices and modals (replaces PracticeAttendanceCard)
 enum PracticeStatusCardMode { clickable, readOnly }
 
-class PracticeStatusCard extends StatefulWidget {
+class PracticeStatusCard extends ConsumerStatefulWidget {
   final Practice practice;
   final PracticeStatusCardMode mode;
   final String? clubId; // Add clubId for RSVP updates
@@ -403,7 +383,6 @@ class PracticeStatusCard extends StatefulWidget {
   final VoidCallback? onLocationTap;
   final VoidCallback? onInfoTap; // Add callback for info icon (only used in CLICKABLE mode)
   final VoidCallback? onTap; // For READ_ONLY mode card tap
-  final ParticipationProvider? participationProvider; // For READ_ONLY mode
   final bool showAttendanceStatus; // For READ_ONLY mode
 
   const PracticeStatusCard({
@@ -416,15 +395,15 @@ class PracticeStatusCard extends StatefulWidget {
     this.onLocationTap,
     this.onInfoTap,
     this.onTap,
-    this.participationProvider,
     this.showAttendanceStatus = true,
   });
 
   @override
-  State<PracticeStatusCard> createState() => _PracticeStatusCardState();
+  ConsumerState<PracticeStatusCard> createState() => _PracticeStatusCardState();
 }
 
-class _PracticeStatusCardState extends State<PracticeStatusCard> {
+class _PracticeStatusCardState extends ConsumerState<PracticeStatusCard> {
+  // Guest update flag - REMOVED for clean slate
 
   @override
   Widget build(BuildContext context) {
@@ -443,7 +422,9 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   Widget _buildReadOnlyFutureCard() {
-    final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
+    final controller = ref.read(participationControllerProvider.notifier);
+    final state = ref.watch(participationControllerProvider);
+    final userStatus = state.participationStatusMap[widget.practice.id] ?? controller.getParticipationStatus(widget.practice.id);
 
     Widget cardContent = Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
@@ -593,16 +574,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ),
 
               // Status display (single disabled button showing current status)
-              if (widget.showAttendanceStatus && userStatus != null)
+              if (widget.showAttendanceStatus)
                 _buildReadOnlyStatusDisplay(userStatus),
             ],
           ),
 
-          // Guest section for read-only mode (if user is going and has guests)
-          if (userStatus == ParticipationStatus.yes) ...[
-            const SizedBox(height: 12),
-            _buildReadOnlyGuestSection(),
-          ],
+          // Guest section - REMOVED for clean slate
         ],
       ),
     );
@@ -620,7 +597,9 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   Widget _buildReadOnlyPastCard() {
-    final userStatus = widget.participationProvider?.getParticipationStatus(widget.practice.id);
+    final controller = ref.read(participationControllerProvider.notifier);
+    final state = ref.watch(participationControllerProvider);
+    final userStatus = state.participationStatusMap[widget.practice.id] ?? controller.getParticipationStatus(widget.practice.id);
 
     Widget cardContent = Container(
       padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Same padding as RSVP card
@@ -761,16 +740,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               ),
 
               // Status display (single disabled button showing current status)
-              if (widget.showAttendanceStatus && userStatus != null)
+              if (widget.showAttendanceStatus)
                 _buildReadOnlyStatusDisplay(userStatus),
             ],
           ),
 
-          // Guest section for read-only mode (show if attended or going and guests exist)
-          if (userStatus == ParticipationStatus.yes || userStatus == ParticipationStatus.attended) ...[
-            const SizedBox(height: 12),
-            _buildReadOnlyGuestSection(),
-          ],
+          // Guest section - REMOVED for clean slate
         ],
       ),
     );
@@ -788,20 +763,15 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   Widget _buildClickableCard() {
-    return Consumer<ParticipationProvider>(
-      builder: (context, participationProvider, child) {
-        final rsvp = RsvpService(participationProvider);
-        final rsvpState = rsvp.getState(widget.practice);
+    final controller = ref.read(participationControllerProvider.notifier);
+    final state = ref.watch(participationControllerProvider);
 
-        // Get current participation status from provider, fallback to widget parameter
-        final currentParticipationStatus = rsvpState.status;
-        // Get guest data from provider
-        final guestList = participationProvider.getPracticeGuests(widget.practice.id);
-        final bringGuest = participationProvider.getBringGuestState(widget.practice.id);
+    // Get current participation status from Riverpod controller/state
+    final currentParticipationStatus = state.participationStatusMap[widget.practice.id] ?? controller.getParticipationStatus(widget.practice.id);
 
-        // Show final toast on commit via ToastManager
+    // Show final toast on commit via ToastManager
 
-        return Container(
+    return Container(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 16), // Reduced left/right padding by 50% (16 -> 8)
           decoration: BoxDecoration(
             color: const Color(0xFFF9FAFB), // Light gray background
@@ -975,28 +945,26 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
                   // RSVP buttons
                   Row(
                     children: [
-                      _buildParticipationButton(ParticipationStatus.yes, currentParticipationStatus, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.yes, currentParticipationStatus),
                       const SizedBox(width: 8),
-                      _buildParticipationButton(ParticipationStatus.maybe, currentParticipationStatus, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.maybe, currentParticipationStatus),
                       const SizedBox(width: 8),
-                      _buildParticipationButton(ParticipationStatus.no, currentParticipationStatus, participationProvider),
+                      _buildParticipationButton(ParticipationStatus.no, currentParticipationStatus),
                     ],
                   ),
                 ],
               ),
 
-              // Bring a guest section: show for Yes and Maybe; hide only on No
-              if (currentParticipationStatus != ParticipationStatus.no) ...[
+              // Bring a guest section: show only for Yes and Maybe
+              if (currentParticipationStatus == ParticipationStatus.yes || currentParticipationStatus == ParticipationStatus.maybe) ...[
                 const SizedBox(height: 12),
-                _buildGuestSection(participationProvider, bringGuest, guestList),
+                _buildGuestSection(),
               ],
 
 
             ],
           ),
         );
-      },
-    );
   }
 
   Widget _buildReadOnlyStatusDisplay(ParticipationStatus status) {
@@ -1053,15 +1021,9 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
     );
   }
 
-  Widget _buildReadOnlyGuestSection() {
-    if (widget.participationProvider == null) return const SizedBox.shrink();
+  // Read-only guest section - REMOVED for clean slate
 
-    final guestList = widget.participationProvider!.getPracticeGuests(widget.practice.id);
-
-    // For read-only past practices, show guests if they exist regardless of bringGuest state
-    // This displays historical data - what actually happened
-    if (guestList.totalGuests == 0) return const SizedBox.shrink();
-
+  Widget _buildGuestSection() {
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
@@ -1069,188 +1031,23 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
         borderRadius: BorderRadius.circular(6),
         border: Border.all(color: Colors.grey[200]!),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          // Read-only guest display (no checkbox, no edit button)
-          Row(
-            children: [
-              Icon(
-                Icons.group,
-                size: 16,
-                color: const Color(0xFF0284C7),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Guests',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
-                ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '+${guestList.totalGuests}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B7280),
-                ),
-              ),
-            ],
+          Checkbox(
+            value: false, // Always false for clean slate
+            onChanged: null, // No functionality
+            activeColor: const Color(0xFF0284C7),
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
-
-          // Guest list
-          if (guestList.guests.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ...guestList.guests.map((guest) => Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16), // Indent guest names
-                  Expanded(
-                    child: Text(
-                      guest.name,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF374151),
-                      ),
-                    ),
-                  ),
-                  GuestTypeTag(guestType: guest.type),
-                ],
-              ),
-            )),
-          ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildGuestSection(ParticipationProvider participationProvider, bool bringGuest, PracticeGuestList guestList) {
-    return Container(
-      padding: const EdgeInsets.all(6), // Reduced from 12 to 6 (50% reduction)
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: Colors.grey[200]!),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Checkbox, label, and Edit guests pill button
-          Row(
-            children: [
-              Checkbox(
-                value: bringGuest,
-                onChanged: (value) {
-                  final newBringGuest = value ?? false;
-                  RsvpService(participationProvider).setBringGuest(practiceId: widget.practice.id, bring: newBringGuest);
-
-                  if (!newBringGuest) {
-                    // Clear guests if not bringing any
-                    RsvpService(participationProvider).setGuests(practiceId: widget.practice.id, guests: []);
-                    // If guests were previously attached, show plain status toast
-                    if (guestList.totalGuests > 0) {
-                      final current = participationProvider.getParticipationStatus(widget.practice.id);
-                      if (current == ParticipationStatus.yes) {
-                        showTopToast(context, 'Going', ParticipationStatus.yes.color, Icons.check);
-                      } else if (current == ParticipationStatus.maybe) {
-                        showTopToast(context, 'Might go', ParticipationStatus.maybe.color, Icons.help_outline);
-                      }
-                    }
-
-                  } else {
-                    // Automatically open guest modal when checkbox is checked
-                    // Use a small delay to ensure the UI state is updated first
-                    Future.delayed(const Duration(milliseconds: 100), () async {
-                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: false);
-                      // Clear bring-guest if exiting with no guests
-                      if (participationProvider.getPracticeGuests(widget.practice.id).totalGuests == 0) {
-                        RsvpService(participationProvider).setBringGuest(practiceId: widget.practice.id, bring: false);
-                      }
-                    });
-                  }
-                },
-                activeColor: const Color(0xFF0284C7),
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              const SizedBox(width: 4),
-              const Text(
-                'Bring guest(s)',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: Color(0xFF374151),
-                ),
-              ),
-              if (guestList.totalGuests > 0) ...[
-                const SizedBox(width: 6),
-                Text(
-                  '+${guestList.totalGuests}',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF6B7280),
-                  ),
-                ),
-              ],
-              if (bringGuest) ...[
-                const Spacer(), // Push the button to the right
-                MouseRegion(
-                  cursor: SystemMouseCursors.click,
-                  child: GestureDetector(
-                    onTap: () async {
-                      await _showGuestManagementModal(participationProvider, guestList, dependentsOnly: false);
-                      // Clear bring-guest if exiting with no guests
-                      if (participationProvider.getPracticeGuests(widget.practice.id).totalGuests == 0) {
-                        RsvpService(participationProvider).setBringGuest(practiceId: widget.practice.id, bring: false);
-                      }
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF0284C7),
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: const Text(
-                        'Edit guests',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
+          const SizedBox(width: 4),
+          const Text(
+            'Bring guest(s)',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Color(0xFF374151),
+            ),
           ),
-
-          // Guest list display (only show if guests exist)
-          if (bringGuest && guestList.totalGuests > 0) ...[
-            const SizedBox(height: 8),
-            ...guestList.guests.map((guest) => Container(
-              margin: const EdgeInsets.only(bottom: 4),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16), // Indent guest names
-                  Expanded(
-                    child: Text(
-                      guest.name,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF374151),
-                      ),
-                    ),
-                  ),
-                  GuestTypeTag(guestType: guest.type),
-                ],
-              ),
-            )),
-          ],
         ],
       ),
     );
@@ -1258,42 +1055,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
 
 
 
-  Future<void> _showGuestManagementModal(ParticipationProvider participationProvider, PracticeGuestList guestList, {required bool dependentsOnly}) {
-    return PhoneAwareModalUtils.showPhoneAwareBottomSheet<void>(
-      context: context,
-      child: GuestManagementModal(
-        initialGuests: guestList,
-        onGuestsChanged: (newGuestList) {
-          // Update provider with new guest data
-          // Capture prior guest count before updating
-          final oldCount = participationProvider.getPracticeGuests(widget.practice.id).totalGuests;
-          // Update provider with new guest data
-          RsvpService(participationProvider).setGuests(practiceId: widget.practice.id, guests: newGuestList.guests);
-          // Update bring flag when no guests remain
-          if (newGuestList.totalGuests == 0) {
-            RsvpService(participationProvider).setBringGuest(practiceId: widget.practice.id, bring: false);
-          }
-          // Show a single toast on Done if guest count changed and status is Yes/Maybe
-          final newCount = newGuestList.totalGuests;
-          if (oldCount != newCount) {
-            final status = participationProvider.getParticipationStatus(widget.practice.id);
-            if (status == ParticipationStatus.yes || status == ParticipationStatus.maybe) {
-              final base = status == ParticipationStatus.yes ? 'Going' : 'Might go';
-              final message = newCount > 0 ? '$base with $newCount ${newCount == 1 ? 'guest' : 'guests'}' : base;
-              showTopToast(context, message, status.color, status == ParticipationStatus.yes ? Icons.check : Icons.help_outline);
-            }
-          }
-        },
-        practiceId: widget.practice.id,
-        dependentsOnly: dependentsOnly,
-      ),
-    );
-  }
+  // Guest management modal - REMOVED for clean slate
 
 
 
 
-  Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus, ParticipationProvider participationProvider) {
+  Widget _buildParticipationButton(ParticipationStatus status, ParticipationStatus currentParticipationStatus) {
     final bool isSelected = currentParticipationStatus == status;
 
     // Use status color
@@ -1307,10 +1074,12 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
           if (widget.clubId == null) return;
           if (!widget.practice.isRSVPWindowOpen) return;
 
-          final current = RsvpService(participationProvider).getState(widget.practice).status;
-          final needsConfirm = participationProvider.needsGuestConfirmation(widget.practice.id, status);
+          // Guest confirmation logic - REMOVED for clean slate
 
-          if (needsConfirm && ((current == ParticipationStatus.yes && (status == ParticipationStatus.maybe || status == ParticipationStatus.no)) || (current == ParticipationStatus.maybe && status == ParticipationStatus.no))) {
+          // Guest confirmation logic removed in clean slate; kept as comment to avoid dead_code
+          /*
+          final bool _enableGuestConfirmation = const bool.fromEnvironment('ENABLE_GUEST_CONFIRMATION', defaultValue: false);
+          if (_enableGuestConfirmation) {
             final res = await showSharedRSVPConfirmationDialog(
               context: context,
               provider: participationProvider,
@@ -1328,24 +1097,18 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
               practiceIds: [widget.practice.id],
               target: status,
               decision: res,
-            );
-
-            if (!mounted) return;
-
-            if (mounted) {
-              showFinalCommitToastForStatus(context, status, participationProvider, widget.practice);
-            }
-            return;
           }
+          */
 
-          // Default path: apply immediately through RsvpService
-          await RsvpService(participationProvider).setRsvpStatus(
-            clubId: widget.clubId!,
-            practice: widget.practice,
-            status: status,
+
+          // Default path: apply immediately through Riverpod controller
+          await ref.read(participationControllerProvider.notifier).updateParticipationStatus(
+            widget.clubId!,
+            widget.practice.id,
+            status,
           );
           if (mounted) {
-            showFinalCommitToastForStatus(context, status, participationProvider, widget.practice);
+            showFinalCommitToastForStatus(context, status);
           }
         } catch (error) {
           if (mounted) {
@@ -1415,9 +1178,21 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
   }
 
   String _getParticipationHeaderText(ParticipationStatus? currentParticipationStatus) {
-    final provider = Provider.of<ParticipationProvider>(context); // listen: true to react both to provider and parent rebuilds
-    final view = provider.getPracticeStatusViewState(widget.practice);
-    return view.label;
+    switch (currentParticipationStatus) {
+      case ParticipationStatus.yes:
+        return 'Going';
+      case ParticipationStatus.no:
+        return 'Not going';
+      case ParticipationStatus.maybe:
+        return 'Maybe';
+      case ParticipationStatus.attended:
+        return 'Attended';
+      case ParticipationStatus.missed:
+        return 'Missed';
+      case ParticipationStatus.blank:
+      default:
+        return 'Are you going?';
+    }
   }
 
   Color _getParticipationHeaderColor(ParticipationStatus? currentParticipationStatus) {
@@ -1427,10 +1202,8 @@ class _PracticeStatusCardState extends State<PracticeStatusCard> {
       case ParticipationStatus.no:
         return AppColors.error; // Red
       case ParticipationStatus.maybe:
-        // Use provider's view model for Maybe color hint; depend on provider to rebuild
-        final provider = Provider.of<ParticipationProvider>(context);
-        final view = provider.getPracticeStatusViewState(widget.practice);
-        return view.useSuccessColorForMaybe ? AppColors.success : const Color(0xFFF59E0B);
+        // Default Maybe color
+        return const Color(0xFFF59E0B);
       case ParticipationStatus.blank:
         return const Color(0xFF6B7280); // Gray
       case ParticipationStatus.attended:
@@ -2192,9 +1965,9 @@ class BulkRSVPConfirmationModal extends StatelessWidget {
 
 
 
-/// Widget for displaying guest type tags with practice tag styling
+/// Widget for displaying guest type tags - STUB for clean slate
 class GuestTypeTag extends StatelessWidget {
-  final GuestType guestType;
+  final dynamic guestType; // Using dynamic to avoid import issues
 
   const GuestTypeTag({
     super.key,
@@ -2203,22 +1976,7 @@ class GuestTypeTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0284C7).withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFF0284C7).withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        guestType.displayName,
-        style: const TextStyle(
-          fontSize: 12,
-          color: Color(0xFF0284C7),
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-    );
+    return const SizedBox.shrink(); // Return empty widget
   }
 }
 

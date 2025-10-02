@@ -4,14 +4,14 @@ library;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/club.dart';
-import '../../core/providers/navigation_provider.dart';
+import '../../core/providers/navigation_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../base/widgets/bulk_rsvp_manager.dart';
 
 /// Screen demonstrating bulk RSVP functionality
-class BulkRSVPScreen extends StatefulWidget {
+class BulkRSVPScreen extends ConsumerStatefulWidget {
   final Club club;
   final String currentUserId;
   
@@ -22,10 +22,10 @@ class BulkRSVPScreen extends StatefulWidget {
   });
   
   @override
-  State<BulkRSVPScreen> createState() => _BulkRSVPScreenState();
+  ConsumerState<BulkRSVPScreen> createState() => _BulkRSVPScreenState();
 }
 
-class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
+class _BulkRSVPScreenState extends ConsumerState<BulkRSVPScreen> {
   @override
   Widget build(BuildContext context) {
     // Match platform handling used by other screens
@@ -77,8 +77,9 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
           club: widget.club,
           onCancel: () => Navigator.of(context).pop(),
         ),
-        bottomNavigationBar: Consumer<NavigationProvider>(
-          builder: (context, navigationProvider, child) {
+        bottomNavigationBar: Consumer(
+          builder: (context, ref, child) {
+            final navigationState = ref.watch(navigationControllerProvider);
             return BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
               items: const [
@@ -103,13 +104,13 @@ class _BulkRSVPScreenState extends State<BulkRSVPScreen> {
                   label: 'Profile',
                 ),
               ],
-              currentIndex: navigationProvider.selectedIndex,
+              currentIndex: navigationState.selectedIndex,
               selectedItemColor: AppColors.primary,
               unselectedItemColor: Colors.grey,
               onTap: (index) {
                 // Navigate back to main app with selected tab
                 Navigator.of(context).popUntil((route) => route.isFirst);
-                navigationProvider.selectTab(index);
+                ref.read(navigationControllerProvider.notifier).selectTab(index);
               },
             );
           },

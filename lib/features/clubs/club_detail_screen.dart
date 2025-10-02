@@ -3,17 +3,18 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/participation_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/constants/app_constants.dart';
 
-import '../../core/providers/participation_provider.dart';
-import '../../core/services/schedule_service.dart';
-import '../../core/di/service_locator.dart';
-import '../../core/providers/navigation_provider.dart';
+// import '../../core/providers/participation_provider.dart';
+
+import '../../core/di/riverpod_providers.dart';
+import '../../core/providers/navigation_riverpod.dart';
 import '../../core/utils/responsive_helper.dart';
 import '../../base/widgets/buttons.dart';
 import '../../base/widgets/rsvp_components.dart';
@@ -25,7 +26,7 @@ import '../../base/widgets/phone_aware_modal_utils.dart';
 import '../bulk_rsvp/bulk_rsvp_screen.dart';
 import 'practice_detail_screen.dart';
 
-class ClubDetailScreen extends StatefulWidget {
+class ClubDetailScreen extends ConsumerStatefulWidget {
   final Club club;
   final String currentUserId;
   final Function(String practiceId, ParticipationStatus status)? onParticipationChanged;
@@ -40,16 +41,15 @@ class ClubDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<ClubDetailScreen> createState() => _ClubDetailScreenState();
+  ConsumerState<ClubDetailScreen> createState() => _ClubDetailScreenState();
 }
 
-class _ClubDetailScreenState extends State<ClubDetailScreen>
+class _ClubDetailScreenState extends ConsumerState<ClubDetailScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   late ScrollController _scrollController;
   final GlobalKey _tabBarKey = GlobalKey(); // Add GlobalKey for TabBar
   final GlobalKey _recurringPracticesKey = GlobalKey(); // Add GlobalKey for recurring practices container
-  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
   final bool _isMember = false;
   bool _isLoading = false;
   bool _showingBulkRSVP = false; // Temporarily disabled
@@ -153,11 +153,7 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           practice: practice,
           club: widget.club,
           currentUserId: widget.currentUserId,
-          onParticipationChanged: (practiceId, status) {
-            // Update the participation provider to ensure calendar syncs
-            final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
-            participationProvider.updateParticipationStatus(widget.club.id, practiceId, status);
-          },
+          // onParticipationChanged suppressed; PracticeStatusCard commits via Riverpod
         ),
       ),
     );
@@ -363,13 +359,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               SizedBox(height: ResponsiveHelper.getSpacing(context, mobileSpacing: 16.0)),
 
               // Next Practice Section
-              Consumer<ParticipationProvider>(builder: (context, participationProvider, child) {
+              Consumer(builder: (context, ref, child) {
                 final nextPractice = _getNextPractice();
                 if (nextPractice == null) return const SizedBox.shrink();
 
                 // Initialize participation status if needed (async call deferred)
                 WidgetsBinding.instance.addPostFrameCallback((_) {
-                  participationProvider.initializePracticeParticipation(nextPractice);
+                  ref.read(participationControllerProvider.notifier).initializePracticeParticipation(nextPractice);
                 });
 
                 return Column(
@@ -527,8 +523,9 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
               ),
             ),
       // Add bottom navigation when used as standalone page (not embedded in clubs list)
-      bottomNavigationBar: widget.onBackPressed == null ? Consumer<NavigationProvider>(
-        builder: (context, navigationProvider, child) {
+      bottomNavigationBar: widget.onBackPressed == null ? Consumer(
+        builder: (context, ref, child) {
+          final navigationState = ref.watch(navigationControllerProvider);
           return BottomNavigationBar(
             type: BottomNavigationBarType.fixed,
             items: const [
@@ -553,13 +550,13 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
                 label: 'Profile',
               ),
             ],
-            currentIndex: navigationProvider.selectedIndex,
+            currentIndex: navigationState.selectedIndex,
             selectedItemColor: AppColors.primary,
             unselectedItemColor: Colors.grey,
             onTap: (index) {
               // Navigate back to main app with selected tab
               Navigator.of(context).popUntil((route) => route.isFirst);
-              navigationProvider.selectTab(index);
+              ref.read(navigationControllerProvider.notifier).selectTab(index);
             },
           );
         },
@@ -735,16 +732,11 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
           ),
           const SizedBox(height: 16),
           Expanded(
-            child: Consumer<ParticipationProvider>(
-              builder: (context, participationProvider, child) {
-                return PracticeCalendar(
-                  club: widget.club,
-                  onPracticeSelected: _handlePracticeSelected,
-                  participationProvider: participationProvider,
-                  onShowLevelFilter: _showPracticeFilterModal,
-                  onAutoScrollTabBarToTop: _autoScrollToTabsPosition,
-                );
-              },
+            child: PracticeCalendar(
+              club: widget.club,
+              onPracticeSelected: _handlePracticeSelected,
+              onShowLevelFilter: _showPracticeFilterModal,
+              onAutoScrollTabBarToTop: _autoScrollToTabsPosition,
             ),
           ),
         ],
@@ -754,7 +746,8 @@ class _ClubDetailScreenState extends State<ClubDetailScreen>
 
   /// Get recurring/template practices for the club using ScheduleService
   List<PracticePattern> _getRecurringPractices() {
-    return _scheduleService.getPracticePatterns(widget.club.id);
+    final scheduleService = ref.read(scheduleServiceProvider);
+    return scheduleService.getPracticePatterns(widget.club.id);
   }
 
   Widget _buildGroupsTab(BuildContext context) {

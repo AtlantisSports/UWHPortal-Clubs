@@ -458,43 +458,50 @@ class MockDataService {
     return responses;
   }
 
-  /// Get recurring practice dates from September 2025 through November 2025
+  /// Get recurring practice dates in a rolling window around "now"
+  /// Generates dates from ~2 months back through ~3 months ahead to
+  /// keep the calendar populated regardless of the current date.
   static List<DateTime> _getRecurringPracticeDates(
-    int dayOfWeek, 
-    int hour, 
+    int dayOfWeek,
+    int hour,
     int minute, {
     String recurrence = 'weekly',
     DateTime? startDate,
   }) {
     final dates = <DateTime>[];
-    final endDate = DateTime(2025, 11, 9); // November 9, 2025
-    
+
+    // Rolling window: start ~60 days back from the first of that month, end ~90 days ahead
+    final now = DateTime.now();
+    final startWindow = DateTime(now.year, now.month, 1).subtract(const Duration(days: 60));
+    final endWindow = now.add(const Duration(days: 90));
+
     DateTime current;
-    
+
     if (startDate != null) {
-      // Use the provided start date and set the time
-      current = DateTime(startDate.year, startDate.month, startDate.day, hour, minute);
+      // Respect provided pattern start but clamp to the rolling window
+      final effectiveStart = startDate.isAfter(startWindow) ? startDate : startWindow;
+      current = DateTime(effectiveStart.year, effectiveStart.month, effectiveStart.day, hour, minute);
     } else {
-      // Default behavior: find first occurrence starting from September 1, 2025
-      final defaultStartDate = DateTime(2025, 9, 1);
+      // Find first occurrence of the target weekday starting from the rolling window month
+      final defaultStartDate = DateTime(startWindow.year, startWindow.month, 1);
       current = defaultStartDate;
       while (current.weekday != dayOfWeek && current.month == defaultStartDate.month) {
         current = current.add(const Duration(days: 1));
       }
-      
-      // If we didn't find the day in the start month, find it in the next month
+
+      // If not found in that month, find it in the next month
       if (current.month != defaultStartDate.month) {
         current = DateTime(defaultStartDate.year, defaultStartDate.month + 1, 1);
         while (current.weekday != dayOfWeek) {
           current = current.add(const Duration(days: 1));
         }
       }
-      
+
       // Set the time
       current = DateTime(current.year, current.month, current.day, hour, minute);
     }
-    
-    // Generate all occurrences until end date based on recurrence pattern
+
+    // Generate all occurrences until end of window based on recurrence pattern
     int intervalDays;
     switch (recurrence) {
       case 'biweekly':
@@ -508,22 +515,22 @@ class MockDataService {
         intervalDays = 7; // Every week
         break;
     }
-    
+
     // Generate dates based on recurrence type
     if (recurrence == 'monthlyByWeek') {
       // Special handling for monthly by week patterns
-      dates.addAll(_generateMonthlyByWeekDates(current, endDate, dayOfWeek));
+      dates.addAll(_generateMonthlyByWeekDates(current, endWindow, dayOfWeek));
     } else {
       // Standard weekly/biweekly/3-weekly patterns
-      while (current.isBefore(endDate) || current.isAtSameMomentAs(endDate)) {
+      while (current.isBefore(endWindow) || current.isAtSameMomentAs(endWindow)) {
         dates.add(current);
         current = current.add(Duration(days: intervalDays));
       }
     }
-    
+
     return dates;
   }
-  
+
   /// Generate dates for monthly by week patterns (e.g., 2nd Sunday of each month)
   static List<DateTime> _generateMonthlyByWeekDates(DateTime startDate, DateTime endDate, int targetWeekday) {
     final dates = <DateTime>[];

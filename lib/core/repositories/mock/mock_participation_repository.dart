@@ -1,28 +1,33 @@
 /// Mock implementation of participation repository
-/// Integrates with existing ParticipationProvider and mock data
+/// Provides realistic mock data for participation operations without Service Locator
 library;
 
+import 'dart:math';
 import '../interfaces/participation_repository.dart';
 import '../../models/practice.dart';
 import '../../models/guest.dart';
-import '../../providers/participation_provider.dart';
 import '../../services/user_service.dart';
-import '../../di/service_locator.dart';
 import '../../../features/clubs/clubs_repository.dart';
 
-/// Mock implementation of IParticipationRepository using existing providers
-class MockParticipationRepository implements IParticipationRepository {
-  final ParticipationProvider _participationProvider;
+/// Mock implementation of ParticipationRepository for development and testing
+///
+/// This implementation provides realistic mock data and behavior while maintaining
+/// the same interface as the future production implementation.
+class MockParticipationRepository implements ParticipationRepository {
   final UserService _userService;
   final ClubsRepository _clubsRepository;
+  final Random _random = Random();
+
+  // In-memory storage for mock data
+  final Map<String, ParticipationStatus> _participationStatusMap = {};
+  final Map<String, PracticeGuestList> _practiceGuestsMap = {};
+  final Map<String, bool> _bringGuestMap = {};
 
   MockParticipationRepository({
-    ParticipationProvider? participationProvider,
-    UserService? userService,
-    ClubsRepository? clubsRepository,
-  }) : _participationProvider = participationProvider ?? ServiceLocator.participationProvider,
-        _userService = userService ?? ServiceLocator.userService,
-        _clubsRepository = clubsRepository ?? ServiceLocator.clubsRepository;
+    required UserService userService,
+    required ClubsRepository clubsRepository,
+  }) : _userService = userService,
+        _clubsRepository = clubsRepository;
 
   @override
   Future<ParticipationStatus?> getParticipationStatus({
@@ -30,8 +35,8 @@ class MockParticipationRepository implements IParticipationRepository {
     required String practiceId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 50));
-    // Use the existing provider
-    return _participationProvider.getParticipationStatus(practiceId);
+    final key = '${practiceId}_$userId';
+    return _participationStatusMap[key];
   }
 
   @override
@@ -40,18 +45,18 @@ class MockParticipationRepository implements IParticipationRepository {
     required String practiceId,
     required ParticipationStatus status,
   }) async {
-    await Future.delayed(const Duration(milliseconds: 100));
+    await Future.delayed(Duration(milliseconds: 100 + _random.nextInt(200)));
     try {
-      // Find the club that contains this practice
-      final clubs = await _clubsRepository.getClubs();
-      for (final club in clubs) {
-        final practice = club.upcomingPractices.where((p) => p.id == practiceId).firstOrNull;
-        if (practice != null) {
-          await _participationProvider.updateParticipationStatus(club.id, practiceId, status);
-          return true;
-        }
+      final key = '${practiceId}_$userId';
+      _participationStatusMap[key] = status;
+
+      // Clear guests if status is No
+      if (status == ParticipationStatus.no) {
+        _practiceGuestsMap[practiceId] = const PracticeGuestList();
+        _bringGuestMap[practiceId] = false;
       }
-      return false;
+
+      return true;
     } catch (e) {
       return false;
     }
@@ -121,11 +126,12 @@ class MockParticipationRepository implements IParticipationRepository {
   Future<Map<String, ParticipationStatus>> getPracticeParticipants(String practiceId) async {
     await Future.delayed(const Duration(milliseconds: 100));
     // Mock implementation - return sample participants
+    final currentUserKey = '${practiceId}_${_userService.currentUserId}';
     return {
       'user1': ParticipationStatus.yes,
       'user2': ParticipationStatus.maybe,
       'user3': ParticipationStatus.no,
-      _userService.currentUserId: _participationProvider.getParticipationStatus(practiceId),
+      _userService.currentUserId: _participationStatusMap[currentUserKey] ?? ParticipationStatus.blank,
     };
   }
 
@@ -158,7 +164,8 @@ class MockParticipationRepository implements IParticipationRepository {
         if (startDate != null && practice.dateTime.isBefore(startDate)) continue;
         if (endDate != null && practice.dateTime.isAfter(endDate)) continue;
         
-        history[practice.id] = _participationProvider.getParticipationStatus(practice.id);
+        final key = '${practice.id}_$userId';
+        history[practice.id] = _participationStatusMap[key] ?? ParticipationStatus.blank;
       }
       
       return history;
@@ -173,7 +180,7 @@ class MockParticipationRepository implements IParticipationRepository {
     required String practiceId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 50));
-    final guestList = _participationProvider.getPracticeGuests(practiceId);
+    final guestList = _practiceGuestsMap[practiceId] ?? const PracticeGuestList();
     return guestList.guests;
   }
 
@@ -185,7 +192,8 @@ class MockParticipationRepository implements IParticipationRepository {
   }) async {
     await Future.delayed(const Duration(milliseconds: 100));
     try {
-      _participationProvider.updatePracticeGuests(practiceId, guests);
+      _practiceGuestsMap[practiceId] = PracticeGuestList(guests: guests);
+      _bringGuestMap[practiceId] = guests.isNotEmpty;
       return true;
     } catch (e) {
       return false;
@@ -198,7 +206,7 @@ class MockParticipationRepository implements IParticipationRepository {
     required String practiceId,
   }) async {
     await Future.delayed(const Duration(milliseconds: 50));
-    return _participationProvider.getBringGuestState(practiceId);
+    return _bringGuestMap[practiceId] ?? false;
   }
 
   @override
@@ -209,7 +217,13 @@ class MockParticipationRepository implements IParticipationRepository {
   }) async {
     await Future.delayed(const Duration(milliseconds: 100));
     try {
-      _participationProvider.updateBringGuestState(practiceId, bringGuest);
+      _bringGuestMap[practiceId] = bringGuest;
+
+      // Clear guests if bring guest is turned off
+      if (!bringGuest) {
+        _practiceGuestsMap[practiceId] = const PracticeGuestList();
+      }
+
       return true;
     } catch (e) {
       return false;

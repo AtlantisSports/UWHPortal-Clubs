@@ -190,8 +190,7 @@ class Practice extends BaseModel {
   final int maxParticipants;
   final List<String> participants;
   final Map<String, ParticipationStatus> participationResponses;
-  // Per-user conditional threshold for Maybe (presence implies user selected Conditional Maybe)
-  final Map<String, int> conditionalYesThresholds;
+
   final bool isRecurring;
   final String? recurringPattern;
   final String? tag; // Practice level/type tag (e.g., "Open", "High-Level", "Intermediate")
@@ -209,7 +208,7 @@ class Practice extends BaseModel {
     this.maxParticipants = 20,
     this.participants = const [],
     this.participationResponses = const {},
-    this.conditionalYesThresholds = const {},
+
     this.isRecurring = false,
     this.recurringPattern,
     this.tag,
@@ -341,7 +340,7 @@ class Practice extends BaseModel {
       'maxParticipants': maxParticipants,
       'participants': participants,
       'participationResponses': participationResponses.map((key, value) => MapEntry(key, value.name)),
-      'conditionalYesThresholds': conditionalYesThresholds,
+
       'isRecurring': isRecurring,
       'recurringPattern': recurringPattern,
     };
@@ -366,9 +365,7 @@ class Practice extends BaseModel {
           orElse: () => ParticipationStatus.blank,
         )),
       ) ?? {},
-      conditionalYesThresholds: (json['conditionalYesThresholds'] as Map<String, dynamic>?)?.map(
-        (key, value) => MapEntry(key, (value as num).toInt()),
-      ) ?? {},
+
       isRecurring: json['isRecurring'] as bool? ?? false,
       recurringPattern: json['recurringPattern'] as String?,
       createdAt: json['createdAt'] != null
@@ -393,7 +390,7 @@ class Practice extends BaseModel {
     int? maxParticipants,
     List<String>? participants,
     Map<String, ParticipationStatus>? participationResponses,
-    Map<String, int>? conditionalYesThresholds,
+
     bool? isRecurring,
     String? recurringPattern,
     String? tag,
@@ -411,7 +408,7 @@ class Practice extends BaseModel {
       maxParticipants: maxParticipants ?? this.maxParticipants,
       participants: participants ?? this.participants,
       participationResponses: participationResponses ?? this.participationResponses,
-      conditionalYesThresholds: conditionalYesThresholds ?? this.conditionalYesThresholds,
+
       isRecurring: isRecurring ?? this.isRecurring,
       recurringPattern: recurringPattern ?? this.recurringPattern,
       tag: tag ?? this.tag,

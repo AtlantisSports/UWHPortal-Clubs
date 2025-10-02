@@ -5,8 +5,11 @@ library;
 import '../../models/practice.dart';
 import '../../models/practice_pattern.dart';
 
-/// Interface for practice data operations
-abstract class IPracticeRepository {
+/// Unified interface for practice data operations
+///
+/// This interface provides a comprehensive API for all practice-related operations,
+/// following the standardized repository pattern.
+abstract class PracticeRepository {
   /// Get all practices for a club
   Future<List<Practice>> getClubPractices(String clubId);
   

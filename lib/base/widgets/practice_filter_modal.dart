@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/practice_filter_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/practice_filter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/club.dart';
 
+import 'toast_manager.dart';
+
 /// Bottom sheet modal for filtering practices by level and location
 /// Follows the same design pattern as the Events filter modal
-class PracticeFilterModal extends StatefulWidget {
+class PracticeFilterModal extends ConsumerStatefulWidget {
   final Set<String> availableLevels;
   final Set<String> availableLocations;
   final Club club; // Added to access practice data for validation
@@ -21,43 +23,39 @@ class PracticeFilterModal extends StatefulWidget {
   });
 
   @override
-  State<PracticeFilterModal> createState() => _PracticeFilterModalState();
+  ConsumerState<PracticeFilterModal> createState() => _PracticeFilterModalState();
 }
 
-class _PracticeFilterModalState extends State<PracticeFilterModal> {
+class _PracticeFilterModalState extends ConsumerState<PracticeFilterModal> {
   late Set<String> _tempSelectedLevels;
   late Set<String> _tempSelectedLocations;
-  bool _showToast = false;
+
 
   @override
   void initState() {
     super.initState();
-    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
-    _tempSelectedLevels = Set.from(filterProvider.selectedLevels);
-    _tempSelectedLocations = Set.from(filterProvider.selectedLocations);
+    final filterState = ref.read(practiceFilterControllerProvider);
+    _tempSelectedLevels = Set.from(filterState.selectedLevels);
+    _tempSelectedLocations = Set.from(filterState.selectedLocations);
   }
 
   void _applyFilters() {
-    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
-    filterProvider.updateSelectedLevels(_tempSelectedLevels);
-    filterProvider.updateSelectedLocations(_tempSelectedLocations);
+    final filterController = ref.read(practiceFilterControllerProvider.notifier);
+    filterController.updateSelectedLevels(_tempSelectedLevels);
+    filterController.updateSelectedLocations(_tempSelectedLocations);
     // Close the modal after applying filters
     widget.onFiltersChanged?.call();
   }
 
   void _showErrorToast() {
-    setState(() {
-      _showToast = true;
-    });
-
-    // Hide toast after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
-        setState(() {
-          _showToast = false;
-        });
-      }
-    });
+    ToastManager.showTopToast(
+      context,
+      message: 'No practices match the selected filters. Please adjust your selection.',
+      color: Colors.red.shade600,
+      icon: Icons.error_outline,
+      persistent: false,
+      duration: const Duration(seconds: 3),
+    );
   }
 
   bool _hasMatchingPractices() {
@@ -74,14 +72,14 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
   }
 
   void _resetFilters() {
-    final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
+    final filterController = ref.read(practiceFilterControllerProvider.notifier);
     setState(() {
       _tempSelectedLevels.clear();
       _tempSelectedLocations.clear();
     });
     // Apply the cleared filters immediately so changes persist, but keep modal open
-    filterProvider.updateSelectedLevels(_tempSelectedLevels);
-    filterProvider.updateSelectedLocations(_tempSelectedLocations);
+    filterController.updateSelectedLevels(_tempSelectedLevels);
+    filterController.updateSelectedLocations(_tempSelectedLocations);
   }
 
   @override
@@ -259,38 +257,10 @@ class _PracticeFilterModalState extends State<PracticeFilterModal> {
             ],
           ),
 
+
           ],
         ),
 
-      // Custom toast overlay
-      if (_showToast)
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 12,
-          left: 16,
-          right: 16,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Colors.red.shade600,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.1),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: const Text(
-              'No practices match the selected filters. Please adjust your selection.',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ),
         ],
       ),
     );

@@ -4,6 +4,8 @@ library;
 import 'package:flutter/material.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/app_constants.dart';
+import 'toast_manager.dart';
+
 import '../../core/services/guest_service.dart';
 
 class GuestManagementModal extends StatefulWidget {
@@ -56,9 +58,6 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
 
   final ScrollController _scrollController = ScrollController(); // Add scroll controller
 
-  // Toast state for validation feedback
-  bool _showToast = false;
-  String _toastMessage = '';
 
   @override
   void initState() {
@@ -239,36 +238,7 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
           ),
         ),
 
-        // Toast overlay (mobile-only) - positioned at top
-        if (_showToast && MediaQuery.of(context).size.width <= 768)
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 12,
-            left: 20,
-            right: 20,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.red[700],
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
-                  ),
-                ],
-              ),
-              child: Text(
-                _toastMessage,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-          ),
+
       ],
     );
   }
@@ -776,19 +746,14 @@ class _GuestManagementModalState extends State<GuestManagementModal> {
   void _showValidationToast(String message) {
     // Only show toasts on mobile screen layout
     if (MediaQuery.of(context).size.width <= 768) {
-      setState(() {
-        _toastMessage = message;
-        _showToast = true;
-      });
-
-      // Hide toast after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() {
-            _showToast = false;
-          });
-        }
-      });
+      ToastManager.showTopToast(
+        context,
+        message: message,
+        color: Colors.red[700]!,
+        icon: Icons.error_outline,
+        persistent: false,
+        duration: const Duration(seconds: 3),
+      );
     }
   }
 

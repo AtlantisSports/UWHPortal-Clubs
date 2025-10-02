@@ -2,22 +2,24 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/app_constants.dart';
 import 'toast_manager.dart';
 
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
-import '../../core/providers/participation_provider.dart';
-import '../../core/providers/practice_filter_provider.dart';
+
+import '../../core/providers/practice_filter_riverpod.dart';
 import '../../base/widgets/phone_aware_modal_utils.dart';
 import '../../base/widgets/rsvp_components.dart';
 import '../../core/utils/time_utils.dart';
 
 import '../../core/models/guest.dart';
 import '../../base/widgets/guest_management_modal.dart';
-import 'shared_rsvp_confirm.dart';
-import '../../core/utils/rsvp_apply_helper.dart';
+
+
+import '../../core/data/mock_data_service.dart';
+
 
 
 import 'dart:async';
@@ -48,10 +50,10 @@ class PracticeDay {
   PracticeDay({required this.date, required this.practices});
 }
 
-class PracticeCalendar extends StatefulWidget {
+class PracticeCalendar extends ConsumerStatefulWidget {
   final Club club;
   final Function(Practice)? onPracticeSelected;
-  final ParticipationProvider? participationProvider;
+  // Legacy participation provider removed after Riverpod migration
   final VoidCallback? onShowLevelFilter;
   final VoidCallback? onAutoScrollTabBarToTop;
 
@@ -59,16 +61,16 @@ class PracticeCalendar extends StatefulWidget {
     super.key,
     required this.club,
     this.onPracticeSelected,
-    this.participationProvider,
+
     this.onShowLevelFilter,
     this.onAutoScrollTabBarToTop,
   });
 
   @override
-  State<PracticeCalendar> createState() => _PracticeCalendarState();
+  ConsumerState<PracticeCalendar> createState() => _PracticeCalendarState();
 }
 
-class _PracticeCalendarState extends State<PracticeCalendar> {
+class _PracticeCalendarState extends ConsumerState<PracticeCalendar> {
   Club get club => widget.club;
 
   @override
@@ -252,7 +254,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                       ),
                     ),
                     const Spacer(),
-                    _buildFilterButton(context, widget.participationProvider),
+                    _buildFilterButton(context),
                   ],
                 ),
               ),
@@ -263,11 +265,11 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      _buildMonth(context, 'September 2025', 2025, 9, widget.participationProvider),
+                      _buildMonth(context, 'September 2025', 2025, 9),
                       const SizedBox(height: 24),
-                      _buildMonth(context, 'October 2025', 2025, 10, widget.participationProvider),
+                      _buildMonth(context, 'October 2025', 2025, 10),
                       const SizedBox(height: 24),
-                      _buildMonth(context, 'November 2025', 2025, 11, widget.participationProvider),
+                      _buildMonth(context, 'November 2025', 2025, 11),
                     ],
                   ),
                 ),
@@ -280,7 +282,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     );
   }
 
-  Widget _buildMonth(BuildContext context, String title, int year, int month, ParticipationProvider? participationProvider) {
+  Widget _buildMonth(BuildContext context, String title, int year, int month) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -293,18 +295,19 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
           ),
         ),
         const SizedBox(height: 12),
-        Consumer<PracticeFilterProvider>(
-          builder: (context, filterProvider, child) {
-            // Rebuild the grid when filters change so fades and inclusion update immediately
-            return _buildCalendarGrid(context, year, month, participationProvider);
+        Consumer(
+          builder: (context, ref, child) {
+            // Watch filter state to rebuild the grid when filters change
+            ref.watch(practiceFilterControllerProvider);
+            return _buildCalendarGrid(context, year, month);
           },
         ),
       ],
     );
   }
 
-  Widget _buildCalendarGrid(BuildContext context, int year, int month, ParticipationProvider? participationProvider) {
-    final practices = _generatePracticesForMonth(year, month, participationProvider);
+  Widget _buildCalendarGrid(BuildContext context, int year, int month) {
+    final practices = _generatePracticesForMonth(year, month);
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final firstDayOfMonth = DateTime(year, month, 1);
     final startingWeekday = firstDayOfMonth.weekday % 7; // Convert to 0-6 (Sunday = 0)
@@ -391,39 +394,18 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                             ),
                           ),
                           // Guest count indicator (lower-left corner)
-                          Consumer<ParticipationProvider>(
-                            builder: (context, participationProvider, child) {
-                              // Sum unique guests across all practices on this day (unique by Guest.id)
-                              final consideredIds = practicesForDay.map((s) => s.practiceId).toList();
-                              final uniqueGuestIds = <String>{};
-                              for (final pid in consideredIds) {
-                                final guestList = participationProvider.getPracticeGuests(pid);
-                                for (final g in guestList.guests) {
-                                  uniqueGuestIds.add(g.id);
-                                }
-                              }
-                              final guestCount = uniqueGuestIds.length;
+                          // Guest count indicator removed post-migration
 
-                              if (guestCount > 0) {
-                                return Positioned(
-                                  bottom: 2,
-                                  left: 2,
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 1),
-                                    child: Text(
-                                      '+$guestCount',
-                                      style: const TextStyle(
-                                        fontSize: 8,
-                                        fontWeight: FontWeight.bold,
-                                        color: AppColors.primary,
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              }
-                              return const SizedBox.shrink();
-                            },
-                          ),
+
+
+
+
+
+
+
+
+
+                          // Guest count indicator removed post-migration
                           // Practice indicators
                           if (practicesForDay.isNotEmpty)
                             Positioned(
@@ -610,7 +592,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
 
 
 
-  Map<DateTime, List<FilteredPracticeStatus>> _generatePracticesForMonth(int year, int month, ParticipationProvider? participationProvider) {
+  Map<DateTime, List<FilteredPracticeStatus>> _generatePracticesForMonth(int year, int month) {
     final practices = <DateTime, List<FilteredPracticeStatus>>{};
     final today = DateTime.now();
 
@@ -633,21 +615,19 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                (practiceDate.isAfter(todayDate) && (practiceDate.isBefore(cutoffDate) || practiceDate.isAtSameMomentAs(cutoffDate)));
       }).toList();
 
-      if (realPracticesForDay.isNotEmpty) {
         final practiceStatuses = <FilteredPracticeStatus>[];
 
-        // Check if this date has practices that need status evaluation
-        final dateHasPractices = realPracticesForDay.isNotEmpty;
-        final isDateInPastOrToday = !date.isAfter(today);
+        if (realPracticesForDay.isNotEmpty) {
+          // Check if this date has practices that need status evaluation
+          final dateHasPractices = realPracticesForDay.isNotEmpty;
+          final isDateInPastOrToday = !date.isAfter(today);
+          final filterController = ref.read(practiceFilterControllerProvider.notifier);
 
-        if (isDateInPastOrToday && dateHasPractices) {
-          // Past practices and today's practices - use real practice data with participation status
-          if (participationProvider != null) {
-            // Use real practice data with participation status
-            final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
+          if (isDateInPastOrToday && dateHasPractices) {
+            // Past practices and today's practices - use real practice data with participation status
             for (final practice in realPracticesForDay) {
-              final passesLevelFilter = filterProvider.shouldShowPractice(practice);
-              final participationStatus = participationProvider.getParticipationStatus(practice.id);
+              final passesLevelFilter = filterController.shouldShowPractice(practice);
+              final participationStatus = practice.getParticipationStatus(MockDataService.currentUserId);
 
               // Check if practice has transitioned to attendance tracking (30+ minutes after start)
               final now = DateTime.now();
@@ -692,17 +672,14 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                 passesFilter: passesLevelFilter,
               ));
             }
-          }
-        } else {
-          // Future practices - use real practice data with participation status
-          final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
-          for (final practice in realPracticesForDay) {
-            final passesLevelFilter = filterProvider.shouldShowPractice(practice);
+          } else {
+            // Future practices - use real practice data with participation status
+            for (final practice in realPracticesForDay) {
+              final passesLevelFilter = filterController.shouldShowPractice(practice);
 
-            bool isAttendanceMode = false;
-            ParticipationStatus visualStatus;
-            if (participationProvider != null) {
-              final participationStatus = participationProvider.getParticipationStatus(practice.id);
+              bool isAttendanceMode = false;
+              ParticipationStatus visualStatus;
+              final participationStatus = practice.getParticipationStatus(MockDataService.currentUserId);
               switch (participationStatus) {
                 case ParticipationStatus.yes:
                 case ParticipationStatus.maybe:
@@ -716,24 +693,22 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   visualStatus = ParticipationStatus.blank;
                   break;
               }
-            } else {
-              visualStatus = ParticipationStatus.blank;
-            }
 
-            practiceStatuses.add(FilteredPracticeStatus(
-              practiceId: practice.id,
-              participationStatus: visualStatus,
-              isAttendanceMode: isAttendanceMode,
-              passesFilter: passesLevelFilter,
-            ));
+              practiceStatuses.add(FilteredPracticeStatus(
+                practiceId: practice.id,
+                participationStatus: visualStatus,
+                isAttendanceMode: isAttendanceMode,
+                passesFilter: passesLevelFilter,
+              ));
+            }
+          }
+
+          if (practiceStatuses.isNotEmpty) {
+            practices[date] = practiceStatuses;
           }
         }
 
-        if (practiceStatuses.isNotEmpty) {
-          practices[date] = practiceStatuses;
-        }
       }
-    }
 
     return practices;
   }
@@ -763,7 +738,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     if (practicesForDate.length == 1) {
       widget.onPracticeSelected?.call(practicesForDate.first);
     } else if (practicesForDate.length > 1) {
-      openPracticeDetailsModal(context, practicesForDate, widget.participationProvider);
+      openPracticeDetailsModal(context, practicesForDate);
     }
   }
 
@@ -839,13 +814,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                     children: [
                       if (eligible.isNotEmpty)
                         ...eligible.map((p) {
-                          final provider = widget.participationProvider;
-                          final ps = provider?.getParticipationStatus(p.id) ?? ParticipationStatus.blank;
+                          final ps = ParticipationStatus.blank;
                           final bool isSelected = tempSelected.contains(p.id);
                           final bool isExpanded = expandedDescriptions[p.id] ?? false;
                           final String fullDesc = p.description;
-                          final filterProvider = Provider.of<PracticeFilterProvider>(context, listen: false);
-                          final bool passesFilter = filterProvider.shouldShowPractice(p);
+                          final filterController = ref.read(practiceFilterControllerProvider.notifier);
+                          final bool passesFilter = filterController.shouldShowPractice(p);
 
                           return Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
@@ -957,8 +931,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                           child: Text('Ineligible (past/locked)', style: TextStyle(fontSize: 12, color: Colors.grey)),
                         ),
                         ...ineligible.map((p) {
-                          final provider = widget.participationProvider;
-                          final ps = provider?.getParticipationStatus(p.id) ?? ParticipationStatus.blank;
+                          final ps = ParticipationStatus.blank;
                           final bool isExpanded = expandedDescriptions[p.id] ?? false;
                           final String fullDesc = p.description;
                           return Opacity(
@@ -1411,48 +1384,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       }
     });
   }
-  Future<bool> _applyOverlayBulkWithGuestConfirmation(ParticipationProvider provider, List<String> practiceIds, ParticipationStatus target) async {
-    final decision = await showSharedRSVPConfirmationDialog(
-      context: context,
-      provider: provider,
-      practiceId: practiceIds.first,
-      target: target,
-      overrideHasClubMembers: true,
-      overrideHasVisitors: true,
-      overrideHasDependents: true,
-      overrideHasNewPlayers: true,
-    );
-    if (decision == null) return false;
-
-    if (!mounted) return false;
-
-    await applyRSVPChange(
-      context: context,
-      provider: provider,
-      clubId: widget.club.id,
-      practiceIds: practiceIds,
-      target: target,
-      decision: decision,
-    );
-
-    // Success toast and close selection mode
-    String label;
-    IconData icon;
-    Color color;
-    switch (target) {
-      case ParticipationStatus.yes:
-        label = 'Yes'; icon = Icons.check; color = AppColors.success; break;
-      case ParticipationStatus.maybe:
-        label = 'Maybe'; icon = Icons.help_outline; color = AppColors.maybe; break;
-      default:
-        label = 'No'; icon = Icons.cancel; color = AppColors.error; break;
-    }
-    String message = '$label applied to ${practiceIds.length == 1 ? '1 practice' : '${practiceIds.length} practices'}';
-    _showTopScreenToast(message, color, icon);
-    _exitSelectionMode();
-
-    return true;
-  }
 
   Future<void> _applyBulk() async {
     if (_bulkChoice == BulkChoice.none) {
@@ -1460,13 +1391,6 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
         'Please choose an RSVP option to apply',
         AppColors.primary,
         Icons.info_outline,
-      );
-      return;
-    }
-    final provider = widget.participationProvider;
-    if (provider == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Internal error: participation provider unavailable'), duration: Duration(seconds: 2)),
       );
       return;
     }
@@ -1480,120 +1404,9 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
       return;
     }
 
-    // Enforce global Maybe limit (max 10). Block entire apply if exceeding.
-    if (_bulkChoice == BulkChoice.maybe) {
-      final currentMaybe = provider.totalMaybeCount;
-      int newMaybes = 0;
-      for (final id in practiceIds) {
-        if (provider.getParticipationStatus(id) != ParticipationStatus.maybe) {
-          newMaybes++;
-        }
-      }
-      final projected = currentMaybe + newMaybes;
-      if (projected > 10) {
-        final overBy = projected - 10;
-        _showTopScreenToast(
-          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers. Remove $overBy ${overBy == 1 ? 'practice' : 'practices'} to apply Maybe RSVPs.',
-          const Color(0xFFF59E0B),
-          Icons.help_outline,
-          persistent: true,
-        );
-        return;
-      }
-    }
-
-    final status = _bulkChoice == BulkChoice.yes
-        ? ParticipationStatus.yes
-        : _bulkChoice == BulkChoice.maybe
-            ? ParticipationStatus.maybe
-            : ParticipationStatus.no;
-
-    // If any selected practice has guest implications when moving from YES to Maybe/No, confirm once and apply
-    if (status == ParticipationStatus.maybe || status == ParticipationStatus.no) {
-      bool needsConfirm = false;
-      for (final id in practiceIds) {
-        if (provider.needsGuestConfirmation(id, status)) { needsConfirm = true; break; }
-      }
-      if (needsConfirm) {
-        final applied = await _applyOverlayBulkWithGuestConfirmation(provider, practiceIds, status);
-        if (applied) return;
-      }
-    }
-
-    // Guests handling per spec
-    if (_bulkChoice == BulkChoice.no) {
-      // For NO: clear guests and bring flag
-      for (final id in practiceIds) {
-        provider.updatePracticeGuests(id, const []);
-        provider.updateBringGuestState(id, false);
-      }
-    } else if (_bulkChoice == BulkChoice.yes) {
-      // Bring guest UX remains available for YES
-      if (_bulkBringGuests) {
-        for (final id in practiceIds) {
-          final existing = provider.getPracticeGuests(id).guests;
-          final mergedMap = <String, Guest>{};
-          for (final g in existing) {
-            mergedMap[g.id] = g;
-          }
-          for (final g in _bulkGuestList.guests) {
-            mergedMap[g.id] = g;
-          }
-          final merged = mergedMap.values.toList();
-          provider.updatePracticeGuests(id, merged);
-          provider.updateBringGuestState(id, merged.isNotEmpty);
-        }
-      }
-    }
-
-    // Apply participation status in bulk
-    try {
-      // Apply participation status in bulk first
-      await provider.bulkUpdateParticipation(
-        BulkParticipationRequest(
-          practiceIds: practiceIds,
-          newStatus: status,
-          clubId: widget.club.id,
-          userId: provider.currentUserId,
-        ),
-      );
-
-
-      if (!mounted) return;
-
-      IconData icon;
-      Color color;
-      String label;
-      switch (status) {
-        case ParticipationStatus.yes:
-          icon = Icons.check_circle;
-          color = AppColors.success;
-          label = 'Going';
-          break;
-        case ParticipationStatus.maybe:
-          icon = Icons.help;
-          color = const Color(0xFFF59E0B);
-          label = 'Might go';
-          break;
-        default:
-          icon = Icons.cancel;
-          color = AppColors.error;
-          label = 'Not going';
-      }
-      final count = practiceIds.length;
-      final guestCount = _bulkGuestList.totalGuests;
-      final base = '${count == 1 ? '1 practice' : '$count practices'} set to $label';
-      final message = (status == ParticipationStatus.no || guestCount == 0)
-          ? base
-          : '$base with $guestCount ${guestCount == 1 ? 'guest' : 'guests'}';
-      _showTopScreenToast(message, color, icon);
-      _exitSelectionMode();
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to apply: $e')),
-      );
-    }
+    _showTopScreenToast('Bulk apply is not available in this build', AppColors.primary, Icons.info_outline);
+    _exitSelectionMode();
+    return;
   }
 
 
@@ -1627,7 +1440,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
     return practices;
   }
 
-  void openPracticeDetailsModal(BuildContext context, List<Practice> practices, ParticipationProvider? participationProvider) {
+  void openPracticeDetailsModal(BuildContext context, List<Practice> practices) {
     PhoneAwareModalUtils.showPhoneAwareDialog(
       context: context,
       child: Container(
@@ -1675,7 +1488,7 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
                   return PracticeStatusCard(
                     practice: practice,
                     mode: PracticeStatusCardMode.readOnly,
-                    participationProvider: participationProvider,
+
                     showAttendanceStatus: true,
                     onTap: () {
                       Navigator.of(context).pop();
@@ -1703,11 +1516,12 @@ class _PracticeCalendarState extends State<PracticeCalendar> {
   }
 
   /// Build the filter button for the calendar header
-  Widget _buildFilterButton(BuildContext context, ParticipationProvider? participationProvider) {
-    return Consumer<PracticeFilterProvider>(
-      builder: (context, filterProvider, child) {
-        final hasFiltersApplied = filterProvider.hasLevelFiltersApplied || filterProvider.hasLocationFiltersApplied;
-        final selectedCount = filterProvider.selectedLevels.length + filterProvider.selectedLocations.length;
+  Widget _buildFilterButton(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, child) {
+        final filterState = ref.watch(practiceFilterControllerProvider);
+        final hasFiltersApplied = filterState.selectedLevels.isNotEmpty || filterState.selectedLocations.isNotEmpty;
+        final selectedCount = filterState.selectedLevels.length + filterState.selectedLocations.length;
 
         return Container(
           width: 40,

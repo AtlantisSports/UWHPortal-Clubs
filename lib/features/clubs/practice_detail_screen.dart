@@ -2,22 +2,24 @@
 library;
 
 import 'dart:async';
+
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/participation_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../core/constants/app_constants.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/club.dart';
-import '../../core/providers/participation_provider.dart';
-import '../../core/providers/navigation_provider.dart';
+// import '../../core/providers/participation_provider.dart';
+import '../../core/providers/navigation_riverpod.dart';
 import '../../core/utils/time_utils.dart';
 
 import '../../base/widgets/rsvp_components.dart';
 
-class PracticeDetailScreen extends StatefulWidget {
+class PracticeDetailScreen extends ConsumerStatefulWidget {
   final Practice practice;
   final Club club;
   final String currentUserId;
@@ -32,10 +34,10 @@ class PracticeDetailScreen extends StatefulWidget {
   });
 
   @override
-  State<PracticeDetailScreen> createState() => _PracticeDetailScreenState();
+  ConsumerState<PracticeDetailScreen> createState() => _PracticeDetailScreenState();
 }
 
-class _PracticeDetailScreenState extends State<PracticeDetailScreen> with SingleTickerProviderStateMixin {
+class _PracticeDetailScreenState extends ConsumerState<PracticeDetailScreen> with SingleTickerProviderStateMixin {
   // Toast state
   final bool _showToast = false;
   final String _toastMessage = '';
@@ -43,16 +45,17 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
   IconData? _toastIcon;
   String? _toastText;
 
-  // Session-persistent mock summary cache per practice
-  static final Map<String, Map<String, dynamic>> _mockSummaryByPracticeId = {};
-  // Mock RSVP summary state (for RSVPs tab)
-  final Random _rand = Random();
-  final List<int> _condThresholds = const [6, 8, 10, 12];
+  // Base counts for other members (excluding current user's dynamic contribution)
   int _baseYes = 0;
-  Map<int, int> _conditionalCounts = {};
-  Map<int, int> _unsatisfiedCounts = {};
-  int _maybeBlank = 0;
-  int _noCount = 0;
+  int _baseMaybe = 0;
+  // Randomized baseline (session-persistent per practice) to augment mock named users
+  static final Map<String, Map<String, int>> _mockSummaryByPracticeId = {};
+  final Random _rand = Random(42);
+  int _randYes = 0;
+  int _randMaybe = 0;
+  int _randNo = 0;
+
+  int _baseNo = 0;
 
   // Tab controller for pinned TabBar
   late final TabController _tabController;
@@ -62,6 +65,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
   @override
   void initState() {
     super.initState();
+    _initRandomBaseline();
+    _computeBaseCounts();
+
     _tabController = TabController(length: 5, vsync: this);
 
     // Also auto-scroll when user swipes between tabs (not just taps)
@@ -71,76 +77,49 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
       }
     });
 
-    _generateMockRSVPSummary();
+  }
 
-    // After first frame, feed mock overrides into provider so header/icons reflect satisfaction even outside RSVPs tab
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final provider = context.read<ParticipationProvider>();
-      provider.setMockEffectiveYesOverrides(
-        widget.practice.id,
-        baseYes: _baseYes,
-        otherConditionalCounts: _conditionalCounts,
-      );
+  void _computeBaseCounts() {
+    // Derive base Yes/Maybe/No from the practice snapshot, excluding current user
+    final uid = widget.currentUserId;
+    int yes = 0, maybe = 0, no = 0;
+    widget.practice.participationResponses.forEach((userId, status) {
+      if (userId == uid) return;
+      if (status == ParticipationStatus.yes) {
+        yes++;
+      } else if (status == ParticipationStatus.maybe) {
+        maybe++;
+      } else if (status == ParticipationStatus.no) {
+        no++;
+      }
+    });
+    setState(() {
+      _baseYes = yes;
+      _baseMaybe = maybe;
+      _baseNo = no;
     });
   }
 
-  void _generateMockRSVPSummary() {
-    // Persist mock values per practice for the app session
-    final cached = _mockSummaryByPracticeId[widget.practice.id];
+  void _initRandomBaseline() {
+    final id = widget.practice.id;
+    final cached = _mockSummaryByPracticeId[id];
     if (cached != null) {
-      _baseYes = cached['baseYes'] as int;
-      _conditionalCounts = Map<int, int>.from(cached['conditionalCounts'] as Map);
-      _unsatisfiedCounts = Map<int, int>.from(cached['unsatisfiedCounts'] as Map);
-      _maybeBlank = cached['maybeBlank'] as int;
-      _noCount = cached['noCount'] as int;
+      _randYes = cached['yes'] ?? 0;
+      _randMaybe = cached['maybe'] ?? 0;
+      _randNo = cached['no'] ?? 0;
       return;
     }
-
-    // Randomize counts per category
-    // Effective Yes base should feel realistic: 4..6
-    _baseYes = 4 + _rand.nextInt(3); // 4..6
-    // Conditional Maybe totals limited for testing: 0..2 each
-    _conditionalCounts = {for (final t in _condThresholds) t: _rand.nextInt(3)};
-    // Maybe/Blank, No: keep 1..5
-    _maybeBlank = 1 + _rand.nextInt(5);
-    _noCount = 1 + _rand.nextInt(5);
-
-    int attendees = _baseYes;
-    final satisfied = {for (final t in _condThresholds) t: 0};
-
-    bool changed = true;
-    while (changed) {
-      changed = false;
-      for (final t in _condThresholds) {
-        final group = _conditionalCounts[t]!;
-        if (satisfied[t]! < group && attendees + group >= t) {
-          attendees += group;
-          satisfied[t] = group;
-          changed = true;
-        }
-      }
-    }
-
-    _unsatisfiedCounts = {
-      for (final t in _condThresholds) t: _conditionalCounts[t]! - satisfied[t]!
-    };
-
-    _mockSummaryByPracticeId[widget.practice.id] = {
-      'baseYes': _baseYes,
-      'conditionalCounts': _conditionalCounts,
-      'unsatisfiedCounts': _unsatisfiedCounts,
-      'maybeBlank': _maybeBlank,
-      'noCount': _noCount,
-    };
+    final yes = 4 + _rand.nextInt(3); // 4..6
+    final maybe = 1 + _rand.nextInt(5); // 1..5
+    final no = 1 + _rand.nextInt(5); // 1..5
+    _mockSummaryByPracticeId[id] = {'yes': yes, 'maybe': maybe, 'no': no};
+    _randYes = yes;
+    _randMaybe = maybe;
+    _randNo = no;
   }
 
   @override
   void dispose() {
-    // Clear provider overrides for this practice so other screens dont keep mock state
-    try {
-      final provider = context.read<ParticipationProvider>();
-      provider.clearMockEffectiveYesOverrides(widget.practice.id);
-    } catch (_) {}
     _tabController.dispose();
     super.dispose();
   }
@@ -193,102 +172,23 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
   Widget _buildRSVPsTab(BuildContext context) {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
-      child: Consumer<ParticipationProvider>(
-        builder: (context, participationProvider, _) {
-          // Build dynamic Effective Yes with current user + guests (live) and mock others
-          final thresholds = _condThresholds;
-          final baseYes = _baseYes; // others (mock) hard-Yes baseline
-
-          // Other users' conditional groups (mock): one group per threshold with size = _conditionalCounts[t]
-          final Map<int, int> otherTotals = {
-            for (final t in thresholds) t: (_conditionalCounts[t] ?? 0)
-          };
-
-          // Feed overrides into provider so all UI (header, icons, calendar) uses the same totals
-          participationProvider.setMockEffectiveYesOverrides(
-            widget.practice.id,
-            baseYes: baseYes,
-            otherConditionalCounts: otherTotals,
-          );
-
-          // Respect pending countdown: don't include current user until commit
+      child: Consumer(
+        builder: (context, ref, _) {
+          // Live totals: base (others) + my current status and guests
           final practiceId = widget.practice.id;
-          final bool myPending = participationProvider.isPendingChange(practiceId);
+          final controller = ref.read(participationControllerProvider.notifier);
+          final state = ref.watch(participationControllerProvider);
+          final myStatus = state.participationStatusMap[practiceId] ?? controller.getParticipationStatus(practiceId);
+          final bringGuests = controller.getBringGuestState(practiceId);
+          final myGuests = bringGuests ? controller.getPracticeGuests(practiceId).totalGuests : 0;
+          final int myContribution = 1 + myGuests.toInt();
 
-          // Current user state (live)
-          final myStatus = participationProvider.getParticipationStatus(practiceId);
-          final myCondEnabled = participationProvider.getConditionalMaybe(practiceId);
-          final myThreshold = participationProvider.getConditionalMaybeThreshold(practiceId);
-          final myGuests = participationProvider.getPracticeGuests(practiceId).totalGuests;
-          final int userContribution = 1 + myGuests;
+          final int yesTotal = _randYes + _baseYes + (myStatus == ParticipationStatus.yes ? myContribution : 0);
+          final int maybeTotal = _randMaybe + _baseMaybe + (myStatus == ParticipationStatus.maybe ? myContribution : 0);
+          final int noTotal = _randNo + _baseNo + (myStatus == ParticipationStatus.no ? myContribution : 0);
 
-          // Fixed-point computation with user included
-          int effective = baseYes;
-          bool userCounted = false;
-          final Map<int, int> satisfiedOther = {for (final t in thresholds) t: 0};
-
-          // Pending groups: others + maybe the current user (if conditional)
-          final List<Map<String, dynamic>> pending = [];
-          for (final t in thresholds) {
-            final group = otherTotals[t] ?? 0;
-            if (group > 0) pending.add({'t': t, 'c': group, 'user': false});
-          }
-
-          // If user is a hard YES and not using conditional, count immediately so they can help satisfy others
-          if (myStatus == ParticipationStatus.yes && !myCondEnabled && !myPending) {
-            effective += userContribution;
-            userCounted = true;
-          }
-
-          // If user has Conditional Maybe enabled, add as a pending group only when not pending a change
-          if (myCondEnabled && myThreshold != null && !myPending) {
-            pending.add({'t': myThreshold, 'c': userContribution, 'user': true});
-          }
-
-          // Fixed-point loop
-          bool changed = true;
-          while (changed) {
-            changed = false;
-            final List<Map<String, dynamic>> remaining = [];
-            for (final g in pending) {
-              final int t = g['t'] as int;
-              final int c = g['c'] as int;
-              final bool isUser = g['user'] as bool;
-              if (t <= (effective + c)) {
-                effective += c;
-                if (isUser) {
-                  userCounted = true;
-                } else {
-                  satisfiedOther[t] = c; // whole group contributes
-                }
-                changed = true;
-              } else {
-                remaining.add(g);
-              }
-            }
-            if (remaining.length == pending.length) break; // no progress
-            pending
-              ..clear()
-              ..addAll(remaining);
-          }
-
-          // Unsatisfied other conditional groups after considering the user
-          final Map<int, int> unsatisfied = {
-            for (final t in thresholds) t: (otherTotals[t] ?? 0) - (satisfiedOther[t] ?? 0)
-          };
-
-          // If user's conditional is pending (but not during countdown), include them in unsatisfied bucket as people (1 + guests)
-          if (myCondEnabled && myThreshold != null && !userCounted && !myPending) {
-            unsatisfied[myThreshold] = (unsatisfied[myThreshold] ?? 0) + userContribution;
-          }
-
-          // Build debug line: show only applied contributions; include User/Guests only when user is counted
-          String debug;
-          if (userCounted) {
-            debug = 'Debug: totals — Yes: $baseYes, User: 1, Guests: $myGuests, ≥6: ${satisfiedOther[6] ?? 0}, ≥8: ${satisfiedOther[8] ?? 0}, ≥10: ${satisfiedOther[10] ?? 0}, ≥12: ${satisfiedOther[12] ?? 0}';
-          } else {
-            debug = 'Debug: totals — Yes: $baseYes, ≥6: ${satisfiedOther[6] ?? 0}, ≥8: ${satisfiedOther[8] ?? 0}, ≥10: ${satisfiedOther[10] ?? 0}, ≥12: ${satisfiedOther[12] ?? 0}';
-          }
+          // Effective Yes equals the Yes total (for now)
+          final int effectiveYes = yesTotal;
 
           return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Yes (Effective Yes)
@@ -304,61 +204,12 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                 Text('Yes (Effective Yes)',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                 const SizedBox(height: 8),
-                Text('$effective',
+                Text('$effectiveYes',
                     style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: AppColors.success)),
-                const SizedBox(height: 4),
-                Text('Includes satisfied Conditional Maybe',
-                    style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                const SizedBox(height: 4),
-                Text(debug, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
               ]),
             ),
             const SizedBox(height: 12),
-            // Conditional Maybe pending (not yet effective)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text('Conditional Maybe (not yet effective)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
-                const SizedBox(height: 8),
-                ...thresholds.map((t) {
-                  final count = unsatisfied[t] ?? 0;
-                  if (count <= 0) return const SizedBox.shrink();
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 2),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text('Threshold $t', style: TextStyle(fontSize: 16, color: AppColors.textPrimary)),
-                        Row(
-                          children: [
-                            if (myCondEnabled && myThreshold == t && !userCounted)
-                              Padding(
-                                padding: EdgeInsets.only(right: 6),
-                                child: Text(
-                                  myGuests > 0 ? '(U+G)' : '(U)',
-                                  style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                                ),
-                              ),
-                            Text('$count', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-                if (unsatisfied.values.where((c) => c > 0).isEmpty)
-                  Text('None pending', style: TextStyle(fontSize: 14, color: AppColors.textSecondary)),
-              ]),
-            ),
-            const SizedBox(height: 12),
-            // Maybe/Blank and No (mock)
+            // Maybe and No
             Row(children: [
               Expanded(
                 child: Container(
@@ -369,10 +220,10 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                     border: Border.all(color: Colors.grey[300]!),
                   ),
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('Maybe/Blank',
+                    Text('Maybe',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     const SizedBox(height: 6),
-                    Text('$_maybeBlank',
+                    Text('$maybeTotal',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.maybe)),
                   ]),
                 ),
@@ -390,7 +241,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                     Text('No',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: AppColors.textPrimary)),
                     const SizedBox(height: 6),
-                    Text('$_noCount',
+                    Text('$noTotal',
                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.error)),
                   ]),
                 ),
@@ -458,8 +309,7 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
               } else {
                 // Fallback: go to app root and select Clubs tab
                 Navigator.of(context).popUntil((route) => route.isFirst);
-                final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-                navigationProvider.selectTab(3);
+                ref.read(navigationControllerProvider.notifier).selectTab(3);
               }
             },
           ),
@@ -538,35 +388,26 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                     _isPastEvent(widget.practice)
                         ? Container(
                             margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            child: Consumer<ParticipationProvider>(
-                              builder: (context, participationProvider, child) {
-                                return PracticeStatusCard(
-                                  practice: widget.practice,
-                                  mode: PracticeStatusCardMode.readOnly,
-                                  participationProvider: participationProvider,
-                                  showAttendanceStatus: true,
-                                );
-                              },
+                            child: PracticeStatusCard(
+                              practice: widget.practice,
+                              mode: PracticeStatusCardMode.readOnly,
+                              showAttendanceStatus: true,
                             ),
                           )
                         : Container(
                             margin: EdgeInsets.fromLTRB(16, 8, 16, 16),
-                            child: Consumer<ParticipationProvider>(
-                              builder: (context, participationProvider, child) {
-                                return PracticeStatusCard(
-                                  practice: widget.practice,
-                                  mode: PracticeStatusCardMode.clickable,
-                                  clubId: widget.club.id,
-                                  onParticipationChanged: widget.onParticipationChanged != null
-                                      ? (status) {
-                                          widget.onParticipationChanged!(widget.practice.id, status);
-                                          // Toasts are handled after commit by PracticeStatusCard; suppress here.
-                                        }
-                                      : null,
-                                  onLocationTap: () => _handleLocationTap(context, widget.practice.location),
-                                  // No onInfoTap since we're already in practice details
-                                );
-                              },
+                            child: PracticeStatusCard(
+                              practice: widget.practice,
+                              mode: PracticeStatusCardMode.clickable,
+                              clubId: widget.club.id,
+                              onParticipationChanged: widget.onParticipationChanged != null
+                                  ? (status) {
+                                      widget.onParticipationChanged!(widget.practice.id, status);
+                                      // Toasts are handled after commit by PracticeStatusCard; suppress here.
+                                    }
+                                  : null,
+                              onLocationTap: () => _handleLocationTap(context, widget.practice.location),
+                              // No onInfoTap since we're already in practice details
                             ),
                           ),
                   ],
@@ -617,8 +458,9 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
             ],
           ),
         ),
-        bottomNavigationBar: Consumer<NavigationProvider>(
-          builder: (context, navigationProvider, child) {
+        bottomNavigationBar: Consumer(
+          builder: (context, ref, child) {
+            final navigationState = ref.watch(navigationControllerProvider);
             return BottomNavigationBar(
               type: BottomNavigationBarType.fixed,
               items: const [
@@ -643,13 +485,13 @@ class _PracticeDetailScreenState extends State<PracticeDetailScreen> with Single
                   label: 'Profile',
                 ),
               ],
-              currentIndex: navigationProvider.selectedIndex,
+              currentIndex: navigationState.selectedIndex,
               selectedItemColor: AppColors.primary,
               unselectedItemColor: Colors.grey,
               onTap: (index) {
                 // Always go to the root and select the tapped tab
                 Navigator.of(context).popUntil((route) => route.isFirst);
-                navigationProvider.selectTab(index);
+                ref.read(navigationControllerProvider.notifier).selectTab(index);
               },
             );
           },

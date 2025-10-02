@@ -4,8 +4,7 @@ library;
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  // API Configuration
-  static const String baseApiUrl = 'https://api.uwhportal.com';
+  // API Configuration (use EnvironmentConfig.apiBaseUrl for actual URL)
   static const String apiVersion = 'v1';
 
   // App Information
@@ -25,10 +24,9 @@ class AppConstants {
   static const Duration apiTimeout = Duration(seconds: 30);
   static const Duration cacheTimeout = Duration(minutes: 5);
 
-  // Announced practices (mock) cutoff
-  // For mock data, treat "Announced" practices as those on or before this date (inclusive).
-  // Adjust as needed per test scenario.
-  static final DateTime mockAnnouncedCutoff = DateTime(2025, 11, 9, 23, 59, 59);
+  // Announced practices (mock) cutoff: dynamically set ~6 weeks ahead from "now"
+  // Using a getter ensures this stays current across app restarts without hard-coding dates
+  static DateTime get mockAnnouncedCutoff => DateTime.now().add(const Duration(days: 45));
 
   // Asset Paths
   static const String logoAsset = 'assets/images/logo.png';
@@ -151,4 +149,146 @@ class AppDurations {
   static const Duration fast = Duration(milliseconds: 200);
   static const Duration medium = Duration(milliseconds: 300);
   static const Duration slow = Duration(milliseconds: 500);
+}
+
+/// Environment configuration with support for multiple deployment targets
+class EnvironmentConfig {
+  // Environment detection
+  static Environment get currentEnvironment {
+    const environment = String.fromEnvironment('ENVIRONMENT', defaultValue: 'development');
+    switch (environment.toLowerCase()) {
+      case 'production':
+      case 'prod':
+        return Environment.production;
+      case 'staging':
+      case 'stage':
+        return Environment.staging;
+      case 'development':
+      case 'dev':
+      default:
+        return Environment.development;
+    }
+  }
+
+  // Feature flags
+  static bool get useMockServices {
+    const useMocks = String.fromEnvironment('USE_MOCK_SERVICES', defaultValue: '');
+    if (useMocks.isNotEmpty) {
+      return useMocks.toLowerCase() == 'true';
+    }
+    return currentEnvironment == Environment.development;
+  }
+
+  static bool get enableAnalytics => currentEnvironment != Environment.development;
+  static bool get enableCrashReporting => currentEnvironment == Environment.production;
+  static bool get enableDebugLogging => currentEnvironment == Environment.development;
+  static bool get enablePerformanceMonitoring => currentEnvironment == Environment.production;
+
+  // API Configuration
+  static String get apiBaseUrl {
+    const customUrl = String.fromEnvironment('API_BASE_URL');
+    if (customUrl.isNotEmpty) {
+      return customUrl;
+    }
+
+    switch (currentEnvironment) {
+      case Environment.production:
+        return 'https://api.uwhportal.com';
+      case Environment.staging:
+        return 'https://staging-api.uwhportal.com';
+      case Environment.development:
+        return 'http://localhost:5000';
+    }
+  }
+
+  static String get websocketUrl {
+    final baseUrl = apiBaseUrl;
+    return baseUrl.replaceFirst('http', 'ws').replaceFirst('https', 'wss');
+  }
+
+  // Authentication Configuration
+  static String get authDomain {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return 'auth.uwhportal.com';
+      case Environment.staging:
+        return 'staging-auth.uwhportal.com';
+      case Environment.development:
+        return 'localhost:5001';
+    }
+  }
+
+  static String get clientId {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return 'uwhportal-mobile-prod';
+      case Environment.staging:
+        return 'uwhportal-mobile-staging';
+      case Environment.development:
+        return 'uwhportal-mobile-dev';
+    }
+  }
+
+  // Logging Configuration
+  static LogLevel get logLevel {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return LogLevel.warning;
+      case Environment.staging:
+        return LogLevel.info;
+      case Environment.development:
+        return LogLevel.debug;
+    }
+  }
+
+  // Cache Configuration
+  static bool get enableCaching => true;
+  static Duration get cacheExpiry {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return const Duration(hours: 24);
+      case Environment.staging:
+        return const Duration(hours: 1);
+      case Environment.development:
+        return const Duration(minutes: 15);
+    }
+  }
+
+  // Network Configuration
+  static Duration get apiTimeout {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return const Duration(seconds: 45);
+      case Environment.staging:
+        return const Duration(seconds: 30);
+      case Environment.development:
+        return const Duration(seconds: 15);
+    }
+  }
+
+  static int get maxRetries {
+    switch (currentEnvironment) {
+      case Environment.production:
+        return 5;
+      case Environment.staging:
+        return 3;
+      case Environment.development:
+        return 1;
+    }
+  }
+}
+
+/// Deployment environment enumeration
+enum Environment {
+  development,
+  staging,
+  production,
+}
+
+/// Logging level enumeration
+enum LogLevel {
+  debug,
+  info,
+  warning,
+  error,
 }

@@ -4,19 +4,64 @@ library;
 
 import '../interfaces/club_repository.dart';
 import '../../models/club.dart';
+import '../../models/practice.dart';
 import '../../data/mock_data_service.dart';
 
-/// Mock implementation of IClubRepository using existing mock data
-class MockClubRepository implements IClubRepository {
+/// Mock implementation of ClubRepository using existing mock data
+class MockClubRepository implements ClubRepository {
   @override
-  Future<List<Club>> getAllClubs() async {
-    // Use existing mock data service with mapper transformation
-    // This demonstrates how API repositories will work
+  Future<List<Club>> getClubs({
+    int page = 1,
+    int limit = 20,
+    String? search,
+    String? location,
+    List<String>? tags,
+  }) async {
+    // Use existing mock data service with filtering
     final clubs = await MockDataService.getClubs();
-    // In real API implementation, this would be:
-    // final response = await apiClient.get('/clubs');
-    // return ClubMapper.fromApiResponseList(response.data);
-    return clubs;
+
+    // Apply filters
+    var filteredClubs = clubs.where((club) {
+      // Search filter
+      if (search != null && search.isNotEmpty) {
+        final searchLower = search.toLowerCase();
+        if (!club.name.toLowerCase().contains(searchLower) &&
+            !club.description.toLowerCase().contains(searchLower)) {
+          return false;
+        }
+      }
+
+      // Location filter
+      if (location != null && location.isNotEmpty) {
+        if (!club.location.toLowerCase().contains(location.toLowerCase())) {
+          return false;
+        }
+      }
+
+      // Tags filter
+      if (tags != null && tags.isNotEmpty) {
+        final clubTags = club.tags.map((t) => t.toLowerCase()).toSet();
+        final searchTags = tags.map((t) => t.toLowerCase()).toSet();
+        if (!searchTags.any((tag) => clubTags.contains(tag))) {
+          return false;
+        }
+      }
+
+      return true;
+    }).toList();
+
+    // Apply pagination
+    final startIndex = (page - 1) * limit;
+    final endIndex = startIndex + limit;
+
+    if (startIndex >= filteredClubs.length) {
+      return [];
+    }
+
+    return filteredClubs.sublist(
+      startIndex,
+      endIndex > filteredClubs.length ? filteredClubs.length : endIndex,
+    );
   }
 
   @override
@@ -28,6 +73,24 @@ class MockClubRepository implements IClubRepository {
     } catch (e) {
       return null;
     }
+  }
+
+  @override
+  Future<void> refreshClubs() async {
+    // Mock implementation - in real implementation this would clear caches
+    await Future.delayed(const Duration(milliseconds: 100));
+  }
+
+  @override
+  Future<void> updateParticipationStatus(String clubId, String practiceId, ParticipationStatus status) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    // Mock implementation - in real implementation this would call API
+  }
+
+  @override
+  Future<void> updateMemberParticipationStatus(String clubId, String practiceId, String memberId, ParticipationStatus status) async {
+    await Future.delayed(const Duration(milliseconds: 200));
+    // Mock implementation - in real implementation this would call API
   }
 
   @override

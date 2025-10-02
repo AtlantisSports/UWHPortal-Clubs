@@ -8,9 +8,10 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../utils/error_handler.dart';
+import '../config/environment_config.dart';
 
 class ApiClient {
-  static const String _baseUrl = 'https://api.uwhportal.com'; // Replace with actual endpoint
+  String get _baseUrl => EnvironmentConfig.apiBaseUrl;
   
   final http.Client _client;
   String? _authToken;

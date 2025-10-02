@@ -5,8 +5,11 @@ library;
 import '../../models/practice.dart';
 import '../../models/guest.dart';
 
-/// Interface for participation/RSVP data operations
-abstract class IParticipationRepository {
+/// Unified interface for participation/RSVP data operations
+///
+/// This interface provides a comprehensive API for all participation-related operations,
+/// following the standardized repository pattern.
+abstract class ParticipationRepository {
   /// Get user's participation status for a practice
   Future<ParticipationStatus?> getParticipationStatus({
     required String userId,

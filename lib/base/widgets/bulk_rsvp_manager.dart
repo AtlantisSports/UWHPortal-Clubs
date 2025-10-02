@@ -4,31 +4,29 @@ library;
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/models/practice_recurrence.dart';
 import '../../core/models/club.dart';
 import '../../core/models/guest.dart';
 import '../../core/constants/dependent_constants.dart';
-import '../../core/services/schedule_service.dart';
+
 import '../../core/services/rsvp_service.dart';
 import '../../core/services/practice_filter_service.dart';
-import '../../core/di/service_locator.dart';
+import '../../core/di/riverpod_providers.dart';
 import '../../core/utils/time_utils.dart';
 import '../../core/utils/practice_data_consistency.dart';
+import '../../core/providers/participation_riverpod.dart';
 import 'dropdown_utils.dart';
-import 'shared_rsvp_confirm.dart';
-import '../../core/utils/rsvp_apply_helper.dart';
 
 import 'phone_aware_modal_utils.dart';
-import '../../core/providers/participation_provider.dart';
 import '../../core/constants/app_constants.dart';
 
 import 'toast_manager.dart';
 
 /// Comprehensive bulk RSVP manager with advanced filtering and selection
-class BulkRSVPManager extends StatefulWidget {
+class BulkRSVPManager extends ConsumerStatefulWidget {
   final Club club;
   final VoidCallback? onCancel;
 
@@ -39,11 +37,10 @@ class BulkRSVPManager extends StatefulWidget {
   });
 
   @override
-  State<BulkRSVPManager> createState() => _BulkRSVPManagerState();
+  ConsumerState<BulkRSVPManager> createState() => _BulkRSVPManagerState();
 }
 
-class _BulkRSVPManagerState extends State<BulkRSVPManager> {
-  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
+class _BulkRSVPManagerState extends ConsumerState<BulkRSVPManager> {
 
   // Filter state
   Set<String> _selectedLocations = <String>{}; // Changed to Set for multi-select
@@ -150,7 +147,8 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
   /// Get representative practices (one per recurring pattern) for bulk RSVP selection
   List<Practice> _getRepresentativePractices() {
     // Use practice patterns instead of recurring practices to avoid date issues
-    final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
+    final scheduleService = ref.read(scheduleServiceProvider);
+    final practicePatterns = scheduleService.getPracticePatterns(widget.club.id);
 
     // Convert practice patterns to Practice objects for bulk RSVP display
     // Generate representative practice instances for the current week
@@ -277,7 +275,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     setState(() => _isLoading = true);
 
     try {
-      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+      final controller = ref.read(participationControllerProvider.notifier);
 
       // Use actual practice instances for this club and only those with RSVP window still open
       final allInstances = widget.club.upcomingPractices;
@@ -286,22 +284,22 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       for (final practice in eligiblePractices) {
 
         // Clear user's own RSVP
-        await participationProvider.updateParticipationStatus(
+        await controller.updateParticipationStatus(
           widget.club.id,
           practice.id,
           ParticipationStatus.blank,
         );
 
         // Clear new player guests and dependents (preserve known Visitors/Club members)
-        final currentGuests = participationProvider.getPracticeGuests(practice.id);
+        final currentGuests = controller.getPracticeGuests(practice.id);
         final filteredGuests = currentGuests.guests.where((guest) {
           // Keep guests that are known Visitors or Club members
           // Remove new player guests and dependents
           return guest.type == GuestType.visitor || guest.type == GuestType.clubMember;
         }).toList();
 
-        participationProvider.updatePracticeGuests(practice.id, filteredGuests);
-        participationProvider.updateBringGuestState(practice.id, filteredGuests.isNotEmpty);
+        await controller.updatePracticeGuests(practice.id, filteredGuests);
+        await controller.updateBringGuestState(practice.id, filteredGuests.isNotEmpty);
       }
 
       _showCustomToast(
@@ -497,16 +495,13 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       );
     }
 
-    return Consumer<ParticipationProvider>(
-      builder: (context, participationProvider, child) {
-        return _buildConsolidatedPracticeSelector(filteredPractices, participationProvider);
-      },
-    );
+    return _buildConsolidatedPracticeSelector(filteredPractices);
   }
 
-  Widget _buildConsolidatedPracticeSelector(List<Practice> filteredPractices, ParticipationProvider participationProvider) {
+  Widget _buildConsolidatedPracticeSelector(List<Practice> filteredPractices) {
     // Get practice patterns for recurrence information
-    final practicePatterns = _scheduleService.getPracticePatterns(widget.club.id);
+    final scheduleService = ref.read(scheduleServiceProvider);
+    final practicePatterns = scheduleService.getPracticePatterns(widget.club.id);
     final patternMap = {for (var pattern in practicePatterns) pattern.id: pattern};
 
     // Separate weekly and non-weekly practices
@@ -1350,7 +1345,7 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     });
 
     try {
-      final participationProvider = Provider.of<ParticipationProvider>(context, listen: false);
+
 
       // Get practice IDs based on selected timeframe and filters
       final targetPracticeIds = _getTargetPracticeIds();
@@ -1361,10 +1356,10 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
       if (sel == ParticipationStatus.maybe || sel == ParticipationStatus.no) {
         bool needsConfirm = false;
         for (final id in targetPracticeIds) {
-          if (participationProvider.needsGuestConfirmation(id, sel!)) { needsConfirm = true; break; }
+          if (ref.read(participationControllerProvider.notifier).needsGuestConfirmation(id, sel!)) { needsConfirm = true; break; }
         }
         if (needsConfirm) {
-          final applied = await _applyBulkWithGuestConfirmation(participationProvider, targetPracticeIds, sel!);
+          final applied = await _applyBulkWithGuestConfirmation(targetPracticeIds, sel!);
           if (mounted) {
             setState(() { _isLoading = false; });
           }
@@ -1386,21 +1381,21 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
 
         // Store guest data for all target practices
         for (final practiceId in targetPracticeIds) {
-          participationProvider.updatePracticeGuests(practiceId, guestList);
-          participationProvider.updateBringGuestState(practiceId, true);
+          await ref.read(participationControllerProvider.notifier).updatePracticeGuests(practiceId, guestList);
+          await ref.read(participationControllerProvider.notifier).updateBringGuestState(practiceId, true);
         }
       } else if (!_includeDependents || _selectedRSVPChoice == ParticipationStatus.no) {
         // Clear guest data for all target practices if not including dependents or RSVPing NO
         for (final practiceId in targetPracticeIds) {
-          participationProvider.updatePracticeGuests(practiceId, []);
-          participationProvider.updateBringGuestState(practiceId, false);
+          await ref.read(participationControllerProvider.notifier).updatePracticeGuests(practiceId, []);
+          await ref.read(participationControllerProvider.notifier).updateBringGuestState(practiceId, false);
         }
       }
 
       // Execute the bulk update through participation provider
       int removedNonDependentTotal = 0;
       for (final practiceId in targetPracticeIds) {
-        await participationProvider.updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
+        await ref.read(participationControllerProvider.notifier).updateParticipationStatus(widget.club.id, practiceId, _selectedRSVPChoice!);
       }
 
       // Show success result to user
@@ -1481,42 +1476,9 @@ class _BulkRSVPManagerState extends State<BulkRSVPManager> {
     );
   }
 
-  // Bulk confirmation flow when changing from YES to Maybe/No and guests are involved
-  Future<bool> _applyBulkWithGuestConfirmation(ParticipationProvider provider, List<String> practiceIds, ParticipationStatus target) async {
-    final decision = await showSharedRSVPConfirmationDialog(
-      context: context,
-      provider: provider,
-      practiceId: practiceIds.first,
-      target: target,
-      overrideHasClubMembers: true,
-      overrideHasVisitors: true,
-      overrideHasDependents: true,
-      overrideHasNewPlayers: true,
-    );
-
-    if (decision == null) return false;
-    if (!mounted) return false;
-
-    await applyRSVPChange(
-      context: context,
-      provider: provider,
-      clubId: widget.club.id,
-      practiceIds: practiceIds,
-      target: target,
-      decision: decision,
-    );
-
-    // Success toast
-    final count = practiceIds.length;
-    final label = target == ParticipationStatus.yes ? 'Going' : target == ParticipationStatus.maybe ? 'Might go' : 'Not going';
-    final message = '$count ${count == 1 ? 'practice' : 'practices'} set to $label';
-    _showCustomToast(
-      message,
-      target == ParticipationStatus.yes ? AppColors.success : target == ParticipationStatus.no ? AppColors.error : AppColors.maybe,
-      target == ParticipationStatus.yes ? Icons.check : target == ParticipationStatus.no ? Icons.cancel : Icons.help_outline,
-    );
-
-    return true;
+  // Bulk confirmation flow disabled in clean slate; no-op
+  Future<bool> _applyBulkWithGuestConfirmation(List<String> practiceIds, ParticipationStatus target) async {
+    return false;
   }
 
 

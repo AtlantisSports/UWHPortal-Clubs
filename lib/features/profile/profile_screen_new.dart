@@ -1,18 +1,18 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import '../../core/providers/user_provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../core/providers/user_riverpod.dart';
 import '../../core/models/user_role.dart';
 import '../../core/constants/app_constants.dart';
 
-class ProfileScreen extends StatefulWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   // Modal state variables
   bool _isShowingRoleSelectionModal = false;
   
@@ -58,8 +58,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ],
               ),
-              body: Consumer<UserProvider>(
-                builder: (context, userProvider, child) {
+              body: Consumer(
+                builder: (context, ref, child) {
+                  final userState = ref.watch(userControllerProvider);
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -76,7 +77,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         const SizedBox(height: AppSpacing.small),
                         Text(
-                          'Current Role: ${userProvider.currentRole.displayName}',
+                          'Current Role: ${userState.currentRole.displayName}',
                           style: AppTextStyles.bodyMedium,
                         ),
                         const SizedBox(height: AppSpacing.large),
@@ -170,9 +171,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildRoleSelectionModal() {
     return _buildModalContainer(
-      child: Consumer<UserProvider>(
-        builder: (context, userProvider, child) {
-          UserRole tempSelectedRole = userProvider.currentRole;
+      child: Consumer(
+        builder: (context, ref, child) {
+          final userState = ref.watch(userControllerProvider);
+          UserRole tempSelectedRole = userState.currentRole;
           
           return StatefulBuilder(
             builder: (context, setModalState) {
@@ -251,7 +253,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         const SizedBox(width: 16),
                         ElevatedButton(
                           onPressed: () {
-                            userProvider.updateRole(tempSelectedRole);
+                            ref.read(userControllerProvider.notifier).updateRole(tempSelectedRole);
                             setState(() => _isShowingRoleSelectionModal = false);
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(

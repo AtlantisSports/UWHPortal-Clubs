@@ -7,8 +7,8 @@ import '../../models/practice.dart';
 import '../../models/practice_pattern.dart';
 import '../../data/mock_data_service.dart';
 
-/// Mock implementation of IPracticeRepository using existing mock data
-class MockPracticeRepository implements IPracticeRepository {
+/// Mock implementation of PracticeRepository using existing mock data
+class MockPracticeRepository implements PracticeRepository {
   @override
   Future<List<Practice>> getClubPractices(String clubId) async {
     await Future.delayed(const Duration(milliseconds: 100));

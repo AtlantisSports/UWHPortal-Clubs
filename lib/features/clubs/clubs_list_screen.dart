@@ -3,32 +3,27 @@ library;
 
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/club.dart';
 import '../../core/models/practice.dart';
 import '../../core/models/practice_pattern.dart';
 import '../../core/constants/app_constants.dart';
-import '../../core/providers/navigation_provider.dart';
-import '../../core/providers/participation_provider.dart';
-import '../../core/services/schedule_service.dart';
-import '../../core/di/service_locator.dart';
+import '../../core/providers/navigation_riverpod.dart';
+import '../../core/di/riverpod_providers.dart';
 import '../../base/widgets/cards.dart';
 import '../../base/widgets/buttons.dart';
 import 'club_detail_screen.dart';
 import 'practice_detail_screen.dart';
-import 'clubs_provider.dart';
+import '../../core/providers/clubs_riverpod.dart';
 
-class ClubsListScreen extends StatefulWidget {
+class ClubsListScreen extends ConsumerStatefulWidget {
   const ClubsListScreen({super.key});
 
   @override
-  State<ClubsListScreen> createState() => _ClubsListScreenState();
+  ConsumerState<ClubsListScreen> createState() => _ClubsListScreenState();
 }
 
-class _ClubsListScreenState extends State<ClubsListScreen> {
-  // Use UserService for consistent user ID
-  String get _currentUserId => ServiceLocator.userService.currentUserId;
-  final ScheduleService _scheduleService = ServiceLocator.scheduleService;
+class _ClubsListScreenState extends ConsumerState<ClubsListScreen> {
   final ScrollController _scrollController = ScrollController();
 
   // Global keys for measuring card heights dynamically
@@ -51,19 +46,17 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ClubsProvider>().loadClubs();
+      ref.read(clubsControllerProvider.notifier).loadClubs();
 
       // Register clubs tab handler for reset functionality
-      final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-      navigationProvider.registerTabBackHandler(3, _resetToClubsList);
+      ref.read(navigationControllerProvider.notifier).registerTabBackHandler(3, _resetToClubsList);
     });
   }
 
   @override
   void dispose() {
     // Unregister tab handler when widget is disposed
-    final navigationProvider = Provider.of<NavigationProvider>(context, listen: false);
-    navigationProvider.unregisterTabBackHandler(3);
+    ref.read(navigationControllerProvider.notifier).unregisterTabBackHandler(3);
     _scrollController.dispose();
     super.dispose();
   }
@@ -84,49 +77,15 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
 
   void _handleRSVPChange(String practiceId, ParticipationStatus newStatus) {
-    // Use centralized participation provider
-    final participationProvider = context.read<ParticipationProvider>();
-
-    // Find the club that has this practice
-    final clubsProvider = context.read<ClubsProvider>();
-    String? clubId;
-    for (final club in clubsProvider.clubs) {
-      for (final practice in club.upcomingPractices) {
-        if (practice.id == practiceId) {
-          clubId = club.id;
-          break;
-        }
-      }
-      if (clubId != null) break;
-    }
-
-    if (clubId != null) {
-      // Enforce Maybe limit (max 10) for list-card quick RSVP
-      if (newStatus == ParticipationStatus.maybe &&
-          participationProvider.getParticipationStatus(practiceId) != ParticipationStatus.maybe &&
-          participationProvider.totalMaybeCount >= 10) {
-        _showCustomToast(
-          'Only 10 Maybe RSVPs are allowed at any given time; they are just not very useful to organizers.',
-          const Color(0xFFF59E0B),
-          Icons.help_outline,
-          persistent: true,
-        );
-        return;
-      }
-      participationProvider.updateParticipationStatus(clubId, practiceId, newStatus);
-    }
-
-    // Show confirmation message
-    if (mounted) {
-      // Prepare toast content based on participation status
-      String message = 'RSVP updated to: ${newStatus.displayText}';
-      Color toastColor = newStatus.color;
-
-      if (newStatus == ParticipationStatus.maybe) {
-        _showCustomToast(message, toastColor, Icons.help);
-      } else {
-        _showCustomToast(message, toastColor, newStatus.overlayIcon);
-      }
+    // Riverpod handles participation updates in UI components now.
+    // Keep a toast for feedback.
+    if (!mounted) return;
+    final message = 'RSVP updated to: ${newStatus.displayText}';
+    final toastColor = newStatus.color;
+    if (newStatus == ParticipationStatus.maybe) {
+      _showCustomToast(message, toastColor, Icons.help);
+    } else {
+      _showCustomToast(message, toastColor, newStatus.overlayIcon);
     }
   }
 
@@ -166,7 +125,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
         builder: (context) => PracticeDetailScreen(
           practice: practice,
           club: club,
-          currentUserId: _currentUserId,
+          currentUserId: ref.read(userServiceProvider).currentUserId,
           onParticipationChanged: (practiceId, status) {
             _handleRSVPChange(practiceId, status);
           },
@@ -200,7 +159,8 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
 
   /// Get recurring/template practices for club card display using ScheduleService
   List<PracticePattern> _getRecurringPractices(Club club) {
-    return _scheduleService.getPracticePatterns(club.id);
+    final scheduleService = ref.read(scheduleServiceProvider);
+    return scheduleService.getPracticePatterns(club.id);
   }
 
   /// Auto-scroll to ensure expanded dropdown content is visible
@@ -258,7 +218,7 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
     if (_showingClubDetail && _selectedClub != null) {
       return ClubDetailScreen(
         club: _selectedClub!,
-        currentUserId: _currentUserId,
+        currentUserId: ref.read(userServiceProvider).currentUserId,
         onParticipationChanged: _handleRSVPChange,
         onBackPressed: _navigateBackToList,
       );
@@ -379,33 +339,34 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
   }
 
   Widget _buildClubsTab() {
-    return Consumer<ClubsProvider>(
-      builder: (context, clubsProvider, child) {
-        // Ensure we have enough keys for all clubs - with safety checks
-        if (clubsProvider.clubs.isNotEmpty) {
-          while (_cardKeys.length < clubsProvider.clubs.length) {
-            _cardKeys.add(GlobalKey());
-          }
-        }
+    final clubsState = ref.watch(clubsControllerProvider);
+    final userService = ref.watch(userServiceProvider);
 
-        return Column(
-          children: [
-            // Clubs list
-            Expanded(
-              child: clubsProvider.isLoading
-                  ? const Center(child: CircularProgressIndicator())
-                  : clubsProvider.clubs.isEmpty
-                      ? _buildEmptyState()
-                      : ListView.builder(
-                          controller: _scrollController,
-                          padding: const EdgeInsets.all(AppSpacing.small),
-                          itemCount: clubsProvider.clubs.length,
-                          itemBuilder: (context, index) {
-                            final club = clubsProvider.clubs[index];
-                            final nextPractice = _getNextPractice(club);
-                            final currentParticipationStatus = nextPractice != null
-                                ? nextPractice.getParticipationStatus(_currentUserId)
-                                : ParticipationStatus.blank;
+    // Ensure we have enough keys for all clubs - with safety checks
+    if (clubsState.clubs.isNotEmpty) {
+      while (_cardKeys.length < clubsState.clubs.length) {
+        _cardKeys.add(GlobalKey());
+      }
+    }
+
+    return Column(
+      children: [
+        // Clubs list
+        Expanded(
+          child: clubsState.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : clubsState.clubs.isEmpty
+                  ? _buildEmptyState()
+                  : ListView.builder(
+                      controller: _scrollController,
+                      padding: const EdgeInsets.all(AppSpacing.small),
+                      itemCount: clubsState.clubs.length,
+                      itemBuilder: (context, index) {
+                        final club = clubsState.clubs[index];
+                        final nextPractice = _getNextPractice(club);
+                        final currentParticipationStatus = nextPractice != null
+                            ? nextPractice.getParticipationStatus(userService.currentUserId)
+                            : ParticipationStatus.blank;
 
                             return ClubCard(
                               key: index < _cardKeys.length ? _cardKeys[index] : null,
@@ -435,8 +396,6 @@ class _ClubsListScreenState extends State<ClubsListScreen> {
             ),
           ],
         );
-      },
-    );
   }
 
   Widget _buildFindClubTab() {

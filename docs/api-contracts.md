@@ -8,7 +8,11 @@ The Flutter app uses a repository pattern with clean interfaces that define exac
 
 ## Base Configuration
 
-- **Base URL**: `https://api.uwhportal.com/v1` (configurable)
+- **Base URL**: Environment-specific (see EnvironmentConfig.apiBaseUrl)
+  - Development: `https://dev-api.uwhportal.com`
+  - Staging: `https://staging-api.uwhportal.com`
+  - Production: `https://api.uwhportal.com`
+- **API Version**: `/v1` (configurable via AppConstants.apiVersion)
 - **Authentication**: Bearer token in Authorization header
 - **Content-Type**: `application/json`
 - **Error Format**: Standardized error responses with status codes

@@ -8,6 +8,10 @@ import 'interfaces/participation_repository.dart';
 import 'mock/mock_club_repository.dart';
 import 'mock/mock_practice_repository.dart';
 import 'mock/mock_participation_repository.dart';
+import '../services/user_service.dart';
+import '../../features/clubs/clubs_repository.dart';
+import '../../features/clubs/mock_clubs_service.dart';
+import '../api/api_client.dart';
 // import 'api/api_club_repository.dart';
 // import 'api/api_practice_repository.dart';
 // import 'api/api_participation_repository.dart';
@@ -32,7 +36,7 @@ class RepositoryFactory {
   static RepositoryEnvironment get environment => _environment;
   
   /// Create club repository instance
-  static IClubRepository createClubRepository() {
+  static ClubRepository createClubRepository() {
     switch (_environment) {
       case RepositoryEnvironment.mock:
       case RepositoryEnvironment.hybrid:
@@ -43,9 +47,9 @@ class RepositoryFactory {
         throw UnimplementedError('API club repository not yet implemented');
     }
   }
-  
+
   /// Create practice repository instance
-  static IPracticeRepository createPracticeRepository() {
+  static PracticeRepository createPracticeRepository() {
     switch (_environment) {
       case RepositoryEnvironment.mock:
       case RepositoryEnvironment.hybrid:
@@ -56,13 +60,16 @@ class RepositoryFactory {
         throw UnimplementedError('API practice repository not yet implemented');
     }
   }
-  
+
   /// Create participation repository instance
-  static IParticipationRepository createParticipationRepository() {
+  static ParticipationRepository createParticipationRepository() {
     switch (_environment) {
       case RepositoryEnvironment.mock:
       case RepositoryEnvironment.hybrid:
-        return MockParticipationRepository();
+        return MockParticipationRepository(
+          userService: MockUserService(),
+          clubsRepository: ClubsRepositoryImpl(clubsService: MockClubsService(ApiClient())),
+        );
       case RepositoryEnvironment.api:
         // TODO: Return API implementation when available
         // return ApiParticipationRepository();
